@@ -23,15 +23,19 @@ const storage = multer.diskStorage({
 // In-memory job store (Use SQLite in production)
 interface Job {
   id: string;
+  ownershipToken: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'BLOCKED' | 'NOT_IMPLEMENTED';
   resultUrl?: string;
   tool: string;
   error?: string;
+  createdAt: number;
 }
 const jobs = new Map<string, Job>();
 
 const hasAiProviderConfigured = () => Boolean(process.env.MEITU_API_KEY || process.env.AI_PROVIDER_KEY);
 const isAiAdapterImplemented = () => Boolean(process.env.ENABLE_AI_WORKER === 'true');
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB max bounded upload
 
 const fileFilter: multer.Options['fileFilter'] = (_req, _file, cb) => {
   // Do not store files to disk if AI provider is not configured or adapter not implemented
@@ -40,7 +44,24 @@ const fileFilter: multer.Options['fileFilter'] = (_req, _file, cb) => {
   }
   cb(null, true);
 };
-const upload = multer({ storage, fileFilter });
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: MAX_UPLOAD_BYTES
+  }
+});
+
+// Capability endpoint: advertises configured providers and constraints without exposing secrets
+app.get('/api/capabilities', (_req, res) => {
+  res.json({
+    providerConfigured: hasAiProviderConfigured(),
+    workerImplemented: isAiAdapterImplemented(),
+    maxUploadBytes: MAX_UPLOAD_BYTES,
+    supportedTools: ['ai_enhance', 'ai_makeup']
+  });
+});
 
 app.post('/api/jobs', upload.single('image'), (req, res) => {
   const cleanupFile = () => {
@@ -77,14 +98,17 @@ app.post('/api/jobs', upload.single('image'), (req, res) => {
   }
 
   const jobId = uuidv4();
+  const ownershipToken = uuidv4();
   const job: Job = {
     id: jobId,
+    ownershipToken,
     status: 'pending',
-    tool
+    tool,
+    createdAt: Date.now()
   };
   jobs.set(jobId, job);
 
-  res.status(202).json({ jobId, status: 'pending', tool });
+  res.status(202).json({ jobId, ownershipToken, status: 'pending', tool });
 });
 
 app.get('/api/jobs/:id', (req, res) => {
@@ -92,11 +116,27 @@ app.get('/api/jobs/:id', (req, res) => {
   if (!job) {
     return res.status(404).json({ error: 'Job not found' });
   }
-  res.json(job);
+  // Redact ownership token from public response
+  const { ownershipToken: _, ...safeJob } = job;
+  res.json(safeJob);
 });
 
 // Serve processed images statically
 app.use('/uploads', express.static(uploadDir));
+
+// Global Error Handler (handles Multer errors like LIMIT_FILE_SIZE)
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Payload Too Large: File exceeds 25MB limit' });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  if (err) {
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
+  next();
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

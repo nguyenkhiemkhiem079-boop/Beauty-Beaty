@@ -137,6 +137,26 @@ async function runTest() {
   }
   console.log('✅ TEST 4 PASSED: Job retrieved successfully.');
 
+  // TEST 5: GET /api/capabilities
+  console.log('\n--- TEST 5: GET /api/capabilities ---');
+  const response5 = await new Promise<{ statusCode?: number; body: string }>((resolve, reject) => {
+    const req = http.get('http://127.0.0.1:3099/api/capabilities', (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve({ statusCode: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+  });
+
+  console.log(`Response 5 Status: ${response5.statusCode}`);
+  console.log(`Response 5 Body: ${response5.body}`);
+
+  const parsed5 = JSON.parse(response5.body);
+  if (response5.statusCode !== 200 || typeof parsed5.maxUploadBytes !== 'number' || parsed5.maxUploadBytes !== 25 * 1024 * 1024) {
+    throw new Error(`Test 5 Failed: Expected 200 with maxUploadBytes 25MB, got ${response5.statusCode} - ${response5.body}`);
+  }
+  console.log('✅ TEST 5 PASSED: Capabilities advertised correctly with bounded 25MB upload.');
+
   // CLEANUP: Specifically and ONLY delete files created during this test run
   console.log('\n--- CLEANUP: Preserving pre-existing uploads, removing only test-created files ---');
   const filesAfterTest = fs.readdirSync(uploadsDir);

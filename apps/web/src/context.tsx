@@ -2,17 +2,10 @@ import { createContext, useContext, useState } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { SegmentationResult } from './engine/SegmenterManager';
+import { DEFAULT_EDIT_STATE, type EditState } from './types';
 
-export type ToolCategory = 'skin' | 'face' | 'hair' | 'body' | 'ai';
-export type ToolType = 'skin_smooth' | 'face_slim' | 'hair_smooth' | 'chin_slim' | 'ai_makeup';
-
-export interface EditState {
-  skin_smooth: number;
-  face_slim: number;
-  hair_smooth: number;
-  chin_slim: number;
-  ai_makeup?: number;
-}
+export { DEFAULT_EDIT_STATE } from './types';
+export type * from './types';
 
 interface AppContextType {
   imageSrc: string | null;
@@ -37,8 +30,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
   
-  const [editState, setEditState] = useState<EditState>({ skin_smooth: 0, face_slim: 0, hair_smooth: 0, chin_slim: 0 });
-  const [history, setHistory] = useState<EditState[]>([{ skin_smooth: 0, face_slim: 0, hair_smooth: 0, chin_slim: 0 }]);
+  const [editState, setEditState] = useState<EditState>({ ...DEFAULT_EDIT_STATE });
+  const [history, setHistory] = useState<EditState[]>([{ ...DEFAULT_EDIT_STATE }]);
   const [historyIndex, setHistoryIndex] = useState(0);
   
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[][] | null>(null);

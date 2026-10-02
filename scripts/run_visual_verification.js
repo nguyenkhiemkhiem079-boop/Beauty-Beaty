@@ -30,6 +30,65 @@ function waitForServer(url, timeoutMs = 20000) {
   });
 }
 
+function detectChromeBinary() {
+  if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) {
+    return process.env.CHROME_BIN;
+  }
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+
+  if (isWin) {
+    const winCandidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env.PROGRAMFILES || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+    ];
+    for (const cand of winCandidates) {
+      if (cand && fs.existsSync(cand)) return cand;
+    }
+  } else if (isMac) {
+    const macCandidates = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+    ];
+    for (const cand of macCandidates) {
+      if (fs.existsSync(cand)) return cand;
+    }
+  } else {
+    // Linux / CI
+    const linuxCandidates = [
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/snap/bin/chromium'
+    ];
+    for (const cand of linuxCandidates) {
+      if (fs.existsSync(cand)) return cand;
+    }
+  }
+
+  // Fallback to searching PATH via which/where
+  try {
+    const lookupCmd = isWin ? 'where.exe chrome' : 'which google-chrome || which chromium';
+    const resolved = execSync(lookupCmd, { encoding: 'utf8' }).trim().split(/\r?\n/)[0];
+    if (resolved && fs.existsSync(resolved)) return resolved;
+  } catch {
+    // Ignore PATH search failure
+  }
+
+  throw new Error('Chrome/Chromium binary not found. Please set CHROME_BIN environment variable.');
+}
+
 async function main() {
   console.log('=== STARTING REAL-WORLD & RESOLUTION VERIFICATION SUITE ===');
 
@@ -44,7 +103,8 @@ async function main() {
     console.log('Detected existing Vite dev server on port 5173.');
   } catch {
     console.log('Starting Vite dev server on port 5173...');
-    viteProc = spawn('cmd.exe', ['/c', 'npm.cmd', 'run', 'dev:web'], {
+    const isWin = process.platform === 'win32';
+    viteProc = spawn(isWin ? 'cmd.exe' : 'npm', isWin ? ['/c', 'npm.cmd', 'run', 'dev:web'] : ['run', 'dev:web'], {
       cwd: path.join(__dirname, '..'),
       stdio: 'pipe'
     });
@@ -53,8 +113,9 @@ async function main() {
   }
 
   try {
-    const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-    console.log(`Executing Headless Chrome on ${testUrl} with virtual-time-budget for MediaPipe...`);
+    const chromePath = detectChromeBinary();
+    console.log(`Detected browser executable: ${chromePath}`);
+    console.log(`Executing Headless Browser on ${testUrl} with virtual-time-budget for MediaPipe...`);
 
     // Run Chrome with sufficient time budget for neural models and 4000x3000 downsampling
     const cmd = `"${chromePath}" --headless=new --virtual-time-budget=20000 --dump-dom "${testUrl}"`;

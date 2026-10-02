@@ -3,6 +3,7 @@ export interface WarpPoint {
   target: { x: number, y: number };
   radius: number;
   intensity: number;
+  mode?: number; // 0.0 = directional, 1.0 = radial bulge (magnify), -1.0 = radial pinch (shrink)
 }
 
 export class WebGLWarpEngine {
@@ -45,6 +46,7 @@ export class WebGLWarpEngine {
       uniform vec2 u_targets[10];
       uniform float u_radii[10];
       uniform float u_intensities[10];
+      uniform float u_modes[10];
       uniform int u_numPoints;
       
       uniform float u_aspect;
@@ -57,18 +59,27 @@ export class WebGLWarpEngine {
             if (i >= u_numPoints) break;
             
             vec2 cAdj = vec2(u_centers[i].x * u_aspect, u_centers[i].y);
-            vec2 tAdj = vec2(u_targets[i].x * u_aspect, u_targets[i].y);
             
             float dist = distance(tcAdj, cAdj);
-            if (dist < u_radii[i]) {
+            if (dist < u_radii[i] && dist > 0.00001) {
                 float t = 1.0 - (dist / u_radii[i]);
                 // Smooth Hermite interpolation (smoothstep) for C1 continuity to protect background and contours
                 float smoothFactor = t * t * (3.0 - 2.0 * t);
                 float factor = smoothFactor * u_intensities[i];
-                // Inverse mapping: pinch tc towards target
-                // Shift is vector from center to target
-                vec2 shift = (u_targets[i] - u_centers[i]) * factor;
-                tc -= shift;
+                
+                if (abs(u_modes[i]) < 0.5) {
+                    // Directional shift
+                    vec2 shift = (u_targets[i] - u_centers[i]) * factor;
+                    tc -= shift;
+                } else if (u_modes[i] > 0.5) {
+                    // Radial bulge: sample from closer to center (magnifies iris/feature)
+                    vec2 dir = (v_texCoord - u_centers[i]);
+                    tc -= dir * factor;
+                } else {
+                    // Radial pinch: sample from further away (slims/shrinks feature)
+                    vec2 dir = (v_texCoord - u_centers[i]);
+                    tc += dir * factor;
+                }
             }
         }
 
@@ -144,6 +155,7 @@ export class WebGLWarpEngine {
     const targets = new Float32Array(20);
     const radii = new Float32Array(10);
     const intensities = new Float32Array(10);
+    const modes = new Float32Array(10);
 
     for (let i = 0; i < numPoints; i++) {
         centers[i*2] = points[i].center.x;
@@ -152,12 +164,14 @@ export class WebGLWarpEngine {
         targets[i*2+1] = points[i].target.y;
         radii[i] = points[i].radius;
         intensities[i] = points[i].intensity;
+        modes[i] = points[i].mode ?? 0.0;
     }
 
     this.gl.uniform2fv(this.gl.getUniformLocation(this.program, "u_centers"), centers);
     this.gl.uniform2fv(this.gl.getUniformLocation(this.program, "u_targets"), targets);
     this.gl.uniform1fv(this.gl.getUniformLocation(this.program, "u_radii"), radii);
     this.gl.uniform1fv(this.gl.getUniformLocation(this.program, "u_intensities"), intensities);
+    this.gl.uniform1fv(this.gl.getUniformLocation(this.program, "u_modes"), modes);
 
     const aspect = this.width / this.height;
     this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_aspect"), aspect);
@@ -168,5 +182,16 @@ export class WebGLWarpEngine {
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     return this.gl.canvas as HTMLCanvasElement;
+  }
+
+  public dispose() {
+    if (this.gl) {
+      if (this.texture) this.gl.deleteTexture(this.texture);
+      if (this.positionBuffer) this.gl.deleteBuffer(this.positionBuffer);
+      if (this.texCoordBuffer) this.gl.deleteBuffer(this.texCoordBuffer);
+      if (this.program) this.gl.deleteProgram(this.program);
+      const ext = this.gl.getExtension('WEBGL_lose_context');
+      if (ext) ext.loseContext();
+    }
   }
 }
