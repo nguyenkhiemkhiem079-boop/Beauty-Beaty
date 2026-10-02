@@ -38,3 +38,15 @@
 - **Next Action**: 
   - Khởi chạy checkpoint kiểm thử M3 (build, undo/redo, check memory).
   - Tích hợp Giảm nọng cằm (Double Chin) dựa trên WebGL Warp và Neck mask.
+
+## 2026-10-02 (M4 - UI Premium Refactor)
+- **Role**: Frontend / UX Engineer
+- **Task**: Hoàn thiện UI Premium (League Spartan, theme rose/charcoal), Component hóa.
+- **Action**:
+  - Tạo cấu trúc thư mục `apps/web/src/components`.
+  - Tách giao diện thành `Landing.tsx` và `Editor.tsx`.
+  - Chỉnh sửa `App.css` tích hợp Glassmorphism (blur navigation), shadow tinh tế (dành cho hover), và tạo Premium Custom Slider.
+  - Sử dụng hệ thống Icon chuyên nghiệp từ `lucide-react`.
+  - Khai báo danh mục Tool chuyên sâu theo category (Da, Mặt, Tóc) giúp việc mở rộng 82 tính năng dễ dàng hơn.
+- **Next Action**: 
+  - Hoàn tất bộ Preset (P1) hoặc gọi provider AI (M5).
