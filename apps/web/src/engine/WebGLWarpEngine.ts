@@ -61,7 +61,10 @@ export class WebGLWarpEngine {
             
             float dist = distance(tcAdj, cAdj);
             if (dist < u_radii[i]) {
-                float factor = (1.0 - (dist / u_radii[i])) * u_intensities[i];
+                float t = 1.0 - (dist / u_radii[i]);
+                // Smooth Hermite interpolation (smoothstep) for C1 continuity to protect background and contours
+                float smoothFactor = t * t * (3.0 - 2.0 * t);
+                float factor = smoothFactor * u_intensities[i];
                 // Inverse mapping: pinch tc towards target
                 // Shift is vector from center to target
                 vec2 shift = (u_targets[i] - u_centers[i]) * factor;

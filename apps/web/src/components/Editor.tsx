@@ -73,22 +73,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const applyEffects = () => {
     if (!engineRef.current || !canvasRef.current || !originalImage) return;
     
-    engineRef.current.reset();
-    
     const faceLandmarks = landmarks?.[0];
-    
-    if (editState.skin_smooth > 0 && faceLandmarks) {
-      engineRef.current.applySkinSmoothing(faceLandmarks, editState.skin_smooth);
-    }
-    if (editState.face_slim > 0 && faceLandmarks) {
-      engineRef.current.applyFaceSlimming(faceLandmarks, editState.face_slim);
-    }
-    if (editState.hair_smooth > 0) {
-      engineRef.current.applyHairSmoothing(editState.hair_smooth);
-    }
-    if (editState.chin_slim > 0 && faceLandmarks) {
-      engineRef.current.applyDoubleChinReduction(faceLandmarks, editState.chin_slim);
-    }
+    engineRef.current.applyPipeline(editState, faceLandmarks);
     
     const ctx = canvasRef.current.getContext('2d');
     const workCanvas = engineRef.current.getCanvas();
@@ -196,16 +182,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     }
     
     const faceLandmarks = landmarks?.[0];
-    
-    if (editState.skin_smooth > 0 && faceLandmarks) {
-      exportEngine.applySkinSmoothing(faceLandmarks, editState.skin_smooth);
-    }
-    if (editState.face_slim > 0 && faceLandmarks) {
-      exportEngine.applyFaceSlimming(faceLandmarks, editState.face_slim);
-    }
-    if (editState.hair_smooth > 0) {
-      exportEngine.applyHairSmoothing(editState.hair_smooth);
-    }
+    exportEngine.applyPipeline(editState, faceLandmarks);
 
     const dataUrl = exportEngine.getCanvas().toDataURL('image/png', 1.0);
     const a = document.createElement('a');

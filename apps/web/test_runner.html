@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>B019 Double Chin & Export Verification</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 24px;
+        background: #f4f6f9;
+        color: #333;
+      }
+      .test-case-card {
+        background: #fff;
+        padding: 20px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      }
+      h1, h2, h3 {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>B019 Double Chin & Export Verification Suite</h1>
+    <p>Automated verification on Horizontal/Vertical images, straight line backgrounds, lip/jaw preservation, and export parity.</p>
+    <div id="results"></div>
+    <div id="image-grid" style="margin-top: 20px;"></div>
+    <script type="module">
+      import { runAllTests } from './src/test_runner.ts';
+      window.addEventListener('DOMContentLoaded', () => {
+        runAllTests();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-10-02T02:46:39.114Z",
+  "status": "PASSED",
+  "artifactsCount": 15,
+  "metrics": [
+    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
+    "Submental Chin Lift: Mean Diff = 1.08, Max = 60.7 → ✅ LIFTED",
+    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED",
+    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
+    "Submental Chin Lift: Mean Diff = 3.22, Max = 60.7 → ✅ LIFTED",
+    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED",
+    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
+    "Submental Chin Lift: Mean Diff = 5.78, Max = 44.0 → ✅ LIFTED",
+    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED"
+  ]
+}
