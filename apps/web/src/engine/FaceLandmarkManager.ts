@@ -45,7 +45,10 @@ export class FaceLandmarkManager {
     
       this.isInitialized = true;
       console.log("FaceLandmarker initialized successfully");
-    })();
+    })().catch(e => {
+      this.initPromise = null;
+      throw e;
+    });
     
     return this.initPromise;
   }

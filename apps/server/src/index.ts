@@ -47,22 +47,12 @@ app.post('/api/jobs', upload.single('image'), (req, res) => {
     tool
   });
 
-  // Background processing simulation (Mocking Meitu API)
-  setTimeout(() => {
-    const job = jobs.get(jobId);
-    if (job) {
-      job.status = 'processing';
-      
-      // Simulate heavy AI work
-      setTimeout(() => {
-        // Return original image as mock result (since no Meitu key)
-        job.status = 'completed';
-        job.resultUrl = `/uploads/${file.filename}`;
-      }, 3000);
-    }
-  }, 500);
-
-  res.json({ jobId, status: 'pending' });
+  // Removed fake timeout mockup
+  // This API requires Meitu API keys which are blocked.
+  job.status = 'failed';
+  jobs.set(jobId, job);
+  
+  res.json({ jobId, status: 'failed', error: 'BLOCKED: Missing AI Provider API Key' });
 });
 
 app.get('/api/jobs/:id', (req, res) => {

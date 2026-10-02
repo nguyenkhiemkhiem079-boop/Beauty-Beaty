@@ -28,6 +28,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ImageEngine | null>(null);
+  const uploadTokenRef = useRef(0);
 
   useEffect(() => {
     // Re-initialize engine if we return to editor with an existing image
@@ -102,8 +103,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
       setImageSrc(url);
       setErrorMsg(null);
       
+      const currentToken = ++uploadTokenRef.current;
+
       const img = new Image();
       img.onload = async () => {
+        if (currentToken !== uploadTokenRef.current) return;
+
         setOriginalImage(img);
         const canvas = canvasRef.current;
         if (canvas) {
@@ -127,15 +132,18 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           
           setIsDetecting(true);
           try {
-            // Need a single promise initialization
             await Promise.all([
                faceLandmarkManager.initialize(),
                segmenterManager.initialize()
             ]);
+            
+            if (currentToken !== uploadTokenRef.current) return;
 
             const lms = await faceLandmarkManager.detectFaces(canvas);
             const mask = await segmenterManager.segment(canvas);
             
+            if (currentToken !== uploadTokenRef.current) return;
+
             if (!lms || lms.length === 0) {
                 setErrorMsg("Không tìm thấy khuôn mặt trong ảnh.");
             }
@@ -151,6 +159,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
             console.error("AI Analysis failed", err);
             setErrorMsg("AI Model load failed (Check internet or cache).");
           }
+          
+          if (currentToken !== uploadTokenRef.current) return;
           setIsDetecting(false);
           
           const initState = { skin_smooth: 0, face_slim: 0, hair_smooth: 0, chin_slim: 0 };

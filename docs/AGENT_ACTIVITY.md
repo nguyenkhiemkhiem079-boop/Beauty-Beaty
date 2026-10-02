@@ -50,3 +50,14 @@
   - Khai báo danh mục Tool chuyên sâu theo category (Da, Mặt, Tóc) giúp việc mở rộng 82 tính năng dễ dàng hơn.
 - **Next Action**: 
   - Hoàn tất bộ Preset (P1) hoặc gọi provider AI (M5).
+
+## 2026-10-02 (M5 - Upload Race & Architecture Fixes)
+- **Role**: Software Architect / Reality Checker
+- **Task**: Xử lý Upload Race Condition, Dọn Mock API, Fix Submodules.
+- **Action**: 
+  - **Agency Agents & Agent-Reach**: Đã đọc README của `agency-agents` (xác định cấu trúc Orchestrator -> Engineer -> QA -> Reality Checker) và `Agent-Reach` (để research tools). Đã cấu hình submodule chuẩn. Áp dụng chuẩn tập trung Karpathy.
+  - **Race Condition**: Đưa `uploadTokenRef` vào `Editor.tsx` để huỷ các promise cũ nếu người dùng chuyển ảnh liên tục.
+  - **Endpoint Mock**: Đã xóa `setTimeout` fake tại `apps/server/src/index.ts`. Endpoints giờ trả đúng trạng thái `BLOCKED` nếu thiếu API Key.
+  - **Promise Fallback**: Cập nhật `FaceLandmarkManager` và `SegmenterManager` để reset `initPromise` khi `catch` lỗi, cho phép retry.
+- **Next Action**:
+  - Triển khai Body/Face Mesh Warp (các tính năng chưa làm của nhóm Face và Body).

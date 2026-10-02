@@ -50,7 +50,10 @@ export class SegmenterManager {
     
       this.isInitialized = true;
       console.log("ImageSegmenter initialized successfully");
-    })();
+    })().catch(e => {
+      this.initPromise = null;
+      throw e;
+    });
     
     return this.initPromise;
   }

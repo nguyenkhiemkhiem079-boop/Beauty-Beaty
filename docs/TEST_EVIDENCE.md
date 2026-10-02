@@ -22,4 +22,7 @@ Tài liệu này lưu trữ bằng chứng kiểm thử tự động và thủ c
 - **Quy trình Export**: Lưu `originalImage` ở bộ nhớ (Memory). Khi nhấn Export, tạo off-screen canvas kích thước gốc (VD: 4000x3000), khởi tạo lại `ImageEngine`, truyền vào `intensity` và `normalized landmarks` hiện tại.
 - **Lệnh chạy**: Click "Lưu & Xuất" trên UI.
 - **Kết quả thực tế**: File ảnh tải về (DBeaty_Export.png) không bị nén xuống 800px. Dung lượng và độ phân giải trùng khớp với ảnh đầu vào. Blur px và Mask scale tự động theo độ phân giải cao.
-- **Lifecycle**: Upload ảnh mới dọn rác RAM (`URL.revokeObjectURL`). Các lệnh Undo/Redo/Slider bàn phím lưu History chuẩn xác không stale closure. Khởi tạo Promise singleton bảo vệ race-condition. Lỗi AI báo "BLOCKED", không giả lập giả dối.
+- **Lifecycle & Race Condition**: 
+  - Upload ảnh liên tục 10 lần trong 1 giây: Chỉ tiến trình của ảnh cuối cùng được phép can thiệp vào `EditState` và hiển thị lên canvas (Sử dụng `uploadTokenRef`).
+  - Lỗi AI model: Nếu khởi tạo `initPromise` thất bại (mất mạng/văng GPU), promise bị xóa, các lần tải ảnh sau vẫn có thể thử init lại.
+  - Mock Backend: Upload mock server trả đúng lỗi `BLOCKED: Missing AI Provider API Key`.

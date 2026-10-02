@@ -1,0 +1,9 @@
+[submodule ".agents/skills/agency-agents"]
+	path = .agents/skills/agency-agents
+	url = https://github.com/msitarzewski/agency-agents
+[submodule ".agents/skills/Agent-Reach"]
+	path = .agents/skills/Agent-Reach
+	url = https://github.com/Panniantong/Agent-Reach
+[submodule ".agents/skills/andrej-karpathy-skills"]
+	path = .agents/skills/andrej-karpathy-skills
+	url = https://github.com/multica-ai/andrej-karpathy-skills
