@@ -117,8 +117,8 @@ async function main() {
     console.log(`Detected browser executable: ${chromePath}`);
     console.log(`Executing Headless Browser on ${testUrl} with virtual-time-budget for MediaPipe...`);
 
-    // Run Chrome with sufficient time budget for neural models and 4000x3000 downsampling
-    const cmd = `"${chromePath}" --headless=new --virtual-time-budget=20000 --dump-dom "${testUrl}"`;
+    // Run Chrome with sufficient time budget for neural models, regression check, and 2000x3000 export
+    const cmd = `"${chromePath}" --headless=new --virtual-time-budget=50000 --dump-dom "${testUrl}"`;
     const html = execSync(cmd, { maxBuffer: 100 * 1024 * 1024, encoding: 'utf8' });
     console.log(`Page DOM captured (${Math.round(html.length / 1024)} KB).`);
 
@@ -131,11 +131,12 @@ async function main() {
       'real_portrait_front',
       'real_portrait_tilted',
       'real_portrait_beard',
-      'highres_4000x3000_parity'
+      'real_portrait_double_chin',
+      'highres_natural_parity'
     ];
     let currentCaseIdx = 0;
     let imagesInCase = 0;
-    const imagesPerCase = [3, 3, 3, 2];
+    const imagesPerCase = [3, 3, 3, 3, 2];
 
     while ((imgMatch = imageRegex.exec(html)) !== null) {
       const label = imgMatch[1].trim();
@@ -166,12 +167,16 @@ async function main() {
       const text = pMatch[1].replace(/<[^>]+>/g, '').trim();
       if (
         text.includes('Face Detection:') ||
+        text.includes('Output-Render Submental Displacement:') ||
         text.includes('Vector Direction:') ||
         text.includes('Face Tilt Synchronization:') ||
         text.includes('Lip Protection:') ||
         text.includes('Background / Collar Protection:') ||
+        text.includes('Bypass Simulation:') ||
+        text.includes('Natural Aspect Ratio:') ||
         text.includes('Parity Mean Absolute Error') ||
-        text.includes('Peak Signal-to-Noise Ratio')
+        text.includes('Peak Signal-to-Noise Ratio') ||
+        text.includes('Lossless PNG Fidelity:')
       ) {
         metricsLines.push(text);
         console.log(`  METRIC: ${text}`);

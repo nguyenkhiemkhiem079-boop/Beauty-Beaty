@@ -1,4 +1,4 @@
-export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'adjust' | 'filters' | 'templates' | 'ai';
+export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai';
 
 export type ToolType = 
   | 'skin_smooth' 
@@ -12,7 +12,17 @@ export type ToolType =
   | 'contrast'
   | 'saturation'
   | 'temperature'
+  | 'tint'
+  | 'crop'
   | 'ai_makeup';
+
+export interface TemplateCustomText {
+  title?: string;
+  subtitle?: string;
+  dateText?: string;
+  tagline?: string;
+  footer?: string;
+}
 
 export interface EditState {
   skin_smooth: number;
@@ -26,9 +36,13 @@ export interface EditState {
   contrast: number;
   saturation: number;
   temperature: number;
+  tint: number;
   filter_id?: string;
   filter_intensity?: number;
   template_id?: string;
+  template_custom_text?: TemplateCustomText;
+  template_placement?: 'top' | 'center' | 'bottom';
+  crop_aspect_ratio?: 'original' | '1:1' | '4:5' | '3:4' | '9:16';
   ai_makeup?: number;
 }
 
@@ -44,7 +58,10 @@ export const DEFAULT_EDIT_STATE: EditState = {
   contrast: 0,
   saturation: 0,
   temperature: 0,
+  tint: 0,
   filter_id: '',
   filter_intensity: 100,
-  template_id: ''
+  template_id: '',
+  template_placement: 'top',
+  crop_aspect_ratio: 'original'
 };

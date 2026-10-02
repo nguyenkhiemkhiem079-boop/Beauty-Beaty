@@ -15,6 +15,7 @@ export interface PipelineParams {
   contrast?: number;        // X018
   saturation?: number;      // X019
   temperature?: number;     // X020
+  tint?: number;            // X020 color balance / tint
   filter_id?: string;       // X024
   filter_intensity?: number;// X024
 }
@@ -605,9 +606,9 @@ export class ImageEngine {
     ctx.drawImage(glCanvas, 0, 0);
   }
 
-  // Effect 7: Basic Adjustments (Độ sáng, Tương phản, Độ bão hòa, Nhiệt độ màu - X018, X019, X020)
-  applyBasicAdjustments(brightness = 0, contrast = 0, saturation = 0, temperature = 0) {
-    if (brightness === 0 && contrast === 0 && saturation === 0 && temperature === 0) return;
+  // Effect 7: Basic Adjustments (Độ sáng, Tương phản, Độ bão hòa, Nhiệt độ màu, Tint - X018, X019, X020)
+  applyBasicAdjustments(brightness = 0, contrast = 0, saturation = 0, temperature = 0, tint = 0) {
+    if (brightness === 0 && contrast === 0 && saturation === 0 && temperature === 0 && tint === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
@@ -641,9 +642,24 @@ export class ImageEngine {
       ctx.fillRect(0, 0, w, h);
       ctx.restore();
     }
+
+    // Apply color tint overlay (magenta pink or spring green)
+    if (tint !== 0) {
+      ctx.save();
+      if (tint > 0) {
+        ctx.fillStyle = 'rgba(255, 20, 147, 1)';
+        ctx.globalAlpha = (tint / 100.0) * 0.15;
+      } else {
+        ctx.fillStyle = 'rgba(0, 230, 118, 1)';
+        ctx.globalAlpha = (Math.abs(tint) / 100.0) * 0.15;
+      }
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
   }
 
-  // Effect 8: Curated Color Filter Presets (X024)
+  // Effect 8: Curated Color Filter Presets (X024) with complete recipe execution
   applyFilter(filterId: string, intensity = 100) {
     if (!filterId || intensity === 0) return;
     const filter = COLOR_FILTERS.find(f => f.id === filterId);
@@ -673,6 +689,36 @@ export class ImageEngine {
     fCtx.drawImage(this.workCanvas, 0, 0);
     fCtx.filter = 'none';
 
+    // Temperature execution (warm amber or cool cyan)
+    if (s.temperature && s.temperature !== 0) {
+      fCtx.save();
+      if (s.temperature > 0) {
+        fCtx.fillStyle = 'rgba(255, 170, 0, 1)';
+        fCtx.globalAlpha = (s.temperature / 100.0) * 0.18 * factor;
+      } else {
+        fCtx.fillStyle = 'rgba(0, 140, 255, 1)';
+        fCtx.globalAlpha = (Math.abs(s.temperature) / 100.0) * 0.18 * factor;
+      }
+      fCtx.globalCompositeOperation = 'soft-light';
+      fCtx.fillRect(0, 0, w, h);
+      fCtx.restore();
+    }
+
+    // Tint execution (magenta or spring green)
+    if (s.tint && s.tint !== 0) {
+      fCtx.save();
+      if (s.tint > 0) {
+        fCtx.fillStyle = 'rgba(255, 20, 147, 1)';
+        fCtx.globalAlpha = (s.tint / 100.0) * 0.16 * factor;
+      } else {
+        fCtx.fillStyle = 'rgba(0, 230, 118, 1)';
+        fCtx.globalAlpha = (Math.abs(s.tint) / 100.0) * 0.16 * factor;
+      }
+      fCtx.globalCompositeOperation = 'soft-light';
+      fCtx.fillRect(0, 0, w, h);
+      fCtx.restore();
+    }
+
     // Channel balance
     if (s.rTone || s.gTone || s.bTone) {
       fCtx.save();
@@ -699,6 +745,136 @@ export class ImageEngine {
 
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(filterCanvas, 0, 0);
+  }
+
+  // Effect 9: Brush Spot Blemish Healing (B002)
+  applyBlemishHealing(centerNorm: { x: number; y: number }, radiusPx: number) {
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const cx = Math.round(centerNorm.x * w);
+    const cy = Math.round(centerNorm.y * h);
+
+    const r = Math.max(4, Math.round(radiusPx));
+    const x0 = Math.max(0, cx - r);
+    const y0 = Math.max(0, cy - r);
+    const x1 = Math.min(w, cx + r);
+    const y1 = Math.min(h, cy + r);
+    const pw = x1 - x0;
+    const ph = y1 - y0;
+    if (pw <= 0 || ph <= 0) return;
+
+    const imgData = ctx.getImageData(x0, y0, pw, ph);
+    const data = imgData.data;
+
+    // Collect surrounding ring samples (from r*0.7 to r)
+    let sumR = 0, sumG = 0, sumB = 0, ringCount = 0;
+    for (let y = 0; y < ph; y++) {
+      for (let x = 0; x < pw; x++) {
+        const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
+        if (dist >= r * 0.65 && dist <= r) {
+          const idx = (y * pw + x) * 4;
+          sumR += data[idx];
+          sumG += data[idx + 1];
+          sumB += data[idx + 2];
+          ringCount++;
+        }
+      }
+    }
+
+    if (ringCount === 0) return;
+    const avgR = sumR / ringCount;
+    const avgG = sumG / ringCount;
+    const avgB = sumB / ringCount;
+
+    // Radial blend inward
+    for (let y = 0; y < ph; y++) {
+      for (let x = 0; x < pw; x++) {
+        const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
+        if (dist < r) {
+          const t = Math.cos((dist / r) * (Math.PI / 2)); // 1.0 at center, 0.0 at radius
+          const weight = Math.min(1.0, Math.max(0.0, t * 0.85));
+          const idx = (y * pw + x) * 4;
+          data[idx] = Math.round(data[idx] * (1 - weight) + avgR * weight);
+          data[idx + 1] = Math.round(data[idx + 1] * (1 - weight) + avgG * weight);
+          data[idx + 2] = Math.round(data[idx + 2] * (1 - weight) + avgB * weight);
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, x0, y0);
+  }
+
+  // Effect 10: Body Slim / Waist Reshape (B070)
+  applyBodySlim(intensity: number, centerYNorm = 0.65) {
+    if (intensity === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const factor = (intensity / 100.0) * 0.04; // Max 4% inward warp
+
+    const warpPoints: WarpPoint[] = [
+      // Left waist contracting rightward
+      {
+        center: { x: 0.32, y: centerYNorm },
+        target: { x: 0.32 + factor, y: centerYNorm },
+        radius: 0.22,
+        intensity: 1.0,
+        mode: 0.0
+      },
+      // Right waist contracting leftward
+      {
+        center: { x: 0.68, y: centerYNorm },
+        target: { x: 0.68 - factor, y: centerYNorm },
+        radius: 0.22,
+        intensity: 1.0,
+        mode: 0.0
+      }
+    ];
+
+    const ctx = this.workCanvas.getContext('2d')!;
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, warpPoints);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 11: Crop to Preset Aspect Ratio (B090)
+  cropToAspectRatio(aspectRatio: '1:1' | '4:5' | '3:4' | '9:16') {
+    let targetRatio = 1.0;
+    switch (aspectRatio) {
+      case '1:1': targetRatio = 1.0; break;
+      case '4:5': targetRatio = 4 / 5; break;
+      case '3:4': targetRatio = 3 / 4; break;
+      case '9:16': targetRatio = 9 / 16; break;
+    }
+
+    const currentW = this.workCanvas.width;
+    const currentH = this.workCanvas.height;
+    const currentRatio = currentW / currentH;
+
+    let cropW = currentW;
+    let cropH = currentH;
+
+    if (currentRatio > targetRatio) {
+      // Current image is wider than target ratio
+      cropW = Math.round(currentH * targetRatio);
+    } else {
+      // Current image is taller than target ratio
+      cropH = Math.round(currentW / targetRatio);
+    }
+
+    const offsetX = Math.round((currentW - cropW) / 2);
+    const offsetY = Math.round((currentH - cropH) / 2);
+
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropW;
+    croppedCanvas.height = cropH;
+    const cCtx = croppedCanvas.getContext('2d')!;
+    cCtx.drawImage(this.workCanvas, offsetX, offsetY, cropW, cropH, 0, 0, cropW, cropH);
+
+    this.workCanvas.width = cropW;
+    this.workCanvas.height = cropH;
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.drawImage(croppedCanvas, 0, 0);
   }
 
   // Unified Pipeline Executor for Preview and Export
@@ -733,8 +909,14 @@ export class ImageEngine {
     }
 
     // Stage 4: Global Tone & Color Filters
-    if (params.brightness || params.contrast || params.saturation || params.temperature) {
-      this.applyBasicAdjustments(params.brightness, params.contrast, params.saturation, params.temperature);
+    if (params.brightness || params.contrast || params.saturation || params.temperature || params.tint) {
+      this.applyBasicAdjustments(
+        params.brightness || 0,
+        params.contrast || 0,
+        params.saturation || 0,
+        params.temperature || 0,
+        params.tint || 0
+      );
     }
     if (params.filter_id) {
       this.applyFilter(params.filter_id, params.filter_intensity ?? 100);

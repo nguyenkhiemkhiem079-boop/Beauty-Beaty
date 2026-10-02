@@ -21,9 +21,9 @@ Tài liệu này tổng hợp toàn bộ các yêu cầu bên ngoài (nếu có)
        ```env
        MEITU_OPENAPI_ACCESS_KEY=your_actual_access_key
        MEITU_OPENAPI_SECRET_KEY=your_actual_secret_key
-       ENABLE_AI_WORKER=true
        ```
-    3. Khởi động lại server backend (`npm run dev:server`).
+    3. Đăng ký Worker Adapter xử lý thông qua hàm `registerProcessor(toolName, processor)` kết nối Meitu Cloud API SDK.
+    4. Khởi động lại server backend (`npm run dev:server`).
 
 ---
 

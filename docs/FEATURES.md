@@ -10,6 +10,16 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 - `FAILED_QUALITY`: Thuật toán không đạt chuẩn chất lượng hình ảnh thực tế.
 - `BLOCKED_EXTERNAL`: Bị chặn bởi điều kiện tiên quyết bên ngoài (ví dụ: thiếu API Key có phí từ bên thứ ba).
 
+### Bảng Đối Chiếu Hiện Trạng Ledger (Reality Checker & Project Shepherd Reconciliation):
+
+| Trạng thái | Số lượng | Tỷ lệ | Diễn giải |
+|---|---|---|---|
+| **`VERIFIED`** | **0** | **0%** | **Tuyệt đối khóa 0 VERIFIED** cho đến khi nghiệm thu toàn diện độc lập cuối cùng, không có ngoại lệ. |
+| **`IMPLEMENTED_UNVERIFIED`** | **40** | **33.9%** | Đã có code thực thi và test định lượng (B001, B002, B005, B006, B008-B011, B013, B016, B017, B019, B025, B028, B034, B036, B037, B039, B042, B043, B046, B070, B075, B078, B082, X003, X006, X012, X013, X020-X022, X024-X027, I001-I005, I007-I009). |
+| **`PLANNED`** | **72** | **61.0%** | Backlog tính năng chuyên sâu chưa có mã nguồn hoặc đang chuẩn bị giải thuật. |
+| **`BLOCKED_EXTERNAL`** | **6** | **5.1%** | Phụ thuộc Meitu API Key / Cloud Worker trả phí (B031, B044, B062, X010, X011, I006). |
+| **TỔNG CỘNG** | **118** | **100%** | Bao gồm 82 công cụ Beauty B001-B082, 27 tính năng mở rộng X-prefixed, 9 thành phần hạ tầng I-prefixed. |
+
 ---
 
 ## 1. Da (Skin: B001 – B012)

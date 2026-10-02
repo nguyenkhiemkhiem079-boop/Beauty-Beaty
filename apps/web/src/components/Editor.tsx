@@ -2,15 +2,18 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { 
   Undo2, Redo2, Download, ArrowLeft, Upload, Loader2, Sparkles, 
   UserRound, Droplets, Scissors, Minimize, Wand2, Eye, Smile, 
-  Sliders, Palette, LayoutTemplate, SplitSquareVertical
+  Sliders, Palette, LayoutTemplate, SplitSquareVertical, Crop,
+  LayoutGrid, Save, Bookmark, CircleDot
 } from 'lucide-react';
 import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
 import { ImageEngine } from '../engine/ImageEngine';
 import { useAppContext, DEFAULT_EDIT_STATE } from '../context';
-import type { ToolCategory, ToolType } from '../context';
+import type { ToolCategory, ToolType, TemplateCustomText } from '../context';
 import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
+import { CollageMaker } from './CollageMaker';
+import { saveDraft, loadLatestDraft, clearAllDrafts, type AppDraft } from '../utils/draftStorage';
 
 interface Props {
   onExit: () => void;
@@ -33,6 +36,10 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  const [isCollageOpen, setIsCollageOpen] = useState(false);
+  const [draftAvailable, setDraftAvailable] = useState<AppDraft | null>(null);
+  const [draftToast, setDraftToast] = useState<string | null>(null);
+  const [blemishRadius, setBlemishRadius] = useState(16);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ImageEngine | null>(null);
@@ -68,10 +75,18 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     ctx: CanvasRenderingContext2D, 
     w: number, 
     h: number, 
-    tpl: (typeof POSTER_TEMPLATES)[0]
+    tpl: (typeof POSTER_TEMPLATES)[0],
+    customText?: TemplateCustomText,
+    placement: 'top' | 'center' | 'bottom' = 'top'
   ) => {
     ctx.save();
     const scale = Math.max(w, h) / 800;
+
+    const title = customText?.title ?? tpl.title;
+    const subtitle = customText?.subtitle ?? tpl.subtitle;
+    const dateText = customText?.dateText ?? tpl.dateText;
+    const tagline = customText?.tagline ?? tpl.tagline;
+    const footer = customText?.footer ?? tpl.footer;
 
     // Optional border frame
     if (tpl.decorations.showBorders) {
@@ -81,32 +96,35 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
       ctx.strokeRect(pad, pad, w - pad * 2, h - pad * 2);
     }
 
+    let topOffset = 0;
+    if (placement === 'center') topOffset = h * 0.35;
+    else if (placement === 'bottom') topOffset = h * 0.65;
+
     // Title / Headline
     ctx.textAlign = 'center';
     ctx.fillStyle = tpl.textColor;
     ctx.font = `900 ${32 * scale}px 'League Spartan', sans-serif`;
-    ctx.letterSpacing = `${4 * scale}px`;
-    ctx.fillText(tpl.title, w / 2, 60 * scale);
+    ctx.fillText(title, w / 2, (60 * scale) + topOffset);
 
     // Subtitle
     ctx.fillStyle = tpl.accentColor;
     ctx.font = `700 ${12 * scale}px sans-serif`;
-    ctx.letterSpacing = `${2 * scale}px`;
-    ctx.fillText(tpl.subtitle, w / 2, 85 * scale);
+    ctx.fillText(subtitle, w / 2, (85 * scale) + topOffset);
 
     // Date Text
     ctx.font = `500 ${10 * scale}px sans-serif`;
-    ctx.fillText(tpl.dateText, w / 2, 105 * scale);
+    ctx.fillText(dateText, w / 2, (105 * scale) + topOffset);
 
-    // Tagline near bottom
-    ctx.fillStyle = tpl.textColor;
-    ctx.font = `italic 600 ${13 * scale}px sans-serif`;
-    ctx.fillText(tpl.tagline, w / 2, h - 55 * scale);
+    // Tagline & Footer near bottom
+    if (placement !== 'bottom') {
+      ctx.fillStyle = tpl.textColor;
+      ctx.font = `italic 600 ${13 * scale}px sans-serif`;
+      ctx.fillText(tagline, w / 2, h - 55 * scale);
 
-    // Footer credits
-    ctx.font = `500 ${9 * scale}px sans-serif`;
-    ctx.fillStyle = tpl.accentColor;
-    ctx.fillText(tpl.footer, w / 2, h - 25 * scale);
+      ctx.font = `500 ${9 * scale}px sans-serif`;
+      ctx.fillStyle = tpl.accentColor;
+      ctx.fillText(footer, w / 2, h - 25 * scale);
+    }
 
     ctx.restore();
   };
@@ -136,14 +154,21 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
       if (editState.template_id) {
         const tpl = POSTER_TEMPLATES.find(t => t.id === editState.template_id);
         if (tpl) {
-          renderTemplateOverlay(ctx, canvasRef.current.width, canvasRef.current.height, tpl);
+          renderTemplateOverlay(
+            ctx, 
+            canvasRef.current.width, 
+            canvasRef.current.height, 
+            tpl,
+            editState.template_custom_text,
+            editState.template_placement || 'top'
+          );
         }
       }
     }
   };
 
+  // Re-initialize engine if we return to editor with an existing image
   useEffect(() => {
-    // Re-initialize engine if we return to editor with an existing image
     if (originalImage && canvasRef.current && !engineRef.current) {
       const MAX_SIZE = 800;
       let width = originalImage.width;
@@ -195,78 +220,146 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     };
   }, []);
 
+  // Check for saved draft in IndexedDB on initial mount
+  useEffect(() => {
+    loadLatestDraft().then(draft => {
+      if (draft && !originalImage) {
+        setDraftAvailable(draft);
+      }
+    });
+  }, []);
+
+  // Auto-save draft to IndexedDB on edits
+  useEffect(() => {
+    if (!originalImage || !canvasRef.current) return;
+    const timer = setTimeout(async () => {
+      try {
+        const draft: AppDraft = {
+          id: 'latest_active_draft',
+          imageDataUrl: canvasRef.current!.toDataURL('image/jpeg', 0.85),
+          editState,
+          history,
+          historyIndex,
+          timestamp: Date.now()
+        };
+        await saveDraft(draft);
+      } catch (e) {
+        console.warn('Auto-save draft failed:', e);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [editState, history, historyIndex, originalImage]);
+
+  const handleManualSaveDraft = async () => {
+    if (!canvasRef.current) return;
+    try {
+      const draft: AppDraft = {
+        id: 'latest_active_draft',
+        imageDataUrl: canvasRef.current.toDataURL('image/jpeg', 0.85),
+        editState,
+        history,
+        historyIndex,
+        timestamp: Date.now()
+      };
+      await saveDraft(draft);
+      setDraftToast('Đã lưu bản thảo vào IndexedDB thành công!');
+      setTimeout(() => setDraftToast(null), 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRestoreDraft = (draft: AppDraft) => {
+    const img = new Image();
+    img.onload = () => {
+      setOriginalImage(img);
+      setImageSrc(draft.imageDataUrl);
+      setEditState(draft.editState);
+      setHistory(draft.history);
+      setHistoryIndex(draft.historyIndex);
+      setDraftAvailable(null);
+    };
+    img.src = draft.imageDataUrl;
+  };
+
+  const handleDiscardDraft = async () => {
+    await clearAllDrafts();
+    setDraftAvailable(null);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (imageSrc) URL.revokeObjectURL(imageSrc);
+      const currentToken = ++uploadTokenRef.current;
       const url = URL.createObjectURL(file);
       setImageSrc(url);
+      setLandmarks(null);
+      setSegmentationMask(null);
       setErrorMsg(null);
       
-      const currentToken = ++uploadTokenRef.current;
-
       const img = new Image();
       img.onload = async () => {
         if (currentToken !== uploadTokenRef.current) return;
 
         setOriginalImage(img);
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const MAX_SIZE = 800; // Preview size
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > MAX_SIZE || height > MAX_SIZE) {
-            const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
-            width *= ratio;
-            height *= ratio;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
+
+        const MAX_SIZE = 800;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+          width *= ratio;
+          height *= ratio;
+        }
+
+        if (canvasRef.current) {
+          canvasRef.current.width = width;
+          canvasRef.current.height = height;
+          const ctx = canvasRef.current.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          
-          // Dispose previous engine instance
+
           if (engineRef.current) {
             engineRef.current.dispose();
           }
-          engineRef.current = new ImageEngine(canvas);
-          
+          engineRef.current = new ImageEngine(canvasRef.current);
+
           setIsDetecting(true);
           try {
             await Promise.all([
-               faceLandmarkManager.initialize(),
-               segmenterManager.initialize()
+              faceLandmarkManager.initialize(),
+              segmenterManager.initialize()
             ]);
-            
+
             if (currentToken !== uploadTokenRef.current) return;
 
-            const lms = await faceLandmarkManager.detectFaces(canvas);
-            const mask = await segmenterManager.segment(canvas);
-            
+            const [detectedLandmarks, segResult] = await Promise.all([
+              faceLandmarkManager.detectFaces(canvasRef.current),
+              segmenterManager.segment(canvasRef.current)
+            ]);
+
             if (currentToken !== uploadTokenRef.current) return;
 
-            if (!lms || lms.length === 0) {
-              setErrorMsg("Không tìm thấy khuôn mặt trong ảnh.");
+            setLandmarks(detectedLandmarks);
+            setSegmentationMask(segResult || null);
+            if (engineRef.current && segResult) {
+              engineRef.current.setSegmentationMask(segResult);
             }
-            
-            setLandmarks(lms);
-            if (mask) {
-              setSegmentationMask(mask);
-              engineRef.current.setSegmentationMask(mask);
-            } else {
-              setSegmentationMask(null);
+
+            if (detectedLandmarks.length === 0) {
+              setErrorMsg("Không tìm thấy khuôn mặt trong ảnh. Bạn vẫn có thể sử dụng các công cụ chỉnh màu, bộ lọc và ghép poster.");
             }
-          } catch (err) {
-            console.error("AI Analysis failed", err);
-            setErrorMsg("AI Model load failed (Check internet or cache).");
+          } catch (err: any) {
+            if (currentToken === uploadTokenRef.current) {
+              console.error("AI Model Error:", err);
+              setErrorMsg("Khởi tạo mô hình AI thất bại. Hãy thử lại.");
+            }
+          } finally {
+            if (currentToken === uploadTokenRef.current) {
+              setIsDetecting(false);
+            }
           }
-          
-          if (currentToken !== uploadTokenRef.current) return;
-          setIsDetecting(false);
-          
+
           const initState = { ...DEFAULT_EDIT_STATE };
           setEditState(initState);
           setHistory([initState]);
@@ -280,7 +373,6 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const handleExport = () => {
     if (!originalImage) return;
     
-    // Create high-res canvas at native original dimensions
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = originalImage.width;
     exportCanvas.height = originalImage.height;
@@ -288,7 +380,6 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     if (!ctx) return;
     ctx.drawImage(originalImage, 0, 0);
 
-    // Apply engine on native resolution
     const exportEngine = new ImageEngine(exportCanvas);
     if (segmentationMask) {
       exportEngine.setSegmentationMask(segmentationMask);
@@ -297,6 +388,11 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     const faceLandmarks = landmarks?.[0];
     exportEngine.applyPipeline(editState, faceLandmarks);
 
+    // Apply crop if selected
+    if (editState.crop_aspect_ratio && editState.crop_aspect_ratio !== 'original') {
+      exportEngine.cropToAspectRatio(editState.crop_aspect_ratio as any);
+    }
+
     const resultCanvas = exportEngine.getCanvas();
     const resultCtx = resultCanvas.getContext('2d');
 
@@ -304,7 +400,14 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     if (resultCtx && editState.template_id) {
       const tpl = POSTER_TEMPLATES.find(t => t.id === editState.template_id);
       if (tpl) {
-        renderTemplateOverlay(resultCtx, resultCanvas.width, resultCanvas.height, tpl);
+        renderTemplateOverlay(
+          resultCtx, 
+          resultCanvas.width, 
+          resultCanvas.height, 
+          tpl,
+          editState.template_custom_text,
+          editState.template_placement || 'top'
+        );
       }
     }
 
@@ -336,6 +439,34 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     setHistoryIndex(newHistory.length - 1);
   };
 
+  // Spot Blemish Healing on Canvas Click (B002)
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool !== ('skin_blemish' as any) || !canvasRef.current || !engineRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    engineRef.current.applyBlemishHealing({ x, y }, blemishRadius);
+    const ctx = canvasRef.current.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.drawImage(engineRef.current.getCanvas(), 0, 0);
+    }
+    commitHistory();
+  };
+
+  // Direct Aspect Ratio Crop (B090)
+  const handleApplyCrop = (ratio: '1:1' | '4:5' | '3:4' | '9:16') => {
+    if (!engineRef.current || !canvasRef.current) return;
+    engineRef.current.cropToAspectRatio(ratio);
+    canvasRef.current.width = engineRef.current.getCanvas().width;
+    canvasRef.current.height = engineRef.current.getCanvas().height;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx?.drawImage(engineRef.current.getCanvas(), 0, 0);
+    setEditState(prev => ({ ...prev, crop_aspect_ratio: ratio }));
+    commitHistory();
+  };
+
   const resetCurrentCategory = () => {
     setEditState(prev => {
       const next = { ...prev };
@@ -356,18 +487,42 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         next.contrast = 0;
         next.saturation = 0;
         next.temperature = 0;
+        next.tint = 0;
       } else if (activeCategory === 'filters') {
         next.filter_id = '';
       } else if (activeCategory === 'templates') {
         next.template_id = '';
+        next.template_custom_text = undefined;
       }
       return next;
     });
     setTimeout(commitHistory, 50);
   };
 
+  // If collage maker is open, render collage workspace
+  if (isCollageOpen) {
+    return <CollageMaker onBack={() => setIsCollageOpen(false)} />;
+  }
+
   return (
     <div className="editor-layout">
+      {/* Draft Available Banner */}
+      {draftAvailable && !imageSrc && (
+        <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid #d4af37', padding: '12px 24px', borderRadius: '8px', zIndex: 100, display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+          <Bookmark size={20} color="#d4af37" />
+          <span style={{ fontSize: '13px', color: '#f8fafc' }}>Tìm thấy bản thảo chưa hoàn tất từ phiên làm việc trước ({new Date(draftAvailable.timestamp).toLocaleTimeString()}).</span>
+          <button onClick={() => handleRestoreDraft(draftAvailable)} style={{ background: '#d4af37', color: '#000', fontWeight: 600, border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer' }}>Khôi phục</button>
+          <button onClick={handleDiscardDraft} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #475569', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Bỏ qua</button>
+        </div>
+      )}
+
+      {/* Draft Saved Toast */}
+      {draftToast && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: '#10b981', color: '#ffffff', padding: '10px 18px', borderRadius: '6px', zIndex: 100, fontWeight: 500, fontSize: '13px', boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}>
+          {draftToast}
+        </div>
+      )}
+
       <header className="editor-nav">
         <div className="nav-left">
           <button className="btn-icon" onClick={onExit} title="Quay lại"><ArrowLeft size={20} /></button>
@@ -390,11 +545,27 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               >
                 <SplitSquareVertical size={16} /> So sánh
               </button>
+
+              <button 
+                onClick={handleManualSaveDraft}
+                className="btn-secondary" 
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '12px' }}
+                title="Lưu bản thảo vào IndexedDB"
+              >
+                <Save size={14} /> Lưu nháp
+              </button>
             </div>
           )}
         </div>
         
-        <div className="nav-right">
+        <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            onClick={() => setIsCollageOpen(true)}
+            className="btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '13px' }}
+          >
+            <LayoutGrid size={15} color="#d4af37" /> Ghép ảnh
+          </button>
           {imageSrc && (
             <button className="btn-primary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Download size={16} /> Lưu & Xuất
@@ -428,7 +599,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   {errorMsg}
                 </div>
               )}
-              <canvas ref={canvasRef} className="main-canvas" />
+              <canvas 
+                ref={canvasRef} 
+                className="main-canvas" 
+                onClick={handleCanvasClick}
+                style={{ cursor: activeTool === ('skin_blemish' as any) ? 'crosshair' : 'default' }}
+              />
             </div>
           )}
         </div>
@@ -455,6 +631,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               <button className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
                 <Sliders size={18} />Chỉnh màu
               </button>
+              <button className={`tab ${activeCategory === 'crop' ? 'active' : ''}`} onClick={() => { setActiveCategory('crop'); setActiveTool('crop'); }}>
+                <Crop size={18} />Cắt ảnh
+              </button>
               <button className={`tab ${activeCategory === 'filters' ? 'active' : ''}`} onClick={() => { setActiveCategory('filters'); }}>
                 <Palette size={18} />Bộ lọc (200+)
               </button>
@@ -480,6 +659,20 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'skin_brighten' ? 'active' : ''}`} onClick={() => setActiveTool('skin_brighten')}>
                     <Sparkles size={16} /> B004: Sáng da & Nâng tone
                   </div>
+                  <div className={`tool-btn ${activeTool === ('skin_blemish' as any) ? 'active' : ''}`} onClick={() => setActiveTool('skin_blemish' as any)}>
+                    <CircleDot size={16} /> B002: Chấm xóa thâm mụn (Healing Brush)
+                  </div>
+                  {activeTool === ('skin_blemish' as any) && (
+                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '6px', marginTop: '10px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
+                      <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>Cọ xóa thâm mụn:</p>
+                      <p style={{ margin: '0 0 8px 0', color: '#64748b' }}>Nhấp chuột trực tiếp lên nốt mụn/vết thâm trên ảnh để loại bỏ tự nhiên.</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span>Kích thước cọ:</span>
+                        <span>{blemishRadius}px</span>
+                      </div>
+                      <input type="range" min="6" max="35" value={blemishRadius} onChange={e => setBlemishRadius(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -557,6 +750,41 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'temperature' ? 'active' : ''}`} onClick={() => setActiveTool('temperature')}>
                     <Sliders size={16} /> X020: Nhiệt độ ấm / lạnh
                   </div>
+                  <div className={`tool-btn ${activeTool === 'tint' ? 'active' : ''}`} onClick={() => setActiveTool('tint')}>
+                    <Sliders size={16} /> X020: Cân bằng sắc thái Tint (Lục/Tím)
+                  </div>
+                </div>
+              )}
+
+              {/* CROP ASPECT RATIO CATEGORY (B090) */}
+              {activeCategory === 'crop' && (
+                <div className="tool-group">
+                  <h4 className="util-label">Cắt ảnh chuẩn tỷ lệ (B090)</h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>Chọn tỷ lệ khung hình chuẩn để cắt ảnh gọn gàng:</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                    {[
+                      { id: '1:1', label: '1:1 Vuông (Instagram)' },
+                      { id: '4:5', label: '4:5 Chân dung (Portrait)' },
+                      { id: '3:4', label: '3:4 Bìa ảnh (Standard)' },
+                      { id: '9:16', label: '9:16 Story / TikTok' }
+                    ].map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleApplyCrop(item.id as any)}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '8px',
+                          border: editState.crop_aspect_ratio === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                          background: editState.crop_aspect_ratio === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          fontSize: '12px'
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -621,13 +849,13 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 </div>
               )}
 
-              {/* MAGAZINE & POSTER TEMPLATES */}
+              {/* MAGAZINE & POSTER TEMPLATES WITH FULL EDITABILITY */}
               {activeCategory === 'templates' && (
                 <div className="tool-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h4 className="util-label">12 Khung Bìa & Poster</h4>
                     {editState.template_id && (
-                      <button onClick={() => setEditState(prev => ({ ...prev, template_id: '' }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Tắt khung</button>
+                      <button onClick={() => setEditState(prev => ({ ...prev, template_id: '', template_custom_text: undefined }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Tắt khung</button>
                     )}
                   </div>
                   <div className="template-grid">
@@ -636,7 +864,18 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         key={tpl.id}
                         className={`template-card ${editState.template_id === tpl.id ? 'active' : ''}`}
                         onClick={() => {
-                          setEditState(prev => ({ ...prev, template_id: prev.template_id === tpl.id ? '' : tpl.id }));
+                          const isSame = editState.template_id === tpl.id;
+                          setEditState(prev => ({ 
+                            ...prev, 
+                            template_id: isSame ? '' : tpl.id,
+                            template_custom_text: isSame ? undefined : {
+                              title: tpl.title,
+                              subtitle: tpl.subtitle,
+                              dateText: tpl.dateText,
+                              tagline: tpl.tagline,
+                              footer: tpl.footer
+                            }
+                          }));
                           setTimeout(commitHistory, 50);
                         }}
                       >
@@ -645,6 +884,120 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                       </div>
                     ))}
                   </div>
+
+                  {/* EDITABLE TEXT & PLACEMENT FORM */}
+                  {editState.template_id && (() => {
+                    const currentTpl = POSTER_TEMPLATES.find(t => t.id === editState.template_id);
+                    if (!currentTpl) return null;
+                    const customText = editState.template_custom_text || {
+                      title: currentTpl.title,
+                      subtitle: currentTpl.subtitle,
+                      dateText: currentTpl.dateText,
+                      tagline: currentTpl.tagline,
+                      footer: currentTpl.footer
+                    };
+
+                    const handleFieldChange = (field: keyof TemplateCustomText, val: string) => {
+                      setEditState(prev => ({
+                        ...prev,
+                        template_custom_text: {
+                          ...customText,
+                          [field]: val
+                        }
+                      }));
+                    };
+
+                    return (
+                      <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 600, color: '#334155' }}>Tùy Chỉnh Chữ & Bố Cục Bìa</h4>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Tiêu đề chính (Title)</label>
+                            <input 
+                              type="text" 
+                              value={customText.title || ''} 
+                              onChange={e => handleFieldChange('title', e.target.value)} 
+                              onBlur={commitHistory}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Phụ đề (Subtitle)</label>
+                            <input 
+                              type="text" 
+                              value={customText.subtitle || ''} 
+                              onChange={e => handleFieldChange('subtitle', e.target.value)} 
+                              onBlur={commitHistory}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Ngày tháng / Số phát hành</label>
+                            <input 
+                              type="text" 
+                              value={customText.dateText || ''} 
+                              onChange={e => handleFieldChange('dateText', e.target.value)} 
+                              onBlur={commitHistory}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Khẩu hiệu (Tagline)</label>
+                            <input 
+                              type="text" 
+                              value={customText.tagline || ''} 
+                              onChange={e => handleFieldChange('tagline', e.target.value)} 
+                              onBlur={commitHistory}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Chân trang (Footer Credits)</label>
+                            <input 
+                              type="text" 
+                              value={customText.footer || ''} 
+                              onChange={e => handleFieldChange('footer', e.target.value)} 
+                              onBlur={commitHistory}
+                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                            />
+                          </div>
+
+                          {/* Text Placement Selection */}
+                          <div style={{ marginTop: '6px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>Vị trí chữ</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {(['top', 'center', 'bottom'] as const).map(p => (
+                                <button
+                                  key={p}
+                                  onClick={() => {
+                                    setEditState(prev => ({ ...prev, template_placement: p }));
+                                    setTimeout(commitHistory, 50);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    padding: '6px 0',
+                                    borderRadius: '4px',
+                                    border: (editState.template_placement || 'top') === p ? '1px solid var(--color-accent)' : '1px solid #cbd5e1',
+                                    background: (editState.template_placement || 'top') === p ? 'rgba(212, 175, 55, 0.15)' : '#fff',
+                                    fontWeight: (editState.template_placement || 'top') === p ? 600 : 400,
+                                    fontSize: '11px',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {p === 'top' ? 'Trên cùng' : p === 'center' ? 'Ở giữa' : 'Dưới cùng'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -665,7 +1018,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               )}
 
               {/* PARAMETER SLIDER (Active for adjustable tools) */}
-              {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'ai' && (
+              {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'crop' && activeCategory !== 'ai' && activeTool !== ('skin_blemish' as any) && (
                 <div className="parameter-section">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                     <span style={{ fontWeight: 600, fontSize: '14px' }}>Cường độ</span>

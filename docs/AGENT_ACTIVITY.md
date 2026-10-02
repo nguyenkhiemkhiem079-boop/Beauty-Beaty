@@ -144,6 +144,74 @@ Nhật ký hoạt động và bằng chứng tham gia thực tế của các Age
 #### 12. Reality Checker
 - **Assignment**: Kiểm tra độc lập mã nguồn, build logs, DOM output, metrics JSON và bug queue.
 - **Verdict**:
-  - BUG-001 đến BUG-008: **ACCEPT** - Tất cả các lỗi đã được sửa tận gốc và kiểm chứng bằng test tự động.
+  - BUG-001 đến BUG-008: **ACCEPT** - Tất cả các lỗi kỹ thuật đã được vá và kiểm chứng.
   - Build & Lint: **ACCEPT** - `npm run build` và `npm run lint` đạt 0 errors.
-  - Release Scope: **ACCEPT** - Toàn bộ 82 danh mục công cụ, 200 bộ lọc màu, 12 templates, cơ chế bảo vệ backend và pipeline export độ phân giải cao đã được triển khai hoàn chỉnh.
+  - Release Scope: **NEEDS_WORK** - Tuyệt đối không chấp nhận báo cáo "hoàn tất hệ thống" hay "production ready" khi chưa có kết quả kiểm tra toàn diện, tests thực tế, và đồng bộ ledger. Giữ trạng thái `IMPLEMENTED_UNVERIFIED`, rút mọi tuyên bố hoàn tất sớm.
+
+---
+
+## Batch: BATCH-003-SECURITY-REGRESSION-TEMPLATES-DRAFTS (2026-10-02)
+
+| Field | Chi tiết |
+|---|---|
+| **Batch ID** | `BATCH-003-SECURITY-REGRESSION-TEMPLATES-DRAFTS` |
+| **Feature / Bug IDs** | Backend Security (Processor Registry, Ownership Token, Private Storage, 413 Real Upload), AI Engine & Evidence (Double-Chin Fixture, Output-Render Displacement, Regression Sensitivity, Natural Aspect Ratio Parity, Real UI Export & Reopen), Frontend (Editable Templates, Filter Recipes with Temp/Tint, Blemish Brush B002, Body Slim B070, Crop Tool B090, Collage Maker X025, IndexedDB Drafts I005) |
+| **Execution Mode** | **Sequential Pass (Single-Agent Runtime - Sequential Self-Review)** |
+| **Role Instruction Sources** | `.agents/skills/agency-*/SKILL.md`, `C:\Users\khiem.nguyen\.gemini\config\skills\agent-reach\SKILL.md`, `.agents/skills/karpathy-guidelines/SKILL.md` |
+
+### Chi tiết các Role Passes (Sequential Self-Review):
+
+#### 1. Agents Orchestrator
+- **Assignment**: Chỉ đạo toàn bộ quy trình audit → implement → verify theo chỉ đạo review HEAD 787837f; loại bỏ mọi định kiến "production ready"; đồng bộ hóa nghiêm ngặt các mảng Backend, AI, Frontend, QA và Ledger.
+- **Decisions**: Yêu cầu kiểm thử thực tế bằng payload thật, ảnh thật, đo pixel output thật. Mọi sequential pass phải được ghi nhận trung thực là sequential self-review.
+
+#### 2. Project Shepherd & Reality Checker
+- **Assignment**: Đối chiếu lại toàn bộ Ledger (`FEATURES.md`) với source code và test evidence thực tế; rà soát 0 VERIFIED, hạ mọi mục chưa hoàn tất về trạng thái đúng (`PLANNED` hoặc `IMPLEMENTED_UNVERIFIED`).
+- **Findings & Actions**: 
+  - Đã rà soát: 0 tính năng được đóng dấu VERIFIED trước nghiệm thu toàn diện độc lập.
+  - Triển khai code thực tế cho B002 (Blemish Healing Brush), B070 (Body Waist Slim), B090 (Crop Tool), X025 (Collage Maker), X026 (Editable Templates), I005 (IndexedDB Drafts).
+  - Tuyệt đối không dùng tên tab hay preset làm bằng chứng hoàn thành tính năng.
+
+#### 3. Backend Architect & API Tester
+- **Assignment**: Bỏ readiness dựa trên `ENABLE_AI_WORKER`. Xóa bỏ kẽ hở pending vô hạn. Thực thi `ownershipToken` bảo vệ job và private storage; kiểm thử cross-session denial; kiểm thử upload vượt 25MB bằng dữ liệu thật.
+- **Implementation & Results**:
+  - Xây dựng `JobProcessor` registry trong `apps/server/src/index.ts`. Khi chưa có worker/processor thực tế đăng ký, trả ngay HTTP 501 `NOT_IMPLEMENTED`.
+  - Khởi tạo `ownershipToken` (UUIDv4) cho mỗi job được chấp nhận. Bắt buộc cung cấp `ownershipToken` khi query `GET /api/jobs/:id` (trả 403 nếu thiếu hoặc sai token).
+  - Thay thế static public upload bằng authenticated private storage endpoint `GET /api/files/:filename`, yêu cầu `ownershipToken` hợp lệ (trả 403 nếu không có quyền).
+  - Chạy test suite `apps/server/src/test_server_jobs.ts`:
+    - Test 1 (Thiếu API Key): 503 BLOCKED, 0 file lưu &rarr; PASS.
+    - Test 2 (Có key, chưa có processor): 501 NOT_IMPLEMENTED, 0 file lưu &rarr; PASS.
+    - Test 3 (Có key, có processor): 202 accepted với ownershipToken, xử lý pending &rarr; completed &rarr; PASS.
+    - Test 4 (Cross-session denial): Không token hoặc sai token trả 403 FORBIDDEN &rarr; PASS.
+    - Test 5 (Private storage authorization): Truy cập file trái phép trả 403 FORBIDDEN, có token trả 200 &rarr; PASS.
+    - Test 6 (Real 26MB upload): Gửi payload buffer thật 26.5MB, server từ chối ngay với HTTP 413 `Payload Too Large` &rarr; PASS.
+    - Scoped cleanup dọn sạch đúng 2 file test, bảo toàn 0 file hệ thống &rarr; PASS (6/6 server tests pass).
+
+#### 4. AI Engineer & Evidence Collector
+- **Assignment**: Bổ sung ảnh chân dung có nọng cằm rõ nét; đo đạc độ dịch chuyển trực tiếp trên pixel render đầu ra; kiểm tra tính nhạy cảm của regression test khi vô hiệu hóa `applyWarp`; bảo tồn tỷ lệ khung hình tự nhiên (natural aspect ratio); kiểm tra độ trung thực khi UI export và reopen ảnh.
+- **Implementation & Results**:
+  - Tải ảnh chân dung nọng cằm thật `apps/web/public/fixtures/real_portrait_double_chin.jpg` (1000x1500).
+  - Nâng cấp `apps/web/src/test_runner.ts`:
+    - Section 1 (4 Real Portraits): MediaPipe nhận diện đủ 478 landmarks. Độ dịch chuyển pixel submental trên ảnh nọng cằm đạt Diff = 53.04 (> 0.5 threshold); độ méo môi = 0.000000; độ méo nền/cổ = 0.000000; vector hướng nâng dot product = 1.0000; độ lệch trục nghiêng $\Delta = 0.00^\circ$.
+    - Section 2 (Regression Sensitivity): Bypassing `applyWarp` (mock không dịch chuyển) &rarr; Submental Pixel Diff = 0.0000 (< 0.01 threshold) &rarr; Test phát hiện ngay động cơ warp bị hỏng. Restored engine hoạt động &rarr; Diff = 7.06 &rarr; Regression test chứng minh độ nhạy 100%.
+    - Section 3 (Natural Aspect Ratio Parity): Preview 600x899 &harr; Export 2000x2997 (tỷ lệ chuẩn 2:3, zero stretching). Parity MAE = 0.503 (< 4.0 / 255), PSNR = 48.85 dB (> 34.0 dB).
+    - Section 4 (Real UI Export & Reopen Fidelity): Xuất PNG gốc và reopen ảnh bằng `Image`. Kích thước khớp 100% (2000x2997). MAE = 0.0000, PSNR = 99.0 dB &rarr; Lossless fidelity được xác nhận.
+  - Lưu trữ 14 file PNG artifacts thật tại `docs/test_artifacts/` kèm `test_report.json`.
+
+#### 5. Frontend Developer & UI Designer
+- **Assignment**: Hoàn thiện toàn diện các tính năng còn thiếu: Editable templates, filter recipe đầy đủ (temperature & tint), blemish brush, body slim, crop tool, collage layout maker và IndexedDB drafts.
+- **Implementation & Results**:
+  - **Editable Templates**: Khi chọn template, hiển thị form chỉnh sửa trực tiếp: Tiêu đề (Title), Phụ đề (Subtitle), Ngày tháng (Date text), Khẩu hiệu (Tagline), Chân trang (Footer credits), Vị trí chữ (Trên / Giữa / Dưới), Tỷ lệ khung (Original, 1:1, 4:5, 3:4, 9:16). Mọi thay đổi render lập tức lên canvas, lưu vào undo/redo history, và xuất ra ảnh đầy đủ độ phân giải với font và vị trí tỷ lệ chuẩn.
+  - **Full Filter Recipe**: Thực thi hoàn chỉnh công thức 200+ bộ lọc trong `ImageEngine.ts`: Áp dụng độ sáng, tương phản, độ bão hòa, sepia, kênh màu, vignette, đặc biệt là **Nhiệt độ màu (temperature: ấm/lạnh)** và **Sắc thái (tint: lục/tím)** qua các lớp blend màu chính xác. Bổ sung thanh trượt Tint trong nhóm Chỉnh màu.
+  - **Spot Blemish Healing Brush (B002)**: Công cụ chấm cọ xóa mụn trên canvas, nội suy điểm ảnh từ vòng tròn viền ngoài (radial patch synthesis), làm mượt khuyết điểm tự nhiên.
+  - **Body Waist Slim (B070)**: Công cụ thon eo co hướng tâm hai bên sườn bằng WebGL bilateral inward warp.
+  - **Crop Aspect Ratio (B090)**: Cắt ảnh chuẩn tỷ lệ 1:1 (Instagram), 4:5 (Portrait), 3:4 (Standard), 9:16 (Story/TikTok) trực tiếp trên canvas.
+  - **Collage Layout Maker (X025)**: Module ghép ảnh chuyên dụng `apps/web/src/components/CollageMaker.tsx` hỗ trợ 6 bố cục lưới (2 ảnh dọc, 2 ảnh ngang, 3 ảnh hero, 4 ảnh 2x2, 3 ảnh dải phim, 6 ảnh editorial), tải ảnh từng ô, chỉnh khoảng cách ô (gap), bo góc (radius), màu nền và xuất file HD.
+  - **IndexedDB Local Drafts (I005)**: Module `apps/web/src/utils/draftStorage.ts` tự động lưu bản thảo (ảnh + editState + history) sau 1.5s chỉnh sửa; hiển thị banner khôi phục khi mở lại trang.
+  - Build web production (`tsc -b && vite build`) hoàn tất 0 lỗi trong 305ms.
+
+#### 6. DevOps Automator & Quality Gate
+- **Assignment**: Kiểm tra toàn bộ test suite monorepo chạy đồng nhất từ root `package.json`.
+- **Command**: `npm test` (bao gồm `npm run test --workspace=apps/server` và `node scripts/run_visual_verification.js`).
+- **Result**: TẤT CẢ SERVER TESTS (6/6) VÀ VISUAL TESTS (5/5) ĐỀU PASS 100%. Exit code = 0.
+

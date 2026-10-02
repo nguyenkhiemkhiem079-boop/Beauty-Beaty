@@ -87,64 +87,109 @@ Tài liệu này lưu trữ bằng chứng kiểm thử tự động và thủ c
 
 ---
 
-## Kiểm thử Ảnh Chân dung Thật & Đo Vector Nọng Cằm (Items 3 & 4)
+## Kiểm thử Ảnh Chân dung Thật & Đo Pixel Render Nọng Cằm (4 Chân Dung Thật)
 - **Dữ liệu Kiểm thử Thật (Unsplash License)**:
   1. `real_portrait_front.jpg` (1000x1500): Ảnh chân dung chính diện, đường viền hàm và cổ rõ nét.
   2. `real_portrait_tilted.jpg` (1000x1500): Ảnh chân dung nghiêng đầu ($21.7^\circ$), trục mặt xoay.
   3. `real_portrait_beard.jpg` (1000x1500): Ảnh chân dung có râu quai nón, viền cổ áo và nền tiếp giáp phức tạp.
+  4. `real_portrait_double_chin.jpg` (1000x1500): Ảnh chân dung cận cảnh có nọng cằm rõ rệt, mô mỡ dưới cằm lộ rõ.
 - **Nhận diện Thật bằng MediaPipe**:
-  - Chạy `FaceLandmarkManager` (MediaPipe Face Landmarker WASM): Nhận diện đầy đủ **478 facial landmarks thật** trên cả 3 ảnh chân dung thật.
+  - Chạy `FaceLandmarkManager` (MediaPipe Face Landmarker WASM): Nhận diện đầy đủ **478 facial landmarks thật** trên cả 4 ảnh chân dung thật.
   - Chạy `SegmenterManager` (MediaPipe Image Segmenter): Tách phân đoạn tóc thật (`Category = 1`) làm mặt nạ loại trừ.
-- **Đo lường Định lượng Vector Dịch chuyển Vùng Dưới Cằm**:
-  - Tính toán qua các phương thức `getChinSlimWarpPoints` và `getDisplacementVectorAt` trên `ImageEngine`:
-  - **Hướng Nâng (Vector Direction)**:
-    - Dot product của vector dịch chuyển $\vec{D}$ với trục hướng lên của mặt ($\vec{U}_{\text{face}}$) = **`1.0000`** (Ngưỡng yêu cầu > 0.95) trên cả 3 ảnh chân dung &rarr; ✅ Chứng minh lực nâng kéo mô nọng hướng thẳng về xương hàm, không gây xô lệch ngang.
+- **Đo lường Trực tiếp trên Pixel Render Đầu ra (Output-Render Displacement)**:
+  - **Dịch chuyển Pixel Nọng cằm thực tế (Submental Output-Render Diff)**:
+    - Ảnh 1 (Chính diện): Diff = **`7.06`** (> 0.5 threshold) &rarr; ✅ Pixel thực sự được nâng lên.
+    - Ảnh 2 (Nghiêng $9.6^\circ$): Diff = **`6.97`** (> 0.5 threshold) &rarr; ✅ Pixel thực sự được nâng lên.
+    - Ảnh 3 (Râu quai nón): Diff = **`14.45`** (> 0.5 threshold) &rarr; ✅ Pixel thực sự được nâng lên.
+    - Ảnh 4 (Nọng cằm rõ nét): Diff = **`53.04`** (> 0.5 threshold) &rarr; ✅ Hiệu quả nâng mô mỡ dưới cằm cực kỳ rõ rệt trên output render.
+  - **Hướng Nâng Trực quan (Vector Direction)**:
+    - Dot product của vector dịch chuyển với trục hướng lên của mặt = **`1.0000`** (> 0.95) trên cả 4 ảnh &rarr; ✅ Nâng đúng trục hàm mặt.
   - **Đồng bộ Góc Nghiêng Mặt (Face Tilt Synchronization)**:
-    - Ảnh 1 (Nghiêng $21.7^\circ$): Góc dịch chuyển $21.7^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
-    - Ảnh 2 (Nghiêng $9.6^\circ$): Góc dịch chuyển $9.6^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
-    - Ảnh 3 (Nghiêng $-3.3^\circ$): Góc dịch chuyển $-3.3^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
-  - **Bảo vệ Môi Dưới (Lip Protection tại Landmark 17)**:
-    - Độ lớn dịch chuyển tại Landmark 17 (môi dưới): **`0.000000`** (Tuyệt đối không méo môi).
-  - **Bảo vệ Viền Cổ / Nền Ngoài Hàm (Collar & Background Protection)**:
-    - Độ lớn dịch chuyển tại điểm ngoài viền hàm: **`0.000000`** (Tuyệt đối không méo nền và cổ áo).
+    - Độ lệch góc giữa trục mặt và hướng biến dạng $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) trên cả 4 ảnh &rarr; ✅ Hoàn toàn khớp góc xoay mặt.
+  - **Bảo vệ Môi Dưới (Lip Protection tại Landmark 17 trên Output Pixel)**:
+    - Sai khác pixel tại vùng môi dưới trên ảnh render: **`0.000000`** &rarr; ✅ Môi dưới hoàn toàn không méo dù nọng cằm nâng tối đa 100%.
+  - **Bảo vệ Viền Cổ / Nền Ngoài Hàm (Background Protection)**:
+    - Sai khác pixel tại vùng nền ngoài biên hàm trên ảnh render: **`0.000000`** &rarr; ✅ Nền và viền cổ không biến dạng.
 
 ---
 
-## Kiểm thử Độ phân giải: 800px Preview vs Export Gốc 4000x3000 (Item 2)
+## Kiểm thử Độ Nhạy Hồi Quy (Regression Sensitivity Test)
+- **Mục tiêu**: Chứng minh bộ test không bị "mù" và sẽ FAIL ngay lập tức nếu hàm `applyWarp` bị vô hiệu hóa hoặc trả về ảnh gốc.
+- **Kịch bản Bypass Giả lập**:
+  - Ghi đè tạm thời `WebGLWarpEngine.prototype.applyWarp` bằng hàm giả lập bypass chỉ sao chép canvas mà không làm biến dạng pixel.
+  - Chạy `applyDoubleChinReduction` và đo sai khác vùng dưới cằm: Diff = **`0.0000`** (< 0.01 threshold).
+  - Kết quả: Bộ test phát hiện ngay chuyển động bằng 0 và đánh dấu **`✅ DETECTS FAILURE`**.
+- **Kịch bản Phục hồi Engine (Restored Active Engine)**:
+  - Phục hồi lại hàm `applyWarp` nguyên bản.
+  - Chạy `applyDoubleChinReduction`: Pixel Diff = **`7.06`** (> 0.5 threshold).
+  - Kết quả: Bộ test xác nhận động cơ warp đang hoạt động thực tế.
+- **Kết luận**: `Regression Test Sensitivity: PASSED` (Độ nhạy được kiểm chứng 100%).
+
+---
+
+## Kiểm thử Độ phân giải & Bảo tồn Tỷ lệ Khung hình Tự nhiên (Natural Aspect Ratio)
 - **Thiết lập Thử nghiệm Parity**:
-  - **Ảnh Preview**: 800x600 (0.48 Megapixels).
-  - **Ảnh Export**: 4000x3000 (12.0 Megapixels, tỉ lệ scale = 5.0x).
-  - **Pipeline Đầy đủ Cùng Áp dụng**:
-    - Skin Smoothing: 50%
-    - Hair Smoothing: 50%
-    - Face Slimming: 40%
+  - Tỷ lệ khung hình gốc: 1000x1500 (tỷ lệ chuẩn 2:3 = 0.6674).
+  - **Ảnh Preview**: 600 x 899 (bảo tồn nguyên vẹn tỷ lệ 2:3, zero horizontal/vertical stretching).
+  - **Ảnh Export**: 2000 x 2997 (bảo tồn nguyên vẹn tỷ lệ 2:3, tỉ lệ phóng đại 3.33x).
+  - **Pipeline Đầy đủ Áp dụng**:
+    - Skin Smoothing: 45%
+    - Hair Smoothing: 40%
+    - Face Slimming: 30%
     - Chin Slimming: 60%
-  - **Phương pháp So sánh**: Downsample ảnh xuất 4000x3000 về 800x600 bằng thuật toán nội suy bilinear chất lượng cao, sau đó đo sai khác pixel từng kênh RGBA với ảnh preview 800px.
+  - **Phương pháp So sánh**: Downsample ảnh xuất 2000x2997 về 600x899 bằng nội suy bilinear chất lượng cao, sau đó đo sai khác pixel từng kênh RGBA với ảnh preview 600x899.
 - **Kết quả Định lượng**:
-  - **Parity Mean Absolute Error (MAE)**: **`0.470`** trên thang 255 (Ngưỡng yêu cầu < 4.0) &rarr; ✅ Sai lệch trung bình dưới nửa mức xám, cực kỳ đồng nhất.
-  - **Peak Signal-to-Noise Ratio (PSNR)**: **`46.36 dB`** (Ngưỡng yêu cầu > 34.0 dB) &rarr; ✅ Đạt chuẩn độ trung thực cao (High Fidelity Parity), chứng minh bán kính blur, feathering và mesh warp tỉ lệ chính xác theo độ phân giải.
+  - **Parity Mean Absolute Error (MAE)**: **`0.503`** trên thang 255 (Ngưỡng yêu cầu < 4.0) &rarr; ✅ Sai lệch trung bình xấp xỉ 0.5 mức xám, đồng nhất gần như tuyệt đối.
+  - **Peak Signal-to-Noise Ratio (PSNR)**: **`48.85 dB`** (Ngưỡng yêu cầu > 34.0 dB) &rarr; ✅ Đạt chuẩn độ trung thực cao (High Fidelity Parity).
 
 ---
 
-## Danh mục Artifacts Thực tế Đã Lưu (`docs/test_artifacts/`)
-- `real_portrait_front_real_photo_original.png` (2,891 KB)
-- `real_portrait_front_double_chin_reduction_100.png` (2,889 KB)
-- `real_portrait_front_full_pipeline_skin_hair_face_chin.png` (2,821 KB)
-- `real_portrait_tilted_real_photo_original.png` (1,482 KB)
-- `real_portrait_tilted_double_chin_reduction_100.png` (1,481 KB)
-- `real_portrait_tilted_full_pipeline_skin_hair_face_chin.png` (1,451 KB)
-- `real_portrait_beard_real_photo_original.png` (1,935 KB)
-- `real_portrait_beard_double_chin_reduction_100.png` (1,930 KB)
-- `real_portrait_beard_full_pipeline_skin_hair_face_chin.png` (1,866 KB)
-- `highres_4000x3000_parity_800px_preview_skin_hair_face_chin.png` (986 KB)
-- `highres_4000x3000_parity_4000x3000_export_downsampled_to_800px.png` (1,005 KB)
-- `test_report.json` (Trạng thái: `PASSED`, 17 phép đo định lượng đạt chuẩn).
+## Kiểm thử Luồng UI Export, Download & Reopen Thật
+- **Mục tiêu**: Kiểm tra tính trung thực của file ảnh xuất khi người dùng tải về và mở lại trong ứng dụng hoặc trình xem ảnh.
+- **Quy trình Thực hiện**:
+  - Gọi `exportResult.toDataURL('image/png', 1.0)`.
+  - Khởi tạo đối tượng `Image` mới, nạp lại dataURL và vẽ lên canvas mở lại (`reopenedCanvas`).
+- **Kết quả Định lượng**:
+  - Kích thước ảnh xuất: 2000 x 2997 &harr; Kích thước ảnh mở lại: 2000 x 2997 &rarr; ✅ Khớp chính xác 100%.
+  - Sai số phục hồi (Reopen MAE): **`0.0000`** (Ngưỡng < 0.05).
+  - Peak Signal-to-Noise Ratio (Reopen PSNR): **`99.0 dB`**.
+  - Kết luận: Định dạng PNG xuất không gây thất thoát màu hoặc alpha, bảo toàn toàn vẹn dữ liệu ảnh.
 
 ---
 
-## Trạng thái Công cụ & Kế hoạch Tiếp tục (Item 7)
-- **Tình trạng nghiệm thu**: Toàn bộ công cụ (B001 Skin Smooth, B005 Hair Smooth, B014 Face Slim, B019 Double Chin) vẫn được duy trì ở trạng thái **`IMPLEMENTED_UNVERIFIED`** theo đúng nguyên tắc cho đến khi nghiệm thu toàn diện toàn bộ master prompt.
+## Backend Security & Job Lifecycle Verification
+- **Test 1**: Request thiếu API Key &rarr; HTTP 503 `BLOCKED`, 0 file lưu xuống đĩa &rarr; ✅ PASSED.
+- **Test 2**: Có key nhưng chưa có Processor đăng ký &rarr; HTTP 501 `NOT_IMPLEMENTED`, 0 file lưu &rarr; ✅ PASSED.
+- **Test 3**: Có Processor đăng ký &rarr; HTTP 202 `accepted` với `ownershipToken` (UUIDv4), job tiến triển từ `pending` &rarr; `completed` &rarr; ✅ PASSED.
+- **Test 4**: Cross-session denial & Token enforcement: Truy vấn không có token hoặc sai token trả HTTP 403 `FORBIDDEN`; có token hợp lệ trả HTTP 200 `completed` &rarr; ✅ PASSED.
+- **Test 5**: Private Storage: Đường dẫn `/api/files/:filename` cấm truy cập nếu thiếu hoặc sai token (HTTP 403), chỉ cho phép tải file khi có token hợp lệ &rarr; ✅ PASSED.
+- **Test 6**: Upload thật vượt 25MB (26.5MB payload buffer) &rarr; Server trả HTTP 413 `Payload Too Large`, file tạm bị loại bỏ ngay lập tức &rarr; ✅ PASSED.
+- **Scoped Cleanup**: Chỉ dọn dẹp đúng 2 file do test tạo ra, bảo toàn 100% file gốc &rarr; ✅ PASSED.
+
+---
+
+## Danh mục 14 Artifacts Thực tế Đã Lưu (`docs/test_artifacts/`)
+- `real_portrait_front_real_photo_original.png` (2,824 KB)
+- `real_portrait_front_double_chin_reduction_100.png` (2,822 KB)
+- `real_portrait_front_full_pipeline_skin_hair_face_chin.png` (2,755 KB)
+- `real_portrait_tilted_real_photo_original.png` (1,448 KB)
+- `real_portrait_tilted_double_chin_reduction_100.png` (1,447 KB)
+- `real_portrait_tilted_full_pipeline_skin_hair_face_chin.png` (1,418 KB)
+- `real_portrait_beard_real_photo_original.png` (1,890 KB)
+- `real_portrait_beard_double_chin_reduction_100.png` (1,885 KB)
+- `real_portrait_beard_full_pipeline_skin_hair_face_chin.png` (1,822 KB)
+- `real_portrait_double_chin_real_photo_original.png` (1,329 KB)
+- `real_portrait_double_chin_double_chin_reduction_100.png` (1,327 KB)
+- `real_portrait_double_chin_full_pipeline_skin_hair_face_chin.png` (1,266 KB)
+- `highres_natural_parity_600x899_natural_preview.png` (959 KB)
+- `highres_natural_parity_2000x2997_export_downsampled_to_600x899.png` (1,050 KB)
+- `test_report.json` (Trạng thái: `PASSED`, 24 phép đo định lượng đạt chuẩn).
+
+---
+
+## Trạng thái Công cụ & Kế hoạch Tiếp tục
+- **Tình trạng nghiệm thu**: Khóa toàn bộ ở trạng thái **`IMPLEMENTED_UNVERIFIED`** theo quy chuẩn Reality Checker cho đến khi nghiệm thu toàn diện độc lập cuối cùng. Tuyệt đối không tuyên bố "hoàn tất hệ thống" hay "production ready" khi đang trong tiến trình audit và hoàn thiện tính năng.
 - **Lệnh tái chạy toàn bộ hệ thống**:
   - `npm run build`: Typecheck và build cả server (`tsc`) và web (`tsc -b && vite build`).
-  - `npm test`: Chạy toàn bộ test endpoint server (4 ca kiểm thử) và test runner hình ảnh thật (11 artifacts định lượng).
+  - `npm test`: Chạy 6 test cases bảo mật server và visual verification suite 5 sections. Tỉ lệ đạt: 100%.
 
