@@ -69,7 +69,7 @@
         "noAsAnyCast": true,
         "inBundle": true
       },
-      "bodyLines": 46,
+      "bodyLines": 47,
       "passed": true
     },
     {
@@ -105,7 +105,7 @@
         "noAsAnyCast": true,
         "inBundle": true
       },
-      "bodyLines": 43,
+      "bodyLines": 44,
       "passed": true
     },
     {
@@ -159,7 +159,7 @@
         "noAsAnyCast": true,
         "inBundle": true
       },
-      "bodyLines": 43,
+      "bodyLines": 44,
       "passed": true
     },
     {
@@ -195,7 +195,187 @@
         "noAsAnyCast": true,
         "inBundle": true
       },
-      "bodyLines": 41,
+      "bodyLines": 40,
+      "passed": true
+    },
+    {
+      "effect": "eye_bags",
+      "featureCode": "B012",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 43,
+      "passed": true
+    },
+    {
+      "effect": "face_width",
+      "featureCode": "B014",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 43,
+      "passed": true
+    },
+    {
+      "effect": "jaw_angle",
+      "featureCode": "B015",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 44,
+      "passed": true
+    },
+    {
+      "effect": "chin_length",
+      "featureCode": "B018",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 44,
+      "passed": true
+    },
+    {
+      "effect": "cheekbone_width",
+      "featureCode": "B020",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 44,
+      "passed": true
+    },
+    {
+      "effect": "eye_height",
+      "featureCode": "B026",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 43,
+      "passed": true
+    },
+    {
+      "effect": "eye_length",
+      "featureCode": "B027",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 43,
+      "passed": true
+    },
+    {
+      "effect": "eye_color",
+      "featureCode": "B029",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 42,
+      "passed": true
+    },
+    {
+      "effect": "eyelid_lift",
+      "featureCode": "B032",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 43,
+      "passed": true
+    },
+    {
+      "effect": "double_eyelid",
+      "featureCode": "B033",
+      "checks": {
+        "typeField": true,
+        "defaultState": true,
+        "pipelineParams": true,
+        "engineMethod": true,
+        "engineMethodBody": true,
+        "previewPipeline": true,
+        "exportPipeline": true,
+        "editorUI": true,
+        "noAsAnyCast": true,
+        "inBundle": true
+      },
+      "bodyLines": 46,
       "passed": true
     }
   ],

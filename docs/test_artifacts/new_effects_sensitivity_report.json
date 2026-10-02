@@ -1,15 +1,15 @@
 {
-  "total": 11,
-  "required": 11,
+  "total": 21,
+  "required": 21,
   "blocked": 0,
-  "passed": 11,
+  "passed": 21,
   "failed": 0,
   "allPassed": true,
   "results": [
     {
       "name": "B006 skin_oil",
       "zeroDelta": "0.0000",
-      "positiveDelta": "1.7235",
+      "positiveDelta": "1.6275",
       "roiMAE": "5.3549",
       "outsideROI": "0.0000",
       "passed": true,
@@ -18,9 +18,9 @@
     {
       "name": "B008 skin_tone",
       "zeroDelta": "0.0000",
-      "positiveDelta": "2.6985",
-      "warmDelta": "2.6985",
-      "coolDelta": "2.4777",
+      "positiveDelta": "2.4187",
+      "warmDelta": "2.4187",
+      "coolDelta": "2.2121",
       "passed": true
     },
     {
@@ -63,16 +63,16 @@
     {
       "name": "B028 eye_bright",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.1669",
-      "roiMAE": "1.8544",
+      "positiveDelta": "0.1895",
+      "roiMAE": "2.1054",
       "outsideROI": "0.0000",
       "passed": true
     },
     {
       "name": "B034 eye_catchlight",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.1525",
-      "roiMAE": "2.0339",
+      "positiveDelta": "0.1512",
+      "roiMAE": "2.0164",
       "outsideROI": "0.0000",
       "passed": true
     },
@@ -93,13 +93,93 @@
       "roiMAE": "7.8897",
       "outsideROI": "0.0000",
       "passed": true
+    },
+    {
+      "name": "B012 eye_bags",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.1621",
+      "roiMAE": "2.0264",
+      "outsideROI": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "B014 face_width",
+      "zeroDelta": "0.0000",
+      "positiveNarrow": "0.1718",
+      "positiveWiden": "0.1850",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B015 jaw_angle",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.2567",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B018 chin_length",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.3113",
+      "positiveLengthen": "0.2785",
+      "positiveShorten": "0.3113",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B020 cheekbone_width",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.1482",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B026 eye_height",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.2444",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B027 eye_length",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.1194",
+      "roiMAE": "1.2784",
+      "outsideROI": "0.0000",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B029 eye_color",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.0184",
+      "roiMAE": "0.5223",
+      "outsideROI": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "B032 eyelid_lift",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.2538",
+      "roiMAE": "3.1201",
+      "outsideROI": "0.0000",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B033 double_eyelid",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.0784",
+      "roiMAE": "2.1768",
+      "outsideROI": "0.0000",
+      "passed": true
     }
   ],
   "parity": [
     {
       "resolution": "400px preview vs 800px export",
-      "mae": "0.653",
-      "psnr": "35.62",
+      "mae": "0.554",
+      "psnr": "38.37",
       "passed": true
     }
   ]

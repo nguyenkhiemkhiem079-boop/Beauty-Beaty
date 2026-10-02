@@ -215,3 +215,62 @@ Nhật ký hoạt động và bằng chứng tham gia thực tế của các Age
 - **Command**: `npm test` (bao gồm `npm run test --workspace=apps/server` và `node scripts/run_visual_verification.js`).
 - **Result**: TẤT CẢ SERVER TESTS (6/6) VÀ VISUAL TESTS (5/5) ĐỀU PASS 100%. Exit code = 0.
 
+---
+
+## Batch: BATCH-003-FACE-EYE-GEOMETRY-AND-CI (2026-10-02)
+
+| Field | Chi tiết |
+|---|---|
+| **Batch ID** | `BATCH-003-FACE-EYE-GEOMETRY-AND-CI` |
+| **Feature IDs** | `B012` (Reduce eye bags), `B014` (Face width), `B015` (Jaw angle), `B018` (Chin length), `B020` (Cheekbone width), `B026` (Eye height), `B027` (Eye length), `B029` (Eye color / contact lens), `B032` (Eyelid lift), `B033` (Double eyelid crease) |
+| **Execution Mode** | Autonomous Dev &harr; Hard QA Loop with Karpathy Guidelines. Single-agent runtime orchestration. |
+| **Status Result** | 10/10 features IMPLEMENTED_UNVERIFIED. 0 VERIFIED strictly locked. |
+
+### Chi tiết các Role Passes:
+
+#### 1. Agents Orchestrator & Project Shepherd
+- **Source**: `.agents/skills/agency-agents-orchestrator/SKILL.md`, `.agents/skills/agency-project-shepherd/SKILL.md`
+- **Assignment**: Chọn batch tính năng hình học khuôn mặt và mắt kế tiếp (B012, B014, B015, B018, B020, B026, B027, B029, B032, B033); giám sát luồng 14 tầng từ types, state, engine, UI, preview, export, draft persistence đến test sensitivity và GitHub CI.
+- **Decisions**: Khóa chặt quy tắc 0 VERIFIED; giữ nguyên baseline `a793c2b` không để hồi quy 11 hiệu ứng trước đó; loại bỏ mọi stub giả lập hay TODO.
+
+#### 2. Software Architect & AI Engineer
+- **Source**: `.agents/skills/agency-software-architect/SKILL.md`, `.agents/skills/agency-ai-engineer/SKILL.md`
+- **Assignment**: Thiết kế các giải thuật biến dạng hình học WebGL và Canvas 2D dựa trên 478 MediaPipe landmarks:
+  - `B012` (Eye Bags): WebGL upward sub-orbital warp + luminance groove fill nâng sáng rãnh trũng.
+  - `B014` (Face Width): WebGL bilateral pinch/expand warp tại thái dương [127, 356] (bidirectional slider -100 đến 100).
+  - `B015` (Jaw Angle): WebGL bilateral warp tinh chỉnh góc hàm mandibular [172, 397].
+  - `B018` (Chin Length): WebGL directional vertical warp dọc trục mặt từ môi đến đỉnh cằm [152] (bidirectional -100 đến 100).
+  - `B020` (Cheekbone Width): WebGL inward pinch warp tại xương gò má zygomatic arches [116, 345].
+  - `B026` (Eye Height): WebGL vertical eye stretch tách biệt mí trên [159, 386] và mí dưới [145, 374].
+  - `B027` (Eye Length): WebGL lateral canthus extension tại khóe mắt ngoài [33, 263].
+  - `B029` (Eye Color / Lens): Canvas 2D annular radial gradient từ viền con ngươi (0.36r) tới bờ ngoài mống mắt (0.85r - 1.0r) với soft-light blend mode, bảo toàn con ngươi và catchlight, không lem ra sclera hay mi mắt.
+  - `B032` (Eyelid Lift): WebGL upward lid apex warp tại đỉnh mí trên [159, 386].
+  - `B033` (Double Eyelid): Canvas 2D parabolic crease shadow và viền highlight mềm mại theo đường cong mi trên.
+- **Parity & Architecture**: Tích hợp toàn bộ vào `applyPipeline` với trật tự giải phẫu chuẩn: Geometry &rarr; Skin &rarr; Makeup/Eyes. Chuẩn hóa hỗ trợ `NormalizedLandmark[]` và `NormalizedLandmark[][]`.
+
+#### 3. Frontend Developer & UI Designer
+- **Source**: `.agents/skills/agency-frontend-developer/SKILL.md`, `.agents/skills/agency-ui-designer/SKILL.md`
+- **Assignment**: Thêm đầy đủ slider điều khiển trong UI Editor (Skin, Face, Eyes), bảng swatch màu lens mắt (nâu tây, xám khói, xanh ngọc, nâu hạt dẻ, xanh navy), tích hợp slider 2 chiều (-100 đến 100 cho bề rộng mặt và độ dài cằm), đồng bộ Undo/Redo, Category Reset và IndexedDB Drafts.
+
+#### 4. Evidence Collector & Reality Checker
+- **Source**: `.agents/skills/agency-evidence-collector/SKILL.md`, `.agents/skills/agency-reality-checker/SKILL.md`
+- **Assignment**: Đo lường định lượng và kiểm tra độc lập tính xác thực:
+  - Kiểm tra Zero-intensity bypass: Toàn bộ 21 hiệu ứng (Batch 1 + Batch 2) đều có MAE = 0.0000 khi slider = 0.
+  - Kiểm tra Positive delta: Mọi hiệu ứng tạo ra độ biến thiên thực tế rõ ràng (ví dụ: B018 chin_length MAE = 0.3113, B026 eye_height MAE = 0.2444, B032 eyelid_lift MAE = 0.2538 với ROI MAE = 3.1201).
+  - Kiểm tra ROI Protection: B029 eye_color bên ngoài hốc mắt = 0.0000, B033 double_eyelid ngoài vùng mi = 0.0000.
+  - Preview/Export Parity: Preview 400px so với Export 800px downsample đạt MAE = 0.554 (< 4.0 / 255) và PSNR = 38.37 dB (> 34.0 dB).
+  - Real Portrait Regression: 4 ảnh chân dung thật (chính diện, nghiêng, râu, nọng cằm) với 478 landmarks MediaPipe đều đạt submental lift, 0.0000 distortion môi/nền, parity PSNR 48.85 dB.
+  - Báo cáo lưu tại: `docs/test_artifacts/new_effects_sensitivity_report.json` và `docs/test_artifacts/new_effects_code_verification.json`.
+
+#### 5. DevOps Automator
+- **Source**: `.agents/skills/agency-devops-automator/SKILL.md`
+- **Assignment**: Thiết lập pipeline GitHub Actions CI độc lập (`.github/workflows/ci.yml`), tích hợp các stage: Install &rarr; Typecheck &rarr; Lint &rarr; Build &rarr; Server Tests &rarr; Code Verification.
+- **Verification Commands**:
+  - `npm run typecheck`: 0 errors (web & server).
+  - `npm run lint`: 0 errors.
+  - `npm run build`: Web & server built successfully.
+  - `npm run test:server`: 6/6 server tests pass.
+  - `node scripts/verify_new_effects.js`: 21/21 code structure & wiring verification PASS.
+  - `npm run test:visual`: 100% PASS trên 4 chân dung thật.
+
+
