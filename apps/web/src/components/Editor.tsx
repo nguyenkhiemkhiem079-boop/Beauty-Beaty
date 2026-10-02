@@ -5,8 +5,8 @@ import { segmenterManager } from '../engine/SegmenterManager';
 import { ImageEngine } from '../engine/ImageEngine';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 
-type ToolCategory = 'skin' | 'face' | 'hair' | 'body';
-type ToolType = 'skin_smooth' | 'face_slim' | 'hair_smooth' | 'chin_slim';
+type ToolCategory = 'skin' | 'face' | 'hair' | 'body' | 'ai';
+type ToolType = 'skin_smooth' | 'face_slim' | 'hair_smooth' | 'chin_slim' | 'ai_makeup';
 
 interface EditState {
   skin_smooth: number;
@@ -24,6 +24,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const [activeCategory, setActiveCategory] = useState<ToolCategory>('skin');
   const [activeTool, setActiveTool] = useState<ToolType>('skin_smooth');
   const [isDetecting, setIsDetecting] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
   
   const [editState, setEditState] = useState<EditState>({ skin_smooth: 0, face_slim: 0, hair_smooth: 0, chin_slim: 0 });
   const [history, setHistory] = useState<EditState[]>([{ skin_smooth: 0, face_slim: 0, hair_smooth: 0, chin_slim: 0 }]);
@@ -212,9 +213,22 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               <button className={`tab ${activeCategory === 'skin' ? 'active' : ''}`} onClick={() => {setActiveCategory('skin'); setActiveTool('skin_smooth');}}><Droplets size={20} /><br/>Da</button>
               <button className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => {setActiveCategory('face'); setActiveTool('face_slim');}}><UserRound size={20} /><br/>Mặt</button>
               <button className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => {setActiveCategory('hair'); setActiveTool('hair_smooth');}}><Scissors size={20} /><br/>Tóc</button>
+              <button className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => {setActiveCategory('ai'); setActiveTool('ai_makeup');}}><Wand2 size={20} /><br/>AI</button>
             </div>
 
             <div className="tool-content">
+              {activeCategory === 'ai' && (
+                <div className="tool-group">
+                  <h4 className="util-label">Cloud AI</h4>
+                  <div className={`tool-btn ${activeTool === 'ai_makeup' ? 'active' : ''}`} onClick={() => {
+                    setActiveTool('ai_makeup');
+                    setIsProcessingAI(true);
+                    setTimeout(() => { setIsProcessingAI(false); alert("Giả lập: Kết nối Backend thành công (API Key Missing)."); }, 2000);
+                  }}>
+                    <Wand2 size={16} /> Trang điểm AI (Cloud)
+                  </div>
+                </div>
+              )}
               {activeCategory === 'skin' && (
                 <div className="tool-group">
                   <h4 className="util-label">Làm đẹp da</h4>
