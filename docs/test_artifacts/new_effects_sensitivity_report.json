@@ -1,0 +1,78 @@
+{
+  "total": 14,
+  "passed": 3,
+  "failed": 11,
+  "allPassed": false,
+  "results": [
+    {
+      "name": "B005 nasolabial (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B005 nasolabial (intensity=0, bypass)",
+      "mae": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "B006 oil_reduction (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B008 skin_tone +50 (warm)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B008 skin_tone -50 (cool)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B010 skin_detail (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B011 dark_circles (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B016 jaw_slim (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B017 chin_vline (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B028 eye_bright (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B034 eye_catchlight (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "B064 hair_shine (no mask → no-op)",
+      "mae": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "X006 collarbone (intensity=100)",
+      "mae": "0.0000",
+      "passed": false
+    },
+    {
+      "name": "X006 collarbone (intensity=0, bypass)",
+      "mae": "0.0000",
+      "passed": true
+    }
+  ]
+}
