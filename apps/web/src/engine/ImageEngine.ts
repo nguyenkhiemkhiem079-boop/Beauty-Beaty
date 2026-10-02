@@ -13,12 +13,23 @@ export interface PipelineParams {
   nasolabial?: number;        // B005 nasolabial folds lift
   dark_circles?: number;      // B011 dark circle reduction
   skin_detail?: number;       // B010 high-pass grain overlay
+  eye_bags?: number;          // B012 eye bag reduction
   // Face geometry
   face_slim: number;          // B013
   chin_slim: number;          // B019
   jaw_slim?: number;          // B016 jaw contour
   chin_vline?: number;        // B017 chin V-line
+  face_width?: number;        // B014 face width (-100..100)
+  jaw_angle?: number;         // B015 jaw angle (0..100)
+  chin_length?: number;       // B018 chin length (-100..100)
+  cheekbone_width?: number;   // B020 cheekbone width (0..100)
   eye_enlarge?: number;       // B025
+  eye_height?: number;        // B026 eye height (0..100)
+  eye_length?: number;        // B027 eye length (0..100)
+  eye_color?: string;         // B029 eye color hex
+  eye_color_intensity?: number; // B029 eye color intensity (0..100)
+  eyelid_lift?: number;       // B032 eyelid lift (0..100)
+  double_eyelid?: number;     // B033 double eyelid crease (0..100)
   eye_bright?: number;        // B028 sclera brightening
   eye_catchlight?: number;    // B034 catchlight
   teeth_whiten?: number;      // B043
@@ -467,7 +478,7 @@ export class ImageEngine {
   }
 
   // Effect 1f: High-Frequency Skin Detail Restoration (Chi tiết da - B010)
-  applySkinDetail(landmarks: NormalizedLandmark[], intensity: number) {
+  applySkinDetail(_landmarks: NormalizedLandmark[], intensity: number) {
     if (intensity === 0) return;
     const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
     const w = this.workCanvas.width;
@@ -557,6 +568,95 @@ export class ImageEngine {
 
       ctx.save();
       ctx.globalAlpha = (intensity / 100.0) * 0.8;
+      ctx.drawImage(brightCanvas, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  // Effect 1h: Eye Bag Reduction (Giảm bọng mắt - B012)
+  applyEyeBagReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+    const scale = Math.max(w, h) / 800;
+
+    const leftInner = landmarks[133], leftOuter = landmarks[33], leftBottom = landmarks[145];
+    const rightInner = landmarks[362], rightOuter = landmarks[263], rightBottom = landmarks[374];
+    if (!leftInner || !leftOuter || !leftBottom || !rightInner || !rightOuter || !rightBottom) return;
+
+    const leftEyeW = Math.hypot((leftOuter.x - leftInner.x) * aspect, leftOuter.y - leftInner.y);
+    const rightEyeW = Math.hypot((rightOuter.x - rightInner.x) * aspect, rightOuter.y - rightInner.y);
+
+    // 1. WebGL Upward Warp to lift and flatten the bulging pouch
+    if (this.webGLWarp) {
+      const warpIntensity = (intensity / 100.0) * 0.35;
+      const leftBagCenter = {
+        x: (leftInner.x + leftOuter.x) / 2,
+        y: leftBottom.y + leftEyeW * 0.28
+      };
+      const leftBagTarget = {
+        x: leftBagCenter.x,
+        y: leftBagCenter.y - leftEyeW * 0.26 * warpIntensity
+      };
+
+      const rightBagCenter = {
+        x: (rightInner.x + rightOuter.x) / 2,
+        y: rightBottom.y + rightEyeW * 0.28
+      };
+      const rightBagTarget = {
+        x: rightBagCenter.x,
+        y: rightBagCenter.y - rightEyeW * 0.26 * warpIntensity
+      };
+
+      const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+        { center: leftBagCenter, target: leftBagTarget, radius: leftEyeW * 0.55, intensity: 0.9, mode: 0 },
+        { center: rightBagCenter, target: rightBagTarget, radius: rightEyeW * 0.55, intensity: 0.9, mode: 0 }
+      ]);
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(glCanvas, 0, 0);
+    }
+
+    // 2. Soft-light crease lift along the infraorbital bag groove
+    const bagGrooves = [
+      [111, 117, 118, 119, 120, 121, 128], // left groove
+      [340, 346, 347, 348, 349, 350, 357]  // right groove
+    ];
+
+    bagGrooves.forEach(pts => {
+      const brightCanvas = document.createElement('canvas');
+      brightCanvas.width = w; brightCanvas.height = h;
+      const bCtx = brightCanvas.getContext('2d')!;
+      const lightenVal = 100 + (intensity * 0.18);
+      bCtx.filter = `brightness(${lightenVal}%) saturate(${100 - intensity * 0.2}%)`;
+      bCtx.drawImage(this.workCanvas, 0, 0);
+      bCtx.filter = 'none';
+
+      const mCanvas = document.createElement('canvas');
+      mCanvas.width = w; mCanvas.height = h;
+      const mCtx = mCanvas.getContext('2d')!;
+      mCtx.clearRect(0, 0, w, h);
+      mCtx.beginPath();
+      pts.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) mCtx.moveTo(pt.x * w, pt.y * h);
+        else mCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      mCtx.lineWidth = 14 * scale;
+      mCtx.lineCap = 'round';
+      mCtx.lineJoin = 'round';
+      mCtx.strokeStyle = 'white';
+      mCtx.filter = `blur(${10 * scale}px)`;
+      mCtx.stroke();
+      mCtx.filter = 'none';
+
+      bCtx.globalCompositeOperation = 'destination-in';
+      bCtx.drawImage(mCanvas, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha = (intensity / 100.0) * 0.65;
       ctx.drawImage(brightCanvas, 0, 0);
       ctx.restore();
     });
@@ -671,6 +771,91 @@ export class ImageEngine {
     }
   }
 
+  // Effect 3b: Face Width (Bề rộng khuôn mặt - B014) - WebGL Bilateral Warp
+  applyFaceWidth(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftTemple = landmarks[127];
+    const rightTemple = landmarks[356];
+    const nose = landmarks[1];
+    if (!leftTemple || !rightTemple || !nose) return;
+
+    const faceW = Math.abs((rightTemple.x - leftTemple.x) * aspect);
+    const radius = faceW * 0.60;
+    // intensity > 0 narrows, intensity < 0 widens
+    const factor = (intensity / 100.0) * 0.038;
+
+    const leftTarget = { x: leftTemple.x + factor, y: leftTemple.y };
+    const rightTarget = { x: rightTemple.x - factor, y: rightTemple.y };
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftTemple, target: leftTarget, radius, intensity: 0.9, mode: 0 },
+      { center: rightTemple, target: rightTarget, radius, intensity: 0.9, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 3c: Jaw Angle (Góc quai hàm - B015) - WebGL Bilateral Warp
+  applyJawAngle(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftAngle = landmarks[172];
+    const rightAngle = landmarks[397];
+    const chin = landmarks[152];
+    if (!leftAngle || !rightAngle || !chin) return;
+
+    const jawW = Math.abs((rightAngle.x - leftAngle.x) * aspect);
+    const radius = jawW * 0.45;
+    const mapped = (intensity / 100.0) * 0.040;
+
+    const leftTarget = { x: leftAngle.x + mapped, y: leftAngle.y - mapped * 0.25 };
+    const rightTarget = { x: rightAngle.x - mapped, y: rightAngle.y - mapped * 0.25 };
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftAngle, target: leftTarget, radius, intensity: 0.9, mode: 0 },
+      { center: rightAngle, target: rightTarget, radius, intensity: 0.9, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 3d: Cheekbone Width (Hạ gò má - B020) - WebGL Pinch Warp
+  applyCheekboneWidth(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftCheekbone = landmarks[116];
+    const rightCheekbone = landmarks[345];
+    const nose = landmarks[1];
+    if (!leftCheekbone || !rightCheekbone || !nose) return;
+
+    const cheekW = Math.abs((rightCheekbone.x - leftCheekbone.x) * aspect);
+    const radius = cheekW * 0.45;
+    const mapped = (intensity / 100.0) * 0.035;
+
+    const leftTarget = { x: leftCheekbone.x + mapped, y: leftCheekbone.y };
+    const rightTarget = { x: rightCheekbone.x - mapped, y: rightCheekbone.y };
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftCheekbone, target: leftTarget, radius, intensity: 0.9, mode: 0 },
+      { center: rightCheekbone, target: rightTarget, radius, intensity: 0.9, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
   // Effect 4: Eye Enlargement (Mắt to - B025) - WebGL Radial Bulge
   applyEyeEnlargement(landmarks: NormalizedLandmark[], intensity: number) {
     if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
@@ -708,6 +893,101 @@ export class ImageEngine {
       { center: rightCenter, target: rightCenter, radius: rightWidth * 1.15, intensity: warpIntensity, mode: 1.0 }
     ]);
 
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 4b: Eye Height (Chiều cao mắt - B026) - WebGL Vertical Eye Stretch
+  applyEyeHeight(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    const leftTop = landmarks[159], leftBottom = landmarks[145];
+    const rightTop = landmarks[386], rightBottom = landmarks[374];
+    if (!leftTop || !leftBottom || !rightTop || !rightBottom) return;
+
+    const leftH = Math.abs(leftBottom.y - leftTop.y);
+    const rightH = Math.abs(rightBottom.y - rightTop.y);
+    const shiftLeft = (intensity / 100.0) * Math.max(leftH * 0.45, 0.015);
+    const shiftRight = (intensity / 100.0) * Math.max(rightH * 0.45, 0.015);
+
+    const radiusLeft = Math.max(leftH * 1.8, 0.045);
+    const radiusRight = Math.max(rightH * 1.8, 0.045);
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftTop, target: { x: leftTop.x, y: leftTop.y - shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
+      { center: leftBottom, target: { x: leftBottom.x, y: leftBottom.y + shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
+      { center: rightTop, target: { x: rightTop.x, y: rightTop.y - shiftRight }, radius: radiusRight, intensity: 0.85, mode: 0 },
+      { center: rightBottom, target: { x: rightBottom.x, y: rightBottom.y + shiftRight }, radius: radiusRight, intensity: 0.85, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 4c: Eye Length (Chiều dài mắt - B027) - WebGL Lateral Eye Warp
+  applyEyeLength(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftOuter = landmarks[33], leftInner = landmarks[133];
+    const rightOuter = landmarks[263], rightInner = landmarks[362];
+    if (!leftOuter || !leftInner || !rightOuter || !rightInner) return;
+
+    const leftEyeW = Math.hypot((leftOuter.x - leftInner.x) * aspect, leftOuter.y - leftInner.y);
+    const rightEyeW = Math.hypot((rightOuter.x - rightInner.x) * aspect, rightOuter.y - rightInner.y);
+    const shift = (intensity / 100.0) * 0.65;
+
+    const leftTarget = {
+      x: leftOuter.x + (leftOuter.x - leftInner.x) * shift,
+      y: leftOuter.y + (leftOuter.y - leftInner.y) * shift * 0.2
+    };
+    const rightTarget = {
+      x: rightOuter.x + (rightOuter.x - rightInner.x) * shift,
+      y: rightOuter.y + (rightOuter.y - rightInner.y) * shift * 0.2
+    };
+
+    const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
+    const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftOuter, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
+      { center: rightOuter, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 4d: Eyelid Lift (Nâng mí sụp - B032) - WebGL Upward Warp
+  applyEyelidLift(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftTop = landmarks[159], leftInner = landmarks[133], leftOuter = landmarks[33];
+    const rightTop = landmarks[386], rightInner = landmarks[362], rightOuter = landmarks[263];
+    if (!leftTop || !rightTop || !leftInner || !leftOuter || !rightInner || !rightOuter) return;
+
+    const leftEyeW = Math.hypot((leftOuter.x - leftInner.x) * aspect, leftOuter.y - leftInner.y);
+    const rightEyeW = Math.hypot((rightOuter.x - rightInner.x) * aspect, rightOuter.y - rightInner.y);
+    const liftDist = (intensity / 100.0) * Math.max(leftEyeW * 0.40, 0.05);
+
+    const leftTarget = { x: leftTop.x, y: leftTop.y - liftDist };
+    const rightTarget = { x: rightTop.x, y: rightTop.y - liftDist };
+
+    const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
+    const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftTop, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
+      { center: rightTop, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
+    ]);
     const ctx = this.workCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(glCanvas, 0, 0);
@@ -955,6 +1235,40 @@ export class ImageEngine {
     const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
       { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.5, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
       { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.5, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 5d: Chin Length (Chiều dài cằm - B018) - WebGL Directional Warp
+  applyChinLength(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const chin = landmarks[152];
+    const lowerLip = landmarks[17];
+    if (!chin || !lowerLip) return;
+
+    const dx = chin.x - lowerLip.x;
+    const dy = chin.y - lowerLip.y;
+    const len = Math.hypot(dx * aspect, dy);
+    if (len < 0.0001) return;
+
+    const ux = (dx * aspect) / len;
+    const uy = dy / len;
+    // intensity > 0 elongates chin downward, intensity < 0 shortens chin upward
+    const shiftDist = (intensity / 100.0) * Math.max(len * 0.75, 0.08);
+    const target = {
+      x: chin.x + (ux / aspect) * shiftDist,
+      y: chin.y + uy * shiftDist
+    };
+    const radius = Math.max(len * 1.5, 0.22);
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: chin, target, radius, intensity: 1.0, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, h);
@@ -1265,13 +1579,149 @@ export class ImageEngine {
     });
   }
 
+  // Effect 9e: Eye Color / Contact Lens (Màu mắt / Lens - B029)
+  applyEyeColor(landmarks: NormalizedLandmark[], colorHex: string, intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    const leftIris = landmarks[468], rightIris = landmarks[473];
+    const leftInner = landmarks[133], leftOuter = landmarks[33];
+    const rightInner = landmarks[362], rightOuter = landmarks[263];
+    if (!leftIris || !rightIris || !leftInner || !leftOuter || !rightInner || !rightOuter) return;
+
+    const leftEyeW = Math.hypot((leftOuter.x - leftInner.x) * w, (leftOuter.y - leftInner.y) * h);
+    const rightEyeW = Math.hypot((rightOuter.x - rightInner.x) * w, (rightOuter.y - rightInner.y) * h);
+
+    // Parse colorHex to RGB
+    let hex = (colorHex || '#3d6b8c').replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const cr = parseInt(hex.substring(0, 2), 16) || 61;
+    const cg = parseInt(hex.substring(2, 4), 16) || 107;
+    const cb = parseInt(hex.substring(4, 6), 16) || 140;
+
+    const eyes = [
+      { center: leftIris, eyeW: leftEyeW },
+      { center: rightIris, eyeW: rightEyeW }
+    ];
+
+    eyes.forEach(eye => {
+      const cx = eye.center.x * w;
+      const cy = eye.center.y * h;
+      const irisR = eye.eyeW * 0.22;
+      const pupilR = irisR * 0.36;
+
+      const overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = w; overlayCanvas.height = h;
+      const oCtx = overlayCanvas.getContext('2d')!;
+
+      // Create radial gradient for iris annulus: pupil is preserved (alpha 0),
+      // annulus colored, outer edge feathered to 0 (no spill into sclera/skin)
+      const grad = oCtx.createRadialGradient(cx, cy, pupilR * 0.7, cx, cy, irisR);
+      grad.addColorStop(0, `rgba(${cr},${cg},${cb},0)`);
+      grad.addColorStop(0.35, `rgba(${cr},${cg},${cb},0)`); // preserve pupil center
+      grad.addColorStop(0.48, `rgba(${cr},${cg},${cb},${(intensity / 100.0) * 0.75})`);
+      grad.addColorStop(0.85, `rgba(${cr},${cg},${cb},${(intensity / 100.0) * 0.70})`);
+      grad.addColorStop(1.0, `rgba(${cr},${cg},${cb},0)`); // zero spill at border
+
+      oCtx.fillStyle = grad;
+      oCtx.beginPath();
+      oCtx.arc(cx, cy, irisR, 0, Math.PI * 2);
+      oCtx.fill();
+
+      // Blend onto work canvas using soft-light to preserve natural iris texture & striations
+      ctx.save();
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.drawImage(overlayCanvas, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  // Effect 9f: Double Eyelid Crease (Mắt 2 mí - B033)
+  applyDoubleEyelid(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    const eyeContourLeft = [33, 160, 159, 158, 133];
+    const eyeContourRight = [263, 387, 386, 385, 362];
+
+    const pairs = [
+      { contour: eyeContourLeft, topIdx: 159, innerIdx: 133, outerIdx: 33 },
+      { contour: eyeContourRight, topIdx: 386, innerIdx: 362, outerIdx: 263 }
+    ];
+
+    pairs.forEach(pair => {
+      const topPt = landmarks[pair.topIdx];
+      const innerPt = landmarks[pair.innerIdx];
+      const outerPt = landmarks[pair.outerIdx];
+      if (!topPt || !innerPt || !outerPt) return;
+
+      const eyeH = Math.hypot((outerPt.x - innerPt.x) * w, (outerPt.y - innerPt.y) * h) * 0.28;
+      const creaseHeight = Math.max(6 * scale, eyeH * 0.38);
+
+      const pts = pair.contour.map((idx, i) => {
+        const lm = landmarks[idx];
+        if (!lm) return null;
+        const t = i / (pair.contour.length - 1);
+        const arch = 4 * t * (1 - t);
+        return {
+          x: lm.x * w,
+          y: (lm.y * h) - (creaseHeight * arch)
+        };
+      }).filter(Boolean) as { x: number; y: number }[];
+
+      if (pts.length < 3) return;
+
+      // 1. Soft shadow crease line
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const xc = (pts[i].x + pts[i + 1].x) / 2;
+        const yc = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+
+      ctx.strokeStyle = `rgba(45, 25, 18, ${(intensity / 100.0) * 0.50})`;
+      ctx.lineWidth = Math.max(1.2, 1.8 * scale);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = `rgba(35, 18, 10, ${(intensity / 100.0) * 0.40})`;
+      ctx.shadowBlur = 2.5 * scale;
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Subtle soft highlight above crease for natural eyelid fold depth
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y - 1.5 * scale);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const xc = (pts[i].x + pts[i + 1].x) / 2;
+        const yc = ((pts[i].y + pts[i + 1].y) / 2) - 1.5 * scale;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y - 1.5 * scale, xc, yc);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y - 1.5 * scale);
+
+      ctx.strokeStyle = `rgba(255, 245, 235, ${(intensity / 100.0) * 0.22})`;
+      ctx.lineWidth = Math.max(0.8, 1.2 * scale);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
   // Effect 9d: Collarbone Definition (Xương quai xanh - X006)
   applyCollarboneDefinition(intensity: number) {
     if (intensity === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
-    const scale = Math.max(w, h) / 800;
 
     // Add a subtle shadow below collar zone (lower 1/4 of face area, centered)
     const collarY = h * 0.78;
@@ -1428,9 +1878,16 @@ export class ImageEngine {
     this.currentCropNorm = { x: x_n, y: y_n, w: w_n, h: h_n };
 
     // Coordinate mapping for landmarks into cropped coordinate space
-    let mappedLandmarks = landmarks;
-    if (landmarks && isCropped) {
-      mappedLandmarks = landmarks.map(lm => ({
+    let actualLandmarks: NormalizedLandmark[] | undefined = undefined;
+    if (landmarks) {
+      actualLandmarks = (Array.isArray(landmarks) && Array.isArray((landmarks as any)[0]))
+        ? (landmarks as any)[0]
+        : (landmarks as any);
+    }
+
+    let mappedLandmarks = actualLandmarks;
+    if (actualLandmarks && isCropped) {
+      mappedLandmarks = actualLandmarks.map(lm => ({
         ...lm,
         x: (lm.x - x_n) / w_n,
         y: (lm.y - y_n) / h_n,
@@ -1470,10 +1927,19 @@ export class ImageEngine {
     if (params.skin_detail && params.skin_detail > 0 && mappedLandmarks) {
       this.applySkinDetail(mappedLandmarks, params.skin_detail);
     }
+    if (params.eye_bags && params.eye_bags > 0 && mappedLandmarks) {
+      this.applyEyeBagReduction(mappedLandmarks, params.eye_bags);
+    }
 
     // Stage 2: Geometric Feature Shaping (WebGL Warp)
     if (params.face_slim > 0 && mappedLandmarks) {
       this.applyFaceSlimming(mappedLandmarks, params.face_slim);
+    }
+    if (params.face_width && params.face_width !== 0 && mappedLandmarks) {
+      this.applyFaceWidth(mappedLandmarks, params.face_width);
+    }
+    if (params.jaw_angle && params.jaw_angle > 0 && mappedLandmarks) {
+      this.applyJawAngle(mappedLandmarks, params.jaw_angle);
     }
     if (params.jaw_slim && params.jaw_slim > 0 && mappedLandmarks) {
       this.applyJawContour(mappedLandmarks, params.jaw_slim);
@@ -1481,14 +1947,35 @@ export class ImageEngine {
     if (params.chin_vline && params.chin_vline > 0 && mappedLandmarks) {
       this.applyChinVLine(mappedLandmarks, params.chin_vline);
     }
+    if (params.chin_length && params.chin_length !== 0 && mappedLandmarks) {
+      this.applyChinLength(mappedLandmarks, params.chin_length);
+    }
     if (params.chin_slim > 0 && mappedLandmarks) {
       this.applyDoubleChinReduction(mappedLandmarks, params.chin_slim);
+    }
+    if (params.cheekbone_width && params.cheekbone_width > 0 && mappedLandmarks) {
+      this.applyCheekboneWidth(mappedLandmarks, params.cheekbone_width);
     }
     if (params.eye_enlarge && params.eye_enlarge > 0 && mappedLandmarks) {
       this.applyEyeEnlargement(mappedLandmarks, params.eye_enlarge);
     }
+    if (params.eye_height && params.eye_height > 0 && mappedLandmarks) {
+      this.applyEyeHeight(mappedLandmarks, params.eye_height);
+    }
+    if (params.eye_length && params.eye_length > 0 && mappedLandmarks) {
+      this.applyEyeLength(mappedLandmarks, params.eye_length);
+    }
+    if (params.eyelid_lift && params.eyelid_lift > 0 && mappedLandmarks) {
+      this.applyEyelidLift(mappedLandmarks, params.eyelid_lift);
+    }
 
     // Stage 3: Facial Details (2D Canvas)
+    if (params.double_eyelid && params.double_eyelid > 0 && mappedLandmarks) {
+      this.applyDoubleEyelid(mappedLandmarks, params.double_eyelid);
+    }
+    if (params.eye_color_intensity && params.eye_color_intensity > 0 && mappedLandmarks) {
+      this.applyEyeColor(mappedLandmarks, params.eye_color || '#3d6b8c', params.eye_color_intensity);
+    }
     if (params.eye_bright && params.eye_bright > 0 && mappedLandmarks) {
       this.applyEyeBrightening(mappedLandmarks, params.eye_bright);
     }

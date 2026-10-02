@@ -522,7 +522,11 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
-    setEditState(prev => ({ ...prev, [activeTool]: val }));
+    if (activeTool === 'eye_color') {
+      setEditState(prev => ({ ...prev, eye_color_intensity: val }));
+    } else {
+      setEditState(prev => ({ ...prev, [activeTool]: val }));
+    }
   };
 
   const commitHistory = (stateToCommit?: EditState | React.SyntheticEvent | unknown) => {
@@ -640,14 +644,25 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         next.nasolabial = 0;
         next.dark_circles = 0;
         next.skin_detail = 0;
+        next.eye_bags = 0;
       } else if (activeCategory === 'face') {
         next.face_slim = 0;
         next.chin_slim = 0;
         next.jaw_slim = 0;
         next.chin_vline = 0;
+        next.face_width = 0;
+        next.jaw_angle = 0;
+        next.chin_length = 0;
+        next.cheekbone_width = 0;
         next.body_slim = 0;
       } else if (activeCategory === 'eyes') {
         next.eye_enlarge = 0;
+        next.eye_height = 0;
+        next.eye_length = 0;
+        next.eye_color = '#3d6b8c';
+        next.eye_color_intensity = 0;
+        next.eyelid_lift = 0;
+        next.double_eyelid = 0;
         next.eye_bright = 0;
         next.eye_catchlight = 0;
       } else if (activeCategory === 'mouth') {
@@ -848,6 +863,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'skin_detail' ? 'active' : ''}`} onClick={() => setActiveTool('skin_detail')}>
                     <Sparkles size={16} /> B010: Khôi phục chi tiết da
                   </div>
+                  <div className={`tool-btn ${activeTool === 'eye_bags' ? 'active' : ''}`} onClick={() => setActiveTool('eye_bags')}>
+                    <Eye size={16} /> B012: Giảm bọng mắt (Eye Bags)
+                  </div>
                   <div className={`tool-btn ${activeTool === 'skin_blemish' ? 'active' : ''}`} onClick={() => setActiveTool('skin_blemish')}>
                     <CircleDot size={16} /> B002: Chấm xóa thâm mụn (Healing Brush)
                   </div>
@@ -875,14 +893,26 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'face_slim' ? 'active' : ''}`} onClick={() => setActiveTool('face_slim')}>
                     <Minimize size={16} /> B013: Thon mặt (V-Line)
                   </div>
+                  <div className={`tool-btn ${activeTool === 'face_width' ? 'active' : ''}`} onClick={() => setActiveTool('face_width')}>
+                    <Minimize size={16} /> B014: Bề rộng mặt (Face Width)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'jaw_angle' ? 'active' : ''}`} onClick={() => setActiveTool('jaw_angle')}>
+                    <Minimize size={16} /> B015: Góc quai hàm (Jaw Angle)
+                  </div>
                   <div className={`tool-btn ${activeTool === 'jaw_slim' ? 'active' : ''}`} onClick={() => setActiveTool('jaw_slim')}>
                     <Minimize size={16} /> B016: Định hình đường hàm
                   </div>
                   <div className={`tool-btn ${activeTool === 'chin_vline' ? 'active' : ''}`} onClick={() => setActiveTool('chin_vline')}>
                     <Minimize size={16} /> B017: Cằm V-Line thanh tú
                   </div>
+                  <div className={`tool-btn ${activeTool === 'chin_length' ? 'active' : ''}`} onClick={() => setActiveTool('chin_length')}>
+                    <Minimize size={16} /> B018: Độ dài cằm (Chin Length)
+                  </div>
                   <div className={`tool-btn ${activeTool === 'chin_slim' ? 'active' : ''}`} onClick={() => setActiveTool('chin_slim')}>
                     <Minimize size={16} /> B019: Giảm nọng cằm Submental
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'cheekbone_width' ? 'active' : ''}`} onClick={() => setActiveTool('cheekbone_width')}>
+                    <Minimize size={16} /> B020: Hạ gò má (Cheekbones)
                   </div>
                   <div className={`tool-btn ${activeTool === 'body_slim' ? 'active' : ''}`} onClick={() => setActiveTool('body_slim')}>
                     <UserRound size={16} /> B075: Thon eo (Body Slim)
@@ -900,8 +930,55 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'eye_enlarge' ? 'active' : ''}`} onClick={() => setActiveTool('eye_enlarge')}>
                     <Eye size={16} /> B025: Mắt to tự nhiên (Radial Bulge)
                   </div>
+                  <div className={`tool-btn ${activeTool === 'eye_height' ? 'active' : ''}`} onClick={() => setActiveTool('eye_height')}>
+                    <Eye size={16} /> B026: Chiều cao mắt (Eye Height)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'eye_length' ? 'active' : ''}`} onClick={() => setActiveTool('eye_length')}>
+                    <Eye size={16} /> B027: Chiều dài mắt (Eye Length)
+                  </div>
                   <div className={`tool-btn ${activeTool === 'eye_bright' ? 'active' : ''}`} onClick={() => setActiveTool('eye_bright')}>
                     <Eye size={16} /> B028: Sáng mắt (Sclera Brightening)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'eye_color' ? 'active' : ''}`} onClick={() => setActiveTool('eye_color')}>
+                    <Palette size={16} /> B029: Màu lens / Màu mắt (Eye Color)
+                  </div>
+                  {activeTool === 'eye_color' && (
+                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
+                      <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>Bảng màu lens tự nhiên:</p>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {[
+                          { id: '#3d6b8c', name: 'Lam Sapphire' },
+                          { id: '#2a6f97', name: 'Xanh Đại dương' },
+                          { id: '#2e6f40', name: 'Lục Hazel' },
+                          { id: '#8b4513', name: 'Nâu Hổ phách' },
+                          { id: '#5d6b74', name: 'Xám Khói' }
+                        ].map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              setEditState(prev => ({ ...prev, eye_color: c.id, eye_color_intensity: prev.eye_color_intensity || 60 }));
+                              setTimeout(commitHistory, 50);
+                            }}
+                            title={c.name}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: c.id,
+                              border: (editState.eye_color || '#3d6b8c') === c.id ? '2px solid #d4af37' : '2px solid #ffffff',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                              cursor: 'pointer'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className={`tool-btn ${activeTool === 'eyelid_lift' ? 'active' : ''}`} onClick={() => setActiveTool('eyelid_lift')}>
+                    <Eye size={16} /> B032: Nâng mí sụp (Eyelid Lift)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'double_eyelid' ? 'active' : ''}`} onClick={() => setActiveTool('double_eyelid')}>
+                    <Sparkles size={16} /> B033: Mắt 2 mí (Double Eyelid)
                   </div>
                   <div className={`tool-btn ${activeTool === 'eye_catchlight' ? 'active' : ''}`} onClick={() => setActiveTool('eye_catchlight')}>
                     <Sparkles size={16} /> B034: Điểm sáng mắt long lanh (Catchlight)
@@ -1233,14 +1310,16 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 <div className="parameter-section">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                     <span style={{ fontWeight: 600, fontSize: '14px' }}>Cường độ</span>
-                    <span style={{ fontSize: '14px', color: 'var(--color-accent)' }}>{(editState as any)[activeTool] ?? 0}</span>
+                    <span style={{ fontSize: '14px', color: 'var(--color-accent)' }}>
+                      {activeTool === 'eye_color' ? (editState.eye_color_intensity ?? 0) : ((editState as any)[activeTool] ?? 0)}
+                    </span>
                   </div>
                   <input 
                     type="range" 
                     className="premium-slider"
-                    min={(['brightness', 'contrast', 'saturation', 'temperature', 'tint', 'skin_tone'] as ToolType[]).includes(activeTool) ? '-100' : '0'} 
+                    min={(['brightness', 'contrast', 'saturation', 'temperature', 'tint', 'skin_tone', 'chin_length', 'face_width'] as ToolType[]).includes(activeTool) ? '-100' : '0'} 
                     max="100" 
-                    value={(editState as any)[activeTool] ?? 0} 
+                    value={activeTool === 'eye_color' ? (editState.eye_color_intensity ?? 0) : ((editState as any)[activeTool] ?? 0)} 
                     onChange={handleSliderChange}
                     onMouseUp={commitHistory}
                     onTouchEnd={commitHistory}
