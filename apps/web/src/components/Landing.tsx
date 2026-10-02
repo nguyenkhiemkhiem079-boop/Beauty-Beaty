@@ -15,7 +15,7 @@ export const Landing: React.FC<Props> = ({ onStart }) => {
             <a href="#features" className="util-label">Tính năng</a>
             <a href="#privacy" className="util-label">Bảo mật</a>
           </div>
-          <button className="btn-primary" onClick={onStart}>Mở Editor</button>
+          <button className="btn-primary" data-testid="btn-open-editor" onClick={onStart}>Mở Editor</button>
         </div>
       </nav>
 
@@ -30,7 +30,7 @@ export const Landing: React.FC<Props> = ({ onStart }) => {
             </p>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '24px' }}>
-              <button className="btn-primary btn-large" onClick={onStart} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <button className="btn-primary btn-large" data-testid="btn-hero-start" onClick={onStart} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                 Chọn ảnh <ArrowRight size={18} />
               </button>
             </div>

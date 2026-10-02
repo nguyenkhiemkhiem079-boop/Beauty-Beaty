@@ -7,6 +7,7 @@ async function runTest() {
   
   process.env.PORT = '3099';
   delete process.env.MEITU_API_KEY;
+  delete process.env.MEITU_API_SECRET;
   delete process.env.AI_PROVIDER_KEY;
 
   // Import compiled server module
@@ -77,9 +78,22 @@ async function runTest() {
   }
   console.log('✅ TEST 1 PASSED: Endpoint returned 503 BLOCKED and 0 files were saved.');
 
-  // TEST 2: Request with API Key but NO registered processor (HTTP 501 NOT_IMPLEMENTED)
-  console.log('\n--- TEST 2: Key configured but NO Processor registered ---');
+  // TEST 1B: Request with partial credentials (only MEITU_API_KEY, missing MEITU_API_SECRET) -> HTTP 503 BLOCKED
+  console.log('\n--- TEST 1B: Partial Credentials (API Key only, missing Secret) ---');
   process.env.MEITU_API_KEY = 'test_meitu_mock_key_123';
+  delete process.env.MEITU_API_SECRET;
+  const response1B = await makePostRequest(createMultipartBody());
+  console.log(`Response 1B Status: ${response1B.statusCode}, Body: ${response1B.body}`);
+  const parsed1B = JSON.parse(response1B.body);
+  if (response1B.statusCode !== 503 || parsed1B.status !== 'BLOCKED') {
+    throw new Error(`Test 1B Failed: Expected 503 BLOCKED for partial credentials, got ${response1B.statusCode}`);
+  }
+  console.log('✅ TEST 1B PASSED: Partial credentials correctly rejected with 503 BLOCKED.');
+
+  // TEST 2: Request with full credentials configured but NO registered processor (HTTP 501 NOT_IMPLEMENTED)
+  console.log('\n--- TEST 2: Full credentials configured but NO Processor registered ---');
+  process.env.MEITU_API_KEY = 'test_meitu_mock_key_123';
+  process.env.MEITU_API_SECRET = 'test_meitu_mock_secret_456';
   unregisterProcessor('ai_enhance');
 
   const response2 = await makePostRequest(createMultipartBody('ai_enhance'));

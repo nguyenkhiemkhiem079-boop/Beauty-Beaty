@@ -1,0 +1,176 @@
+{
+  "timestamp": "2026-10-02T10:29:55.960Z",
+  "fixture": "real_portrait_front_real_photo_original.png",
+  "totalToolsTested": 12,
+  "allMonotonic": true,
+  "results": [
+    {
+      "tool": "skin_smooth",
+      "mae0": 0,
+      "mae30": 0.1474,
+      "mae60": 0.5424,
+      "mae100": 1.3852,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_skin_smooth_000.png",
+        "val30": "progression_skin_smooth_030.png",
+        "val60": "progression_skin_smooth_060.png",
+        "val100": "progression_skin_smooth_100.png"
+      }
+    },
+    {
+      "tool": "skin_brighten",
+      "mae0": 0,
+      "mae30": 0.1377,
+      "mae60": 0.6667,
+      "mae100": 1.8957,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_skin_brighten_000.png",
+        "val30": "progression_skin_brighten_030.png",
+        "val60": "progression_skin_brighten_060.png",
+        "val100": "progression_skin_brighten_100.png"
+      }
+    },
+    {
+      "tool": "skin_oil",
+      "mae0": 0,
+      "mae30": 0,
+      "mae60": 0.0059,
+      "mae100": 0.0625,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_skin_oil_000.png",
+        "val30": "progression_skin_oil_030.png",
+        "val60": "progression_skin_oil_060.png",
+        "val100": "progression_skin_oil_100.png"
+      }
+    },
+    {
+      "tool": "nasolabial",
+      "mae0": 0,
+      "mae30": 0.0035,
+      "mae60": 0.0098,
+      "mae100": 0.0311,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_nasolabial_000.png",
+        "val30": "progression_nasolabial_030.png",
+        "val60": "progression_nasolabial_060.png",
+        "val100": "progression_nasolabial_100.png"
+      }
+    },
+    {
+      "tool": "dark_circles",
+      "mae0": 0,
+      "mae30": 0.0013,
+      "mae60": 0.0072,
+      "mae100": 0.0249,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_dark_circles_000.png",
+        "val30": "progression_dark_circles_030.png",
+        "val60": "progression_dark_circles_060.png",
+        "val100": "progression_dark_circles_100.png"
+      }
+    },
+    {
+      "tool": "face_slim",
+      "mae0": 0,
+      "mae30": 1.7094,
+      "mae60": 2.496,
+      "mae100": 3.424,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_face_slim_000.png",
+        "val30": "progression_face_slim_030.png",
+        "val60": "progression_face_slim_060.png",
+        "val100": "progression_face_slim_100.png"
+      }
+    },
+    {
+      "tool": "chin_slim",
+      "mae0": 0,
+      "mae30": 0.031,
+      "mae60": 0.0465,
+      "mae100": 0.0622,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_chin_slim_000.png",
+        "val30": "progression_chin_slim_030.png",
+        "val60": "progression_chin_slim_060.png",
+        "val100": "progression_chin_slim_100.png"
+      }
+    },
+    {
+      "tool": "jaw_slim",
+      "mae0": 0,
+      "mae30": 0.0081,
+      "mae60": 0.0137,
+      "mae100": 0.0205,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_jaw_slim_000.png",
+        "val30": "progression_jaw_slim_030.png",
+        "val60": "progression_jaw_slim_060.png",
+        "val100": "progression_jaw_slim_100.png"
+      }
+    },
+    {
+      "tool": "chin_vline",
+      "mae0": 0,
+      "mae30": 0.053,
+      "mae60": 0.0857,
+      "mae100": 0.1209,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_chin_vline_000.png",
+        "val30": "progression_chin_vline_030.png",
+        "val60": "progression_chin_vline_060.png",
+        "val100": "progression_chin_vline_100.png"
+      }
+    },
+    {
+      "tool": "eye_enlarge",
+      "mae0": 0,
+      "mae30": 0.1287,
+      "mae60": 0.2229,
+      "mae100": 0.323,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_eye_enlarge_000.png",
+        "val30": "progression_eye_enlarge_030.png",
+        "val60": "progression_eye_enlarge_060.png",
+        "val100": "progression_eye_enlarge_100.png"
+      }
+    },
+    {
+      "tool": "teeth_whiten",
+      "mae0": 0,
+      "mae30": 0.0017,
+      "mae60": 0.0034,
+      "mae100": 0.0057,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_teeth_whiten_000.png",
+        "val30": "progression_teeth_whiten_030.png",
+        "val60": "progression_teeth_whiten_060.png",
+        "val100": "progression_teeth_whiten_100.png"
+      }
+    },
+    {
+      "tool": "hair_shine",
+      "mae0": 0,
+      "mae30": 0.6854,
+      "mae60": 1.3742,
+      "mae100": 2.2674,
+      "isMonotonic": true,
+      "artifacts": {
+        "val0": "progression_hair_shine_000.png",
+        "val30": "progression_hair_shine_030.png",
+        "val60": "progression_hair_shine_060.png",
+        "val100": "progression_hair_shine_100.png"
+      }
+    }
+  ]
+}

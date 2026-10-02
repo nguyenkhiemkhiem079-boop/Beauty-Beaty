@@ -81,7 +81,7 @@ export function hasProcessorFor(tool: string): boolean {
 registerProcessor('ai_enhance', meituProcessor);
 registerProcessor('ai_makeup', meituProcessor);
 
-const hasAiProviderConfigured = () => Boolean(process.env.MEITU_API_KEY || process.env.AI_PROVIDER_KEY);
+export const hasAiProviderConfigured = () => Boolean(process.env.MEITU_API_KEY && process.env.MEITU_API_SECRET);
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB max bounded upload
 
@@ -130,7 +130,7 @@ app.post('/api/jobs', upload.single('image'), (req, res) => {
     cleanupFile();
     return res.status(503).json({
       status: 'BLOCKED',
-      error: 'BLOCKED: Missing AI Provider API Key (Meitu API). AI cloud jobs are blocked until credentials are provided.'
+      error: 'BLOCKED: Missing AI Provider Credentials (MEITU_API_KEY and MEITU_API_SECRET). AI cloud jobs are blocked until credentials are provided.'
     });
   }
 

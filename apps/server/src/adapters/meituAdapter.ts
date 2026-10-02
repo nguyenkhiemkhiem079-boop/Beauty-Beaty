@@ -79,13 +79,13 @@ export async function meituProcessor(job: Job, filePath: string, config?: MeituA
   }
 
   const apiKey = config?.apiKey || process.env.MEITU_API_KEY;
-  const apiSecret = config?.apiSecret || process.env.MEITU_API_SECRET || 'default_secret';
+  const apiSecret = config?.apiSecret || process.env.MEITU_API_SECRET;
   const apiUrl = config?.apiUrl || process.env.MEITU_API_URL || 'https://openapi.meitu.com/v1/image/process';
   const timeoutMs = config?.timeoutMs || Number(process.env.AI_REQUEST_TIMEOUT_MS) || 30000;
 
   // 2. Credential Check (Explicit BLOCKED_EXTERNAL if credentials are not configured)
-  if (!apiKey) {
-    throw new Error('BLOCKED_EXTERNAL: Missing MEITU_API_KEY. Cloud AI processing is blocked pending provider credentials.');
+  if (!apiKey || !apiSecret) {
+    throw new Error('BLOCKED_EXTERNAL: Missing MEITU_API_KEY or MEITU_API_SECRET. Cloud AI processing is blocked pending complete provider credentials.');
   }
 
   // 3. Setup Cancellation & Timeout AbortController

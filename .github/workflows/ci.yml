@@ -11,10 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  core-verification:
-    name: Core Verification (Typecheck, Lint, Build, Server Tests)
+  static-checks:
+    name: Static Quality & Build Gate
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -28,17 +27,132 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Typecheck
+      - name: TypeScript Compilation Check
         run: npm run typecheck
 
-      - name: Run ESLint
+      - name: Code Linter (oxlint)
         run: npm run lint
 
-      - name: Build Web & Server
+      - name: Production Bundle Build
         run: npm run build
 
-      - name: Run Server Tests
+  server-contract:
+    name: Server Security & Provider Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Server
+        run: npm run build:server
+
+      - name: Run Server Security & Lifecycle Tests
         run: npm run test:server
 
-      - name: Verify Effects Code & Wiring
+  effects-qa:
+    name: Effects Wiring & Sensitivity Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        run: npm run build:web
+
+      - name: Verify Effects Wiring & Implementations
         run: npm run verify:effects
+
+      - name: Verify Effect Sensitivity & Zero-Bypass
+        run: npm run test:effects
+
+      - name: Upload Effect QA Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: effects-qa-reports
+          path: docs/test_artifacts/new_effects_*.json
+
+  visual-qa:
+    name: Real Portrait Visual Verification & High-Res Parity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        run: npm run build:web
+
+      - name: Run Real Portrait Visual Verification
+        run: npm run test:visual
+
+      - name: Upload Visual Evidence Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-evidence-artifacts
+          path: |
+            docs/test_artifacts/*.png
+            docs/test_artifacts/test_report.json
+
+  browser-e2e:
+    name: Playwright Browser End-to-End User Flow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium with OS Dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Web Application
+        run: npm run build:web
+
+      - name: Run Playwright Browser E2E Test Suite
+        run: npx playwright test
+
+      - name: Upload Playwright Reports & Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-artifacts
+          path: |
+            docs/test_artifacts/playwright-report/
+            docs/test_artifacts/playwright_e2e_export.png
+            docs/test_artifacts/progression_*.png
+            docs/test_artifacts/monotonic_progression_report.json

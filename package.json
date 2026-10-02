@@ -17,10 +17,12 @@
     "test:visual": "node scripts/run_visual_verification.js",
     "test:effects": "node scripts/test_new_effects_sensitivity.js",
     "verify:effects": "node scripts/verify_new_effects.js",
+    "test:e2e": "playwright test",
     "lint": "npm run lint --workspace=apps/web",
     "typecheck": "tsc -p apps/web/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "concurrently": "^10.0.5"
   }
 }

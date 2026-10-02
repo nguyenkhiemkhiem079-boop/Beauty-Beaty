@@ -25,6 +25,9 @@ const distBundle = path.join(webSrc, '..', 'dist', 'assets');
 const engineSrc = fs.readFileSync(engineFile, 'utf8');
 const editorSrc = fs.readFileSync(editorFile, 'utf8');
 const typesSrc = fs.readFileSync(typesFile, 'utf8');
+const publicToolsFile = path.join(webSrc, 'config', 'publicTools.ts');
+const publicToolsSrc = fs.existsSync(publicToolsFile) ? fs.readFileSync(publicToolsFile, 'utf8') : '';
+const uiSrc = editorSrc + '\n' + publicToolsSrc;
 
 // Find the compiled bundle JS
 let bundleSrc = '';
@@ -309,9 +312,9 @@ for (const effect of EFFECTS) {
     previewPipeline: checkPipelineWiring(effect.pipelineCall),
     exportPipeline: checkPipelineWiring(effect.pipelineCall), // same applyPipeline for both
     // 7. Editor UI control
-    editorUI: checkInSource(editorSrc, "'" + effect.editorControl + "'") || checkInSource(editorSrc, '"' + effect.editorControl + '"'),
+    editorUI: checkInSource(uiSrc, "'" + effect.editorControl + "'") || checkInSource(uiSrc, '"' + effect.editorControl + '"'),
     // 8. No 'as any' cast for this effect
-    noAsAnyCast: !editorSrc.includes(`'${effect.editorControl}' as any`) && !editorSrc.includes(`"${effect.editorControl}" as any`),
+    noAsAnyCast: !uiSrc.includes(`'${effect.editorControl}' as any`) && !uiSrc.includes(`"${effect.editorControl}" as any`),
     // 9. Bundle contains unique algorithmic strings that survive minification
     // (canvas.filter, rgba literals etc. are not mangled)
     inBundle: bundleSrc ? (
@@ -343,14 +346,14 @@ const historyCheck = EFFECTS.every(e => checkInSource(typesSrc, e.typeField + ':
 console.log(`${historyCheck ? '✅' : '❌'} All 11 fields in EditState (used for undo/redo history snapshots)`);
 
 console.log('\n=== RESET STATE CHECK ===');
-// resetCurrentCategory must cover all new fields
+// resetCurrentCategory or resetCategoryValues must cover all new fields
 const resetCheck = EFFECTS.every(e => 
-  checkInSource(editorSrc, 'next.' + e.typeField + ' = 0') ||
-  checkInSource(editorSrc, 'next.' + e.typeField + ' = ')
+  checkInSource(uiSrc, 'next.' + e.typeField + ' = 0') ||
+  checkInSource(uiSrc, 'next.' + e.typeField + ' = ')
 );
 const resetDetail = EFFECTS.map(e => ({
   field: e.typeField,
-  inReset: checkInSource(editorSrc, 'next.' + e.typeField + ' = 0') || checkInSource(editorSrc, 'next.' + e.typeField + ' = ')
+  inReset: checkInSource(uiSrc, 'next.' + e.typeField + ' = 0') || checkInSource(uiSrc, 'next.' + e.typeField + ' = ')
 }));
 for (const d of resetDetail) {
   const icon = d.inReset ? '  ✓' : '  ✗';

@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { 
   Undo2, Redo2, Download, ArrowLeft, Upload, Loader2, Sparkles, 
-  UserRound, Droplets, Scissors, Minimize, Eye, Smile, 
+  UserRound, Droplets, Scissors, Eye, Smile, 
   Sliders, Palette, LayoutTemplate, SplitSquareVertical, Crop,
-  LayoutGrid, Save, Bookmark, CircleDot, Search, X, RotateCcw, ShieldCheck
+  LayoutGrid, Save, Bookmark, Search, X, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
@@ -14,68 +14,14 @@ import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
 import { CollageMaker } from './CollageMaker';
 import { saveDraft, loadLatestDraft, clearAllDrafts, type AppDraft } from '../utils/draftStorage';
-
-interface ToolDef {
-  id: ToolType;
-  name: string;
-  category: ToolCategory;
-  subgroup?: string;
-  desc: string;
-  min?: number;
-  max?: number;
-  icon: React.ComponentType<{ size?: number; className?: string; color?: string }>;
-}
-
-const ALL_TOOLS: ToolDef[] = [
-  // Skin
-  { id: 'skin_smooth', name: 'Mịn da', category: 'skin', subgroup: 'Làn da', desc: 'Làm mịn bề mặt da tự nhiên, bảo toàn kết cấu vi mô.', icon: Droplets },
-  { id: 'skin_brighten', name: 'Sáng da', category: 'skin', subgroup: 'Làn da', desc: 'Nâng sáng vùng da tối màu mà không làm cháy sáng.', icon: Sparkles },
-  { id: 'skin_oil', name: 'Khử bóng dầu', category: 'skin', subgroup: 'Làn da', desc: 'Khử vùng phản xạ bóng nhờn, mang lại bề mặt da lì mịn màng.', icon: Droplets },
-  { id: 'skin_tone', name: 'Tông da', category: 'skin', subgroup: 'Làn da', desc: 'Điều chỉnh sắc thái da ấm hoặc trắng hồng tươi tắn.', icon: Palette, min: -100, max: 100 },
-  { id: 'skin_detail', name: 'Chi tiết da', category: 'skin', subgroup: 'Làn da', desc: 'Khôi phục vi chi tiết lỗ chân lông tự nhiên sau khi làm mịn.', icon: Sparkles },
-  { id: 'skin_blemish', name: 'Xóa thâm mụn', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Chấm cọ trực tiếp lên nốt mụn để xóa sạch tự nhiên.', icon: CircleDot },
-  { id: 'nasolabial', name: 'Rãnh cười', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Làm mờ nếp gấp rãnh cười sâu giữa mũi và khóe miệng.', icon: Smile },
-  { id: 'dark_circles', name: 'Quầng thâm mắt', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Khử sắc tối và làm sáng bừng vùng da dưới mắt.', icon: Eye },
-  { id: 'eye_bags', name: 'Bọng mắt', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Co gọn nhẹ nhàng bọng mỡ dưới mí mắt.', icon: Eye },
-
-  // Face
-  { id: 'face_slim', name: 'Thon mặt', category: 'face', subgroup: 'Dáng mặt', desc: 'Thu gọn hai bên má tạo dáng mặt thanh thoát.', icon: Minimize },
-  { id: 'face_width', name: 'Độ rộng khuôn mặt', category: 'face', subgroup: 'Dáng mặt', desc: 'Điều chỉnh khuôn mặt thon gọn hoặc đầy đặn hơn.', icon: Minimize, min: -100, max: 100 },
-  { id: 'cheekbone_width', name: 'Gò má', category: 'face', subgroup: 'Dáng mặt', desc: 'Hạ xương gò má nhô cao giúp đường nét mềm mại.', icon: Minimize },
-  { id: 'jaw_angle', name: 'Góc hàm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Điều chỉnh góc xương hàm mềm mại hoặc góc cạnh.', icon: Minimize },
-  { id: 'jaw_slim', name: 'Đường viền hàm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Nâng và vuốt gọn đường viền hàm dưới từ cằm tới mang tai.', icon: Minimize },
-  { id: 'chin_vline', name: 'Cằm V-line', category: 'face', subgroup: 'Hàm & cằm', desc: 'Thu hẹp đỉnh cằm tạo hình chữ V thanh tú.', icon: Minimize },
-  { id: 'chin_length', name: 'Độ dài cằm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Kéo dài hoặc thu ngắn cằm theo tỷ lệ khuôn mặt.', icon: Minimize, min: -100, max: 100 },
-  { id: 'chin_slim', name: 'Giảm nọng cằm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Nâng mô mỡ dưới cằm, giảm nọng rõ rệt.', icon: Minimize },
-
-  // Eyes
-  { id: 'eye_enlarge', name: 'Mắt to', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Phóng to đôi mắt tự nhiên, long lanh hơn.', icon: Eye },
-  { id: 'eye_height', name: 'Chiều cao mắt', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Mở rộng mí mắt trên và dưới theo chiều dọc.', icon: Eye },
-  { id: 'eye_length', name: 'Chiều dài mắt', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Kéo dài đuôi mắt về phía thái dương sắc sảo.', icon: Eye },
-  { id: 'eyelid_lift', name: 'Nâng mí', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Nâng mí mắt trên đỡ sụp, tạo ánh nhìn tươi trẻ.', icon: Eye },
-  { id: 'eye_color', name: 'Màu mắt', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Đổi màu kính áp tròng tự nhiên với bảng màu chọn lọc.', icon: Palette },
-  { id: 'double_eyelid', name: 'Mí đôi', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Tạo đường nếp mí đôi mềm mại uốn cong theo dáng mắt.', icon: Sparkles },
-  { id: 'eye_bright', name: 'Sáng mắt', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Tăng độ trong trẻo cho lòng trắng mắt, khử ánh đỏ.', icon: Eye },
-  { id: 'eye_catchlight', name: 'Điểm sáng', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Thêm điểm sáng phản chiếu long lanh trong con ngươi.', icon: Sparkles },
-
-  // Mouth
-  { id: 'teeth_whiten', name: 'Trắng răng', category: 'mouth', subgroup: 'Nụ cười', desc: 'Khử sắc vàng xỉn trong khoang miệng, mang lại nụ cười rạng ngời.', icon: Smile },
-
-  // Hair
-  { id: 'hair_smooth', name: 'Mượt tóc', category: 'hair', subgroup: 'Chăm sóc tóc', desc: 'Làm mềm mượt và giảm xơ rối cho mái tóc.', icon: Scissors },
-  { id: 'hair_shine', name: 'Bóng tóc', category: 'hair', subgroup: 'Chăm sóc tóc', desc: 'Tăng ánh sáng bóng khỏe, chuẩn salon cho mái tóc.', icon: Sparkles },
-
-  // Body
-  { id: 'body_slim', name: 'Thon eo', category: 'body', subgroup: 'Vóc dáng', desc: 'Thu nhỏ vòng eo thon gọn và cân đối.', icon: UserRound },
-  { id: 'collarbone', name: 'Xương quai xanh', category: 'body', subgroup: 'Vóc dáng', desc: 'Tôn rõ đường xương quai xanh quyến rũ.', icon: UserRound },
-
-  // Adjust
-  { id: 'brightness', name: 'Độ sáng', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Điều chỉnh ánh sáng tổng thể của bức ảnh.', icon: Sliders, min: -100, max: 100 },
-  { id: 'contrast', name: 'Độ tương phản', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Tăng giảm độ tương phản giữa vùng sáng và vùng tối.', icon: Sliders, min: -100, max: 100 },
-  { id: 'saturation', name: 'Độ bão hòa', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Điều chỉnh độ rực rỡ của các gam màu.', icon: Sliders, min: -100, max: 100 },
-  { id: 'temperature', name: 'Nhiệt độ màu', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Cân bằng sắc ấm vàng nắng hoặc mát xanh dịu.', icon: Sliders, min: -100, max: 100 },
-  { id: 'tint', name: 'Sắc thái màu', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Tinh chỉnh sắc thái màu ngả xanh lá hoặc tím hồng.', icon: Sliders, min: -100, max: 100 },
-];
+import { 
+  PUBLIC_TOOLS, 
+  type PublicToolDef, 
+  getToolValue, 
+  setToolValue, 
+  resetToolValue, 
+  resetCategoryValues 
+} from '../config/publicTools';
 
 interface Props {
   onExit: () => void;
@@ -194,11 +140,14 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   };
 
   const showOriginal = () => {
-    if (!canvasRef.current || !originalImage) return;
+    if (!canvasRef.current || !originalImage || !engineRef.current) return;
+    const faceLandmarks = landmarks?.[0];
+    engineRef.current.applyPipeline(DEFAULT_EDIT_STATE, faceLandmarks);
+    const workCanvas = engineRef.current.getCanvas();
     const ctx = canvasRef.current.getContext('2d');
     if (ctx) {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      ctx.drawImage(originalImage, 0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.drawImage(workCanvas, 0, 0);
     }
   };
 
@@ -588,7 +537,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     if (activeTool === 'eye_color') {
       setEditState(prev => ({ ...prev, eye_color_intensity: val }));
     } else {
-      setEditState(prev => ({ ...prev, [activeTool]: val }));
+      setEditState(prev => setToolValue(prev, activeTool, val));
     }
   };
 
@@ -697,72 +646,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   };
 
   const handleResetTool = (toolId: ToolType) => {
-    setEditState(prev => {
-      const next = { ...prev };
-      if (toolId === 'eye_color') {
-        next.eye_color = '#3d6b8c';
-        next.eye_color_intensity = 0;
-      } else {
-        (next as any)[toolId] = 0;
-      }
-      return next;
-    });
+    setEditState(prev => resetToolValue(prev, toolId));
     setTimeout(commitHistory, 50);
   };
 
   const resetCurrentCategory = () => {
-    setEditState(prev => {
-      const next = { ...prev };
-      if (activeCategory === 'skin') {
-        next.skin_smooth = 0;
-        next.skin_brighten = 0;
-        next.skin_oil = 0;
-        next.skin_tone = 0;
-        next.nasolabial = 0;
-        next.dark_circles = 0;
-        next.skin_detail = 0;
-        next.eye_bags = 0;
-      } else if (activeCategory === 'face') {
-        next.face_slim = 0;
-        next.chin_slim = 0;
-        next.jaw_slim = 0;
-        next.chin_vline = 0;
-        next.face_width = 0;
-        next.jaw_angle = 0;
-        next.chin_length = 0;
-        next.cheekbone_width = 0;
-      } else if (activeCategory === 'body') {
-        next.body_slim = 0;
-        next.collarbone = 0;
-      } else if (activeCategory === 'eyes') {
-        next.eye_enlarge = 0;
-        next.eye_height = 0;
-        next.eye_length = 0;
-        next.eye_color = '#3d6b8c';
-        next.eye_color_intensity = 0;
-        next.eyelid_lift = 0;
-        next.double_eyelid = 0;
-        next.eye_bright = 0;
-        next.eye_catchlight = 0;
-      } else if (activeCategory === 'mouth') {
-        next.teeth_whiten = 0;
-      } else if (activeCategory === 'hair') {
-        next.hair_smooth = 0;
-        next.hair_shine = 0;
-      } else if (activeCategory === 'adjust') {
-        next.brightness = 0;
-        next.contrast = 0;
-        next.saturation = 0;
-        next.temperature = 0;
-        next.tint = 0;
-      } else if (activeCategory === 'filters') {
-        next.filter_id = '';
-      } else if (activeCategory === 'templates') {
-        next.template_id = '';
-        next.template_custom_text = undefined;
-      }
-      return next;
-    });
+    setEditState(prev => resetCategoryValues(prev, activeCategory));
     setTimeout(commitHistory, 50);
   };
 
@@ -778,8 +667,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         <div style={{ position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', border: '1px solid #d4af37', padding: '12px 24px', borderRadius: '8px', zIndex: 100, display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
           <Bookmark size={20} color="#d4af37" />
           <span style={{ fontSize: '13px', color: '#f8fafc' }}>Tìm thấy bản thảo chưa hoàn tất từ phiên làm việc trước ({new Date(draftAvailable.timestamp).toLocaleTimeString()}).</span>
-          <button onClick={() => handleRestoreDraft(draftAvailable)} style={{ background: '#d4af37', color: '#000', fontWeight: 600, border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer' }}>Khôi phục</button>
-          <button onClick={handleDiscardDraft} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #475569', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Bỏ qua</button>
+          <button data-testid="btn-restore-draft" onClick={() => handleRestoreDraft(draftAvailable)} style={{ background: '#d4af37', color: '#000', fontWeight: 600, border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer' }}>Khôi phục</button>
+          <button data-testid="btn-discard-draft" onClick={handleDiscardDraft} style={{ background: 'transparent', color: '#94a3b8', border: '1px solid #475569', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>Bỏ qua</button>
         </div>
       )}
 
@@ -799,11 +688,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         <div className="nav-center">
           {imageSrc && (
             <div className="history-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button className="btn-icon" onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)"><Undo2 size={18} /></button>
-              <button className="btn-icon" onClick={handleRedo} disabled={historyIndex === history.length - 1} title="Redo (Ctrl+Shift+Z)"><Redo2 size={18} /></button>
+              <button className="btn-icon" data-testid="btn-undo" onClick={handleUndo} disabled={historyIndex === 0} title="Undo (Ctrl+Z)"><Undo2 size={18} /></button>
+              <button className="btn-icon" data-testid="btn-redo" onClick={handleRedo} disabled={historyIndex === history.length - 1} title="Redo (Ctrl+Shift+Z)"><Redo2 size={18} /></button>
               
               <button 
                 className={`btn-compare ${isComparing ? 'active' : ''}`}
+                data-testid="btn-compare"
                 onMouseDown={() => setIsComparing(true)}
                 onMouseUp={() => setIsComparing(false)}
                 onTouchStart={() => setIsComparing(true)}
@@ -815,6 +705,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
               <button 
                 onClick={handleManualSaveDraft}
+                data-testid="btn-save-draft"
                 className="btn-secondary" 
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', fontSize: '12px' }}
                 title="Lưu bản thảo vào IndexedDB"
@@ -828,13 +719,14 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button 
             onClick={() => setIsCollageOpen(true)}
+            data-testid="btn-open-collage"
             className="btn-secondary" 
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', fontSize: '13px' }}
           >
             <LayoutGrid size={15} color="#d4af37" /> Ghép ảnh
           </button>
           {imageSrc && (
-            <button className="btn-primary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button className="btn-primary" data-testid="btn-export" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Download size={16} /> Lưu & Xuất
             </button>
           )}
@@ -856,7 +748,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               </p>
               <label className="btn-primary btn-large" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '20px' }}>
                 <Upload size={18} /> Chọn ảnh
-                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                <input type="file" data-testid="file-upload-input" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
               </label>
 
               {/* Secondary areas */}
@@ -896,6 +788,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               )}
               <canvas 
                 ref={canvasRef} 
+                data-testid="main-canvas"
                 className="main-canvas" 
                 onClick={handleCanvasClick}
                 style={{ cursor: activeTool === 'skin_blemish' ? 'crosshair' : 'default' }}
@@ -905,29 +798,27 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         </div>
 
         {imageSrc && (() => {
-          const currentToolDef = ALL_TOOLS.find(t => t.id === activeTool);
-          const activeToolVal = activeTool === 'eye_color' 
-            ? (editState.eye_color_intensity ?? 0) 
-            : ((editState as any)[activeTool] ?? 0);
+          const currentToolDef = PUBLIC_TOOLS.find(t => t.id === activeTool);
+          const activeToolVal = getToolValue(editState, activeTool);
 
           const searchResults = searchQuery.trim() 
-            ? ALL_TOOLS.filter(t => 
+            ? PUBLIC_TOOLS.filter(t => 
                 t.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) || 
                 (t.subgroup && t.subgroup.toLowerCase().includes(searchQuery.toLowerCase().trim())) ||
-                t.desc.toLowerCase().includes(searchQuery.toLowerCase().trim())
+                t.desc.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+                t.searchTerms.some(term => term.toLowerCase().includes(searchQuery.toLowerCase().trim()))
               )
             : [];
 
-          const renderToolButton = (tool: ToolDef) => {
-            const val = tool.id === 'eye_color' 
-              ? (editState.eye_color_intensity ?? 0) 
-              : ((editState as any)[tool.id] ?? 0);
+          const renderToolButton = (tool: PublicToolDef) => {
+            const val = getToolValue(editState, tool.id);
             const isModified = val !== 0;
             const Icon = tool.icon;
 
             return (
               <div 
                 key={tool.id} 
+                data-testid={`tool-item-${tool.id}`}
                 className={`tool-btn-compact ${activeTool === tool.id ? 'active' : ''}`}
                 onClick={() => {
                   setActiveTool(tool.id);
@@ -973,37 +864,37 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               {/* Category Navigation Bar (when not searching) */}
               {!searchQuery.trim() && (
                 <div className="category-tabs">
-                  <button className={`tab ${activeCategory === 'skin' ? 'active' : ''}`} onClick={() => { setActiveCategory('skin'); setActiveTool('skin_smooth'); }}>
+                  <button data-testid="tab-skin" className={`tab ${activeCategory === 'skin' ? 'active' : ''}`} onClick={() => { setActiveCategory('skin'); setActiveTool('skin_smooth'); }}>
                     <Droplets size={16} />Da
                   </button>
-                  <button className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
+                  <button data-testid="tab-face" className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
                     <UserRound size={16} />Mặt
                   </button>
-                  <button className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
+                  <button data-testid="tab-eyes" className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
                     <Eye size={16} />Mắt
                   </button>
-                  <button className={`tab ${activeCategory === 'mouth' ? 'active' : ''}`} onClick={() => { setActiveCategory('mouth'); setActiveTool('teeth_whiten'); }}>
+                  <button data-testid="tab-mouth" className={`tab ${activeCategory === 'mouth' ? 'active' : ''}`} onClick={() => { setActiveCategory('mouth'); setActiveTool('teeth_whiten'); }}>
                     <Smile size={16} />Nụ cười
                   </button>
-                  <button className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => { setActiveCategory('hair'); setActiveTool('hair_smooth'); }}>
+                  <button data-testid="tab-hair" className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => { setActiveCategory('hair'); setActiveTool('hair_smooth'); }}>
                     <Scissors size={16} />Tóc
                   </button>
-                  <button className={`tab ${activeCategory === 'body' ? 'active' : ''}`} onClick={() => { setActiveCategory('body'); setActiveTool('body_slim'); }}>
+                  <button data-testid="tab-body" className={`tab ${activeCategory === 'body' ? 'active' : ''}`} onClick={() => { setActiveCategory('body'); setActiveTool('body_slim'); }}>
                     <UserRound size={16} />Vóc dáng
                   </button>
-                  <button className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
+                  <button data-testid="tab-adjust" className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
                     <Sliders size={16} />Chỉnh màu
                   </button>
-                  <button className={`tab ${activeCategory === 'crop' ? 'active' : ''}`} onClick={() => { setActiveCategory('crop'); setActiveTool('crop'); }}>
+                  <button data-testid="tab-crop" className={`tab ${activeCategory === 'crop' ? 'active' : ''}`} onClick={() => { setActiveCategory('crop'); setActiveTool('crop'); }}>
                     <Crop size={16} />Cắt ảnh
                   </button>
-                  <button className={`tab ${activeCategory === 'filters' ? 'active' : ''}`} onClick={() => { setActiveCategory('filters'); }}>
+                  <button data-testid="tab-filters" className={`tab ${activeCategory === 'filters' ? 'active' : ''}`} onClick={() => { setActiveCategory('filters'); }}>
                     <Palette size={16} />Bộ lọc
                   </button>
-                  <button className={`tab ${activeCategory === 'templates' ? 'active' : ''}`} onClick={() => { setActiveCategory('templates'); }}>
+                  <button data-testid="tab-templates" className={`tab ${activeCategory === 'templates' ? 'active' : ''}`} onClick={() => { setActiveCategory('templates'); }}>
                     <LayoutTemplate size={16} />Mẫu bìa
                   </button>
-                  <button className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => { setActiveCategory('ai'); }}>
+                  <button data-testid="tab-ai" className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => { setActiveCategory('ai'); }}>
                     <Sparkles size={16} />Cloud AI
                   </button>
                 </div>
@@ -1040,6 +931,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                           </div>
                           {activeToolVal !== 0 && (
                             <button 
+                              data-testid="btn-reset-tool"
                               onClick={() => handleResetTool(activeTool)}
                               style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer' }}
                               title="Đặt lại công cụ này"
@@ -1083,6 +975,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                               <span className="slider-bound-label">0</span>
                               <input 
                                 type="range"
+                                data-testid="tool-slider"
                                 className="premium-slider"
                                 min="0"
                                 max="100"
@@ -1103,6 +996,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                             </div>
                             <input 
                               type="range"
+                              data-testid="tool-slider"
                               className="premium-slider"
                               min="6"
                               max="35"
@@ -1120,6 +1014,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                             </span>
                             <input 
                               type="range"
+                              data-testid="tool-slider"
                               className="premium-slider"
                               min={currentToolDef.min === -100 ? '-100' : '0'}
                               max="100"
@@ -1144,10 +1039,10 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         </div>
 
                         <div className="tool-subgroup-title">Chăm sóc da</div>
-                        {ALL_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Làn da').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Làn da').map(renderToolButton)}
 
                         <div className="tool-subgroup-title">Khuyết điểm</div>
-                        {ALL_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Khuyết điểm').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Khuyết điểm').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1160,10 +1055,10 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         </div>
 
                         <div className="tool-subgroup-title">Dáng mặt</div>
-                        {ALL_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Dáng mặt').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Dáng mặt').map(renderToolButton)}
 
                         <div className="tool-subgroup-title">Hàm & cằm</div>
-                        {ALL_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Hàm & cằm').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Hàm & cằm').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1176,10 +1071,10 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         </div>
 
                         <div className="tool-subgroup-title">Hình dáng mắt</div>
-                        {ALL_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Hình dáng mắt').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Hình dáng mắt').map(renderToolButton)}
 
                         <div className="tool-subgroup-title">Trang điểm mắt</div>
-                        {ALL_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Trang điểm mắt').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Trang điểm mắt').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1190,7 +1085,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                           <h4 className="util-label" style={{ margin: 0 }}>Nụ cười</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
-                        {ALL_TOOLS.filter(t => t.category === 'mouth').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'mouth').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1201,7 +1096,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                           <h4 className="util-label" style={{ margin: 0 }}>Chăm sóc tóc</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
-                        {ALL_TOOLS.filter(t => t.category === 'hair').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'hair').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1212,7 +1107,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                           <h4 className="util-label" style={{ margin: 0 }}>Vóc dáng</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
-                        {ALL_TOOLS.filter(t => t.category === 'body').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'body').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1223,7 +1118,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                           <h4 className="util-label" style={{ margin: 0 }}>Chỉnh màu</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
                         </div>
-                        {ALL_TOOLS.filter(t => t.category === 'adjust').map(renderToolButton)}
+                        {PUBLIC_TOOLS.filter(t => t.category === 'adjust').map(renderToolButton)}
                       </div>
                     )}
 
@@ -1233,29 +1128,33 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         <h4 className="util-label" style={{ margin: '0 0 4px 0' }}>Cắt ảnh</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>Chọn tỷ lệ khung hình chuẩn để cắt ảnh gọn gàng:</p>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                          {[
-                            { id: 'original', label: 'Gốc' },
-                            { id: '1:1', label: '1:1 Vuông' },
-                            { id: '4:5', label: '4:5 Chân dung' },
-                            { id: '3:4', label: '3:4 Tiêu chuẩn' },
-                            { id: '9:16', label: '9:16 Câu chuyện' }
-                          ].map(item => (
-                            <button
-                              key={item.id}
-                              onClick={() => handleApplyCrop(item.id as any)}
-                              style={{
-                                padding: '12px 10px',
-                                borderRadius: '8px',
-                                border: (editState.crop?.aspectRatio || 'original') === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
-                                background: (editState.crop?.aspectRatio || 'original') === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
-                                cursor: 'pointer',
-                                fontWeight: 500,
-                                fontSize: '12px'
-                              }}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
+                          {(['original', '1:1', '4:5', '3:4', '9:16'] as const).map(ratio => {
+                            const labelMap = {
+                              'original': 'Gốc',
+                              '1:1': '1:1 Vuông',
+                              '4:5': '4:5 Chân dung',
+                              '3:4': '3:4 Tiêu chuẩn',
+                              '9:16': '9:16 Câu chuyện'
+                            };
+                            return (
+                              <button
+                                key={ratio}
+                                data-testid={`crop-ratio-${ratio}`}
+                                onClick={() => handleApplyCrop(ratio)}
+                                style={{
+                                  padding: '12px 10px',
+                                  borderRadius: '8px',
+                                  border: (editState.crop?.aspectRatio || 'original') === ratio ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                                  background: (editState.crop?.aspectRatio || 'original') === ratio ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                                  cursor: 'pointer',
+                                  fontWeight: 500,
+                                  fontSize: '12px'
+                                }}
+                              >
+                                {labelMap[ratio]}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
