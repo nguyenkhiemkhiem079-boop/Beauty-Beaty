@@ -86,6 +86,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     if (editState.hair_smooth > 0) {
       engineRef.current.applyHairSmoothing(editState.hair_smooth);
     }
+    if (editState.chin_slim > 0 && faceLandmarks) {
+      engineRef.current.applyDoubleChinReduction(faceLandmarks, editState.chin_slim);
+    }
     
     const ctx = canvasRef.current.getContext('2d');
     const workCanvas = engineRef.current.getCanvas();

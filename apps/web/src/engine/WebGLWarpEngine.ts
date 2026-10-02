@@ -1,3 +1,10 @@
+export interface WarpPoint {
+  center: { x: number, y: number };
+  target: { x: number, y: number };
+  radius: number;
+  intensity: number;
+}
+
 export class WebGLWarpEngine {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
@@ -33,40 +40,35 @@ export class WebGLWarpEngine {
       precision highp float;
       varying vec2 v_texCoord;
       uniform sampler2D u_image;
-      uniform float u_intensity;
-      uniform vec2 u_centerL;
-      uniform vec2 u_centerR;
-      uniform vec2 u_nose;
-      uniform float u_radius;
+      
+      uniform vec2 u_centers[10];
+      uniform vec2 u_targets[10];
+      uniform float u_radii[10];
+      uniform float u_intensities[10];
+      uniform int u_numPoints;
+      
       uniform float u_aspect;
 
       void main() {
         vec2 tc = v_texCoord;
         vec2 tcAdj = vec2(tc.x * u_aspect, tc.y);
-        vec2 noseAdj = vec2(u_nose.x * u_aspect, u_nose.y);
-        vec2 centerLAdj = vec2(u_centerL.x * u_aspect, u_centerL.y);
-        vec2 centerRAdj = vec2(u_centerR.x * u_aspect, u_centerR.y);
 
-        // Pinch logic: pull cheeks towards nose. 
-        // Inverse mapping: To shrink the face, a point near the cheek should sample from further outside.
-        // Therefore we subtract the inward vector.
-        
-        float distL = distance(tcAdj, centerLAdj);
-        if (distL < u_radius) {
-            float factor = (1.0 - (distL / u_radius)) * u_intensity;
-            // Vector from cheek to nose
-            vec2 shift = (u_nose - u_centerL) * factor;
-            tc -= shift;
+        for (int i = 0; i < 10; i++) {
+            if (i >= u_numPoints) break;
+            
+            vec2 cAdj = vec2(u_centers[i].x * u_aspect, u_centers[i].y);
+            vec2 tAdj = vec2(u_targets[i].x * u_aspect, u_targets[i].y);
+            
+            float dist = distance(tcAdj, cAdj);
+            if (dist < u_radii[i]) {
+                float factor = (1.0 - (dist / u_radii[i])) * u_intensities[i];
+                // Inverse mapping: pinch tc towards target
+                // Shift is vector from center to target
+                vec2 shift = (u_targets[i] - u_centers[i]) * factor;
+                tc -= shift;
+            }
         }
 
-        float distR = distance(tcAdj, centerRAdj);
-        if (distR < u_radius) {
-            float factor = (1.0 - (distR / u_radius)) * u_intensity;
-            vec2 shift = (u_nose - u_centerR) * factor;
-            tc -= shift;
-        }
-
-        // Clamp to edge to avoid sampling outside
         tc = clamp(tc, 0.0, 1.0);
         gl_FragColor = texture2D(u_image, tc);
       }
@@ -114,7 +116,7 @@ export class WebGLWarpEngine {
     return prog;
   }
 
-  public applyWarp(image: HTMLCanvasElement, leftCheek: {x: number, y: number}, rightCheek: {x: number, y: number}, nose: {x: number, y: number}, intensity: number): HTMLCanvasElement {
+  public applyWarp(image: HTMLCanvasElement, points: WarpPoint[]): HTMLCanvasElement {
     this.gl.useProgram(this.program);
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
@@ -132,16 +134,30 @@ export class WebGLWarpEngine {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.texCoordBuffer);
     this.gl.vertexAttribPointer(texLoc, 2, this.gl.FLOAT, false, 0, 0);
 
-    this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_intensity"), (intensity / 100.0) * 0.3);
-    this.gl.uniform2f(this.gl.getUniformLocation(this.program, "u_centerL"), leftCheek.x, leftCheek.y);
-    this.gl.uniform2f(this.gl.getUniformLocation(this.program, "u_centerR"), rightCheek.x, rightCheek.y);
-    this.gl.uniform2f(this.gl.getUniformLocation(this.program, "u_nose"), nose.x, nose.y);
-    
+    const numPoints = Math.min(points.length, 10);
+    this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_numPoints"), numPoints);
+
+    const centers = new Float32Array(20);
+    const targets = new Float32Array(20);
+    const radii = new Float32Array(10);
+    const intensities = new Float32Array(10);
+
+    for (let i = 0; i < numPoints; i++) {
+        centers[i*2] = points[i].center.x;
+        centers[i*2+1] = points[i].center.y;
+        targets[i*2] = points[i].target.x;
+        targets[i*2+1] = points[i].target.y;
+        radii[i] = points[i].radius;
+        intensities[i] = points[i].intensity;
+    }
+
+    this.gl.uniform2fv(this.gl.getUniformLocation(this.program, "u_centers"), centers);
+    this.gl.uniform2fv(this.gl.getUniformLocation(this.program, "u_targets"), targets);
+    this.gl.uniform1fv(this.gl.getUniformLocation(this.program, "u_radii"), radii);
+    this.gl.uniform1fv(this.gl.getUniformLocation(this.program, "u_intensities"), intensities);
+
     const aspect = this.width / this.height;
     this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_aspect"), aspect);
-    
-    const faceW = Math.abs((rightCheek.x - leftCheek.x) * aspect);
-    this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_radius"), faceW * 0.6);
 
     this.gl.viewport(0, 0, this.width, this.height);
     this.gl.clearColor(0,0,0,0);

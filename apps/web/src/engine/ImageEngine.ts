@@ -210,11 +210,47 @@ export class ImageEngine {
     if (!leftCheek || !rightCheek || !nose) return;
 
     if (this.webGLWarp) {
-        const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, leftCheek, rightCheek, nose, intensity);
+        const aspect = w / h;
+        const faceW = Math.abs((rightCheek.x - leftCheek.x) * aspect);
+        const radius = faceW * 0.6;
+        const mappedIntensity = (intensity / 100.0) * 0.3;
+
+        const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+          { center: leftCheek, target: nose, radius, intensity: mappedIntensity },
+          { center: rightCheek, target: nose, radius, intensity: mappedIntensity }
+        ]);
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(glCanvas, 0, 0);
-    } else {
-        console.warn("WebGL Warp not available");
+    }
+  }
+
+  // Effect 4: Double Chin Reduction (Giảm nọng cằm)
+  applyDoubleChinReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const ctx = this.workCanvas.getContext('2d')!;
+    
+    const chin = landmarks[152];
+    const lowerLip = landmarks[17];
+    
+    if (!chin || !lowerLip) return;
+
+    if (this.webGLWarp) {
+        const aspect = w / h;
+        const chinToLip = Math.abs((lowerLip.y - chin.y) * aspect);
+        const radius = chinToLip * 2.5; // broad area below chin
+        const mappedIntensity = (intensity / 100.0) * 0.4;
+
+        // Create target slightly above chin to pull it upwards
+        const target = { x: chin.x, y: chin.y - 0.1 };
+
+        const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+          { center: chin, target, radius, intensity: mappedIntensity }
+        ]);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(glCanvas, 0, 0);
     }
   }
 }
