@@ -26,3 +26,15 @@
   - Thiết lập file theo dõi tính năng `FEATURES.md` và bằng chứng `TEST_EVIDENCE.md`.
 - **Reviewer (Reality Checker)**: M2 checkpoint passed (IMPLEMENTED_UNVERIFIED).
 
+## 2026-10-02 (M3 - Hair Segmentation & WebGL Warp)
+- **Role**: AI Engineer / Frontend Developer
+- **Task**: M3 - Nâng cấp Engine & Thêm tính năng Mượt tóc
+- **Action**:
+  - Tải model `selfie_multiclass.tflite` từ MediaPipe.
+  - Xây dựng `SegmenterManager` để trích xuất segmentation mask (Category 1 = Hair).
+  - Khởi tạo `WebGLWarpEngine` để sử dụng phần cứng GPU (WebGL) thay vì CPU khi warp bóp mặt, nhằm đảm bảo performace khi xuất file độ phân giải lớn.
+  - Tích hợp `applyHairSmoothing` vào `ImageEngine`, sử dụng mask tóc tạo viền mờ (soft edge) để blend với ảnh gốc.
+  - Đã wire tính năng lên UI (`App.tsx`).
+- **Next Action**: 
+  - Khởi chạy checkpoint kiểm thử M3 (build, undo/redo, check memory).
+  - Tích hợp Giảm nọng cằm (Double Chin) dựa trên WebGL Warp và Neck mask.

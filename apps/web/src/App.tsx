@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import './App.css';
 import { faceLandmarkManager } from './engine/FaceLandmarkManager';
+import { segmenterManager } from './engine/SegmenterManager';
 import { ImageEngine } from './engine/ImageEngine';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 
@@ -8,7 +9,9 @@ type ToolType = 'skin' | 'hair' | 'face' | 'chin';
 
 interface EditState {
   skin: number;
+  hair: number;
   face: number;
+  chin: number;
 }
 
 function App() {
@@ -17,9 +20,8 @@ function App() {
   const [activeTool, setActiveTool] = useState<ToolType>('skin');
   const [isDetecting, setIsDetecting] = useState(false);
   
-  // Edit state and history
-  const [editState, setEditState] = useState<EditState>({ skin: 0, face: 0 });
-  const [history, setHistory] = useState<EditState[]>([{ skin: 0, face: 0 }]);
+  const [editState, setEditState] = useState<EditState>({ skin: 0, hair: 0, face: 0, chin: 0 });
+  const [history, setHistory] = useState<EditState[]>([{ skin: 0, hair: 0, face: 0, chin: 0 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,8 +29,8 @@ function App() {
   const landmarksRef = useRef<NormalizedLandmark[][]>([]);
 
   useEffect(() => {
-    // Pre-initialize landmarker
     faceLandmarkManager.initialize().catch(console.error);
+    segmenterManager.initialize().catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -38,10 +40,9 @@ function App() {
   const applyEffects = () => {
     if (!engineRef.current || !canvasRef.current) return;
     
-    // Reset to original before applying ordered effects
     engineRef.current.reset();
     
-    const landmarks = landmarksRef.current[0]; // assume 1 face for now
+    const landmarks = landmarksRef.current[0];
     
     if (editState.skin > 0 && landmarks) {
       engineRef.current.applySkinSmoothing(landmarks, editState.skin);
@@ -49,8 +50,12 @@ function App() {
     if (editState.face > 0 && landmarks) {
       engineRef.current.applyFaceSlimming(landmarks, editState.face);
     }
+    // Hair smoothing happens after skin/warp
+    if (editState.hair > 0) {
+      engineRef.current.applyHairSmoothing(editState.hair);
+    }
+    // (Optional) Double chin logic
     
-    // Draw back to visible canvas
     const ctx = canvasRef.current.getContext('2d');
     const workCanvas = engineRef.current.getCanvas();
     if (ctx) {
@@ -85,22 +90,22 @@ function App() {
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // Init engine
           engineRef.current = new ImageEngine(canvas);
           
-          // Detect landmarks
           setIsDetecting(true);
           try {
             landmarksRef.current = await faceLandmarkManager.detectFaces(canvas);
-            console.log("Landmarks detected:", landmarksRef.current.length > 0 ? "Yes" : "No");
+            const mask = await segmenterManager.segment(canvas);
+            if (mask) {
+               engineRef.current.setSegmentationMask(mask);
+            }
           } catch (err) {
-            console.error("Landmark detection failed", err);
+            console.error("AI Analysis failed", err);
           }
           setIsDetecting(false);
           
-          // Reset state
-          setEditState({ skin: 0, face: 0 });
-          setHistory([{ skin: 0, face: 0 }]);
+          setEditState({ skin: 0, hair: 0, face: 0, chin: 0 });
+          setHistory([{ skin: 0, hair: 0, face: 0, chin: 0 }]);
           setHistoryIndex(0);
         }
       };
@@ -164,11 +169,10 @@ function App() {
         <main className="editor-workspace">
           <div className="sidebar">
             <div className="tool-list">
-              <button className={`tool-item ${activeTool === 'skin' ? 'active' : ''}`} onClick={() => setActiveTool('skin')}>✨ Mịn da (Skin)</button>
-              <button className={`tool-item ${activeTool === 'face' ? 'active' : ''}`} onClick={() => setActiveTool('face')}>👱‍♀️ Thon mặt (Face)</button>
-              {/* Other tools disabled for spike */}
-              <button className="tool-item" style={{ opacity: 0.5 }}>💆‍♀️ Mượt tóc (WIP)</button>
-              <button className="tool-item" style={{ opacity: 0.5 }}>👇 Giảm nọng (WIP)</button>
+              <button className={`tool-item ${activeTool === 'skin' ? 'active' : ''}`} onClick={() => setActiveTool('skin')}>✨ Mịn da</button>
+              <button className={`tool-item ${activeTool === 'hair' ? 'active' : ''}`} onClick={() => setActiveTool('hair')}>💆‍♀️ Mượt tóc</button>
+              <button className={`tool-item ${activeTool === 'face' ? 'active' : ''}`} onClick={() => setActiveTool('face')}>👱‍♀️ Thon mặt</button>
+              <button className={`tool-item ${activeTool === 'chin' ? 'active' : ''}`} onClick={() => setActiveTool('chin')} style={{ opacity: 0.5 }}>👇 Giảm nọng (WIP)</button>
             </div>
             
             <div style={{ marginTop: '40px' }}>
@@ -189,7 +193,7 @@ function App() {
               </div>
             ) : (
               <div style={{ position: 'relative' }}>
-                {isDetecting && <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}>Đang phân tích khuôn mặt...</div>}
+                {isDetecting && <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: '4px' }}>Đang phân tích AI...</div>}
                 <canvas ref={canvasRef} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
               </div>
             )}
@@ -197,7 +201,7 @@ function App() {
           <div className="parameter-panel">
             {imageSrc && (
               <>
-                <h3>Cường độ: {activeTool === 'skin' ? 'Mịn da' : 'Thon mặt'}</h3>
+                <h3>Cường độ</h3>
                 <input 
                   type="range" 
                   min="0" max="100" 
@@ -208,11 +212,13 @@ function App() {
                   style={{ width: '100%', marginTop: '16px' }} 
                 />
                 
-                <p className="util-label" style={{ marginTop: '24px' }}>Trạng thái</p>
+                <p className="util-label" style={{ marginTop: '24px' }}>Lịch sử</p>
                 <ul style={{ paddingLeft: '20px', fontSize: '14px', opacity: 0.8 }}>
                   <li>Faces detected: {landmarksRef.current.length}</li>
-                  <li>Skin effect: {editState.skin}%</li>
-                  <li>Face effect: {editState.face}%</li>
+                  <li>Skin: {editState.skin}%</li>
+                  <li>Hair: {editState.hair}%</li>
+                  <li>Face: {editState.face}%</li>
+                  <li>Chin: {editState.chin}%</li>
                 </ul>
               </>
             )}
@@ -243,10 +249,10 @@ function App() {
               Vẻ đẹp <br /> <span className="accent-italic">hoàn mỹ</span> <br /> trong tầm tay
             </h1>
             <p className="hero-body">
-              Công cụ chỉnh sửa ảnh chân dung chuyên nghiệp, mang đến vẻ đẹp tự nhiên chỉ với vài cú click. Ưu tiên xử lý Local-First, riêng tư & an toàn tuyệt đối.
+              Công cụ chỉnh sửa ảnh chân dung chuyên nghiệp, mang đến vẻ đẹp tự nhiên chỉ với vài cú click. Ưu tiên xử lý Local-First.
             </p>
             <button className="cta-link" onClick={() => setMode('editor')}>
-              Bắt đầu chỉnh sửa ngay &rarr;
+              Bắt đầu ngay &rarr;
             </button>
           </div>
           <div className="hero-visual">
