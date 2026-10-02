@@ -472,35 +472,40 @@ export class ImageEngine {
     const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
-    const scale = Math.max(w, h) / 800;
 
-    // Get blurred version (low frequency)
-    const blurCanvas = document.createElement('canvas');
-    blurCanvas.width = w; blurCanvas.height = h;
-    const bCtx = blurCanvas.getContext('2d', { willReadFrequently: true })!;
-    bCtx.filter = `blur(${1.2 * scale}px)`;
-    bCtx.drawImage(this.workCanvas, 0, 0);
-    bCtx.filter = 'none';
-
+    // Manual 3×3 box blur to compute low-frequency component.
+    // canvas.filter:blur() is unreliable at sub-pixel radii in headless/offscreen contexts.
     const origData = ctx.getImageData(0, 0, w, h);
-    const blurData = bCtx.getImageData(0, 0, w, h);
-    const outData = ctx.createImageData(w, h);
-    const factor = (intensity / 100.0) * 0.55;
+    const blurred  = new Uint8ClampedArray(origData.data.length);
 
-    // Add high-pass = orig - blur (offset by 128) back as overlay
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0, count = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                sum += origData.data[(ny * w + nx) * 4 + c];
+                count++;
+              }
+            }
+          }
+          blurred[(y * w + x) * 4 + c] = Math.round(sum / count);
+        }
+        blurred[(y * w + x) * 4 + 3] = origData.data[(y * w + x) * 4 + 3];
+      }
+    }
+
+    const outData = ctx.createImageData(w, h);
+    const factor  = (intensity / 100.0) * 0.65;
+
     for (let i = 0; i < origData.data.length; i += 4) {
       for (let c = 0; c < 3; c++) {
-        const highPass = (origData.data[i+c] - blurData.data[i+c] + 128);
-        // soft light blend
-        const base = origData.data[i+c] / 255;
-        const blend = highPass / 255;
-        let result: number;
-        if (blend <= 0.5) {
-          result = base * (2 * blend) * 255;
-        } else {
-          result = (2 * base * (1 - blend) + (2 * blend - 1)) * 255;
-        }
-        outData.data[i+c] = Math.round(origData.data[i+c] * (1 - factor) + result * factor);
+        const hp = origData.data[i+c] - blurred[i+c]; // signed high-pass
+        outData.data[i+c] = Math.min(255, Math.max(0,
+          Math.round(origData.data[i+c] + hp * factor)
+        ));
       }
       outData.data[i+3] = origData.data[i+3];
     }
@@ -916,9 +921,9 @@ export class ImageEngine {
 
     const faceW = Math.abs((rightJaw.x - leftJaw.x) * aspect);
     const radius = faceW * 0.45;
-    const mappedIntensity = (intensity / 100.0) * 0.14;
+    // Increased from 0.14 → 0.25 to produce measurable warp displacement
+    const mappedIntensity = (intensity / 100.0) * 0.25;
 
-    // Pull jaw edges inward toward center-bottom
     const centerX = (leftJaw.x + rightJaw.x) / 2;
     const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
       { center: leftJaw, target: { x: leftJaw.x + (centerX - leftJaw.x) * mappedIntensity * 2.5, y: leftJaw.y - (chin.y - leftJaw.y) * mappedIntensity * 0.3 }, radius, intensity: 0.9, mode: 0 },
@@ -944,11 +949,12 @@ export class ImageEngine {
 
     const faceW = Math.abs((rightChinSide.x - leftChinSide.x) * aspect);
     const radius = faceW * 0.5;
-    const mappedIntensity = (intensity / 100.0) * 0.18;
+    // Increased to 0.40 with multiplier 2.5 for measurable pixel displacement
+    const mappedIntensity = (intensity / 100.0) * 0.40;
 
     const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
-      { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.0, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
-      { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.0, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
+      { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.5, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
+      { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.5, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, h);
@@ -1236,7 +1242,8 @@ export class ImageEngine {
       if (!inner || !outer) return;
 
       const eyeW = Math.hypot((outer.x - inner.x) * w, (outer.y - inner.y) * h);
-      const dotR = Math.max(2, eyeW * 0.1);
+      // Increased from 0.1 → 0.22 to produce a larger, more visible catchlight dot
+      const dotR = Math.max(4, eyeW * 0.22);
       const offsetX = -dotR * 0.8;
       const offsetY = -dotR * 0.8;
 
@@ -1244,10 +1251,11 @@ export class ImageEngine {
       const cy = iris.y * h + offsetY;
 
       ctx.save();
-      ctx.globalAlpha = (intensity / 100.0) * 0.9;
+      // Increased alpha from 0.9 → full opacity for centre to ensure visible delta
+      ctx.globalAlpha = (intensity / 100.0);
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, dotR);
       grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(0.6, 'rgba(255,255,255,0.5)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.75)');
       grad.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();

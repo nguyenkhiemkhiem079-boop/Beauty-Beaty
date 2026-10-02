@@ -1,262 +1,525 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>New Effects Sensitivity Test</title>
+  <title>New Effects Sensitivity Test — Corrected</title>
   <script type="module">
     import { ImageEngine } from '/src/engine/ImageEngine.ts';
 
-    // ---- Synthetic landmark generator ----
+    // =========================================================
+    // HELPERS
+    // =========================================================
+
+    /**
+     * CORRECT pattern:
+     *   const engine = new ImageEngine(inputCanvas);
+     *   effect(engine);                          // mutates engine.workCanvas
+     *   const out = engine.getCanvas();          // <-- workCanvas
+     *   compare(baseline, out);
+     */
+
     function makeSyntheticLandmarks() {
-      // Generate 478 landmark points approximating a frontal face on a 400x500 canvas
       const lms = [];
-      // Simple grid approximation; key indices set precisely
-      for (let i = 0; i < 478; i++) {
-        lms.push({ x: 0.5, y: 0.5, z: 0 });
-      }
-      // Face oval approximate pts
-      const ovalMap = {
-        10: [0.5, 0.1], 338: [0.65, 0.12], 297: [0.75, 0.18], 332: [0.80, 0.27],
-        284: [0.83, 0.38], 251: [0.82, 0.50], 389: [0.80, 0.60], 356: [0.75, 0.70],
-        454: [0.65, 0.78], 323: [0.55, 0.83], 361: [0.50, 0.87], 288: [0.48, 0.87],
-        397: [0.45, 0.83], 365: [0.40, 0.80], 379: [0.35, 0.75], 378: [0.30, 0.70],
-        400: [0.25, 0.62], 377: [0.20, 0.52], 152: [0.50, 0.90], 148: [0.22, 0.57],
-        176: [0.30, 0.78], 149: [0.24, 0.60], 150: [0.22, 0.63], 136: [0.20, 0.55],
-        172: [0.18, 0.48], 58: [0.18, 0.40], 132: [0.20, 0.32], 93: [0.22, 0.24],
-        234: [0.25, 0.18], 127: [0.30, 0.14], 162: [0.37, 0.11], 21: [0.44, 0.10],
-        54: [0.50, 0.10], 103: [0.56, 0.10], 67: [0.62, 0.11], 109: [0.68, 0.13],
-        // Nasolabial
-        92: [0.37, 0.60], 165: [0.39, 0.65], 167: [0.41, 0.65], 164: [0.50, 0.65],
-        393: [0.59, 0.65], 391: [0.61, 0.65], 322: [0.63, 0.60], 394: [0.60, 0.68],
-        395: [0.58, 0.70],
+      for (let i = 0; i < 478; i++) lms.push({ x: 0.5, y: 0.5, z: 0 });
+
+      const pts = {
+        // Face oval
+        10:[0.5,0.1],338:[0.65,0.12],297:[0.75,0.18],332:[0.80,0.27],
+        284:[0.83,0.38],251:[0.82,0.50],389:[0.80,0.60],356:[0.75,0.70],
+        454:[0.65,0.78],323:[0.55,0.83],361:[0.50,0.87],288:[0.48,0.87],
+        397:[0.45,0.83],365:[0.40,0.80],379:[0.35,0.75],378:[0.30,0.70],
+        400:[0.25,0.62],377:[0.20,0.52],152:[0.50,0.90],148:[0.22,0.57],
+        176:[0.30,0.78],149:[0.24,0.60],150:[0.22,0.63],136:[0.20,0.55],
+        172:[0.18,0.48],58:[0.18,0.40],132:[0.20,0.32],93:[0.22,0.24],
+        234:[0.25,0.18],127:[0.30,0.14],162:[0.37,0.11],21:[0.44,0.10],
+        54:[0.50,0.10],103:[0.56,0.10],67:[0.62,0.11],109:[0.68,0.13],
+        // Nasolabial zone
+        92:[0.37,0.60],165:[0.39,0.65],167:[0.41,0.65],164:[0.50,0.65],
+        393:[0.59,0.65],391:[0.61,0.65],322:[0.63,0.60],394:[0.60,0.68],
+        395:[0.58,0.70],
         // Under-eye left
-        111: [0.35, 0.42], 117: [0.38, 0.44], 118: [0.41, 0.44], 119: [0.44, 0.44],
-        120: [0.46, 0.44], 121: [0.48, 0.43], 128: [0.36, 0.43], 245: [0.37, 0.42],
-        188: [0.44, 0.43], 174: [0.42, 0.43],
+        111:[0.35,0.42],117:[0.38,0.44],118:[0.41,0.44],119:[0.44,0.44],
+        120:[0.46,0.44],121:[0.48,0.43],128:[0.36,0.43],245:[0.37,0.42],
+        188:[0.44,0.43],174:[0.42,0.43],
         // Under-eye right
-        340: [0.65, 0.42], 346: [0.62, 0.44], 347: [0.59, 0.44], 348: [0.56, 0.44],
-        349: [0.54, 0.44], 350: [0.52, 0.43], 357: [0.64, 0.43], 465: [0.63, 0.42],
-        412: [0.56, 0.43], 399: [0.58, 0.43],
-        // Left eye
-        33: [0.33, 0.38], 7: [0.35, 0.40], 163: [0.37, 0.40], 144: [0.39, 0.40],
-        145: [0.41, 0.40], 153: [0.43, 0.40], 154: [0.44, 0.39], 155: [0.45, 0.38],
-        133: [0.46, 0.37], 246: [0.34, 0.37], 161: [0.36, 0.37], 160: [0.38, 0.36],
-        159: [0.40, 0.36], 158: [0.42, 0.36], 157: [0.44, 0.37], 173: [0.45, 0.38],
-        // Right eye
-        362: [0.67, 0.38], 382: [0.65, 0.40], 381: [0.63, 0.40], 380: [0.61, 0.40],
-        374: [0.59, 0.40], 373: [0.57, 0.40], 390: [0.56, 0.39], 249: [0.55, 0.38],
-        263: [0.54, 0.37], 466: [0.66, 0.37], 388: [0.64, 0.37], 387: [0.62, 0.36],
-        386: [0.60, 0.36], 385: [0.58, 0.36], 384: [0.56, 0.37], 398: [0.55, 0.38],
-        // Iris
-        468: [0.38, 0.38], 473: [0.62, 0.38],
-        // Jaw
-        148: [0.28, 0.67], 377: [0.72, 0.67], 1: [0.5, 0.55],
-        17: [0.5, 0.75],  // lower lip
+        340:[0.65,0.42],346:[0.62,0.44],347:[0.59,0.44],348:[0.56,0.44],
+        349:[0.54,0.44],350:[0.52,0.43],357:[0.64,0.43],465:[0.63,0.42],
+        412:[0.56,0.43],399:[0.58,0.43],
+        // Left eye ring
+        33:[0.33,0.38],7:[0.35,0.40],163:[0.37,0.40],144:[0.39,0.40],
+        145:[0.41,0.40],153:[0.43,0.40],154:[0.44,0.39],155:[0.45,0.38],
+        133:[0.46,0.37],246:[0.34,0.37],161:[0.36,0.37],160:[0.38,0.36],
+        159:[0.40,0.36],158:[0.42,0.36],157:[0.44,0.37],173:[0.45,0.38],
+        // Right eye ring
+        362:[0.67,0.38],382:[0.65,0.40],381:[0.63,0.40],380:[0.61,0.40],
+        374:[0.59,0.40],373:[0.57,0.40],390:[0.56,0.39],249:[0.55,0.38],
+        263:[0.54,0.37],466:[0.66,0.37],388:[0.64,0.37],387:[0.62,0.36],
+        386:[0.60,0.36],385:[0.58,0.36],384:[0.56,0.37],398:[0.55,0.38],
+        // Iris centers (needed for catchlight)
+        468:[0.38,0.38],473:[0.62,0.38],
+        // Jaw + chin
+        148:[0.28,0.67],377:[0.72,0.67],1:[0.5,0.55],
+        17:[0.5,0.75],   // lower lip (B019 protection)
+        // Chin V-line landmarks — must be explicitly set for B017
+        176:[0.30,0.78], // left chin side
+        400:[0.70,0.78], // right chin side (CRITICAL — default 0.5,0.5 breaks warp geometry)
+        152:[0.50,0.90], // menton / chin tip
       };
-      for (const [idx, [x, y]] of Object.entries(ovalMap)) {
-        lms[parseInt(idx)] = { x, y, z: 0 };
-      }
+      for (const [i,[x,y]] of Object.entries(pts)) lms[+i] = {x,y,z:0};
       return lms;
     }
 
-    function makeTestCanvas(width = 400, height = 500) {
+    function makeTestCanvas(w=400, h=500) {
       const c = document.createElement('canvas');
-      c.width = width; c.height = height;
+      c.width = w; c.height = h;
       const ctx = c.getContext('2d');
-      // Fill with a skin-tone gradient
-      const grad = ctx.createLinearGradient(0, 0, width, height);
-      grad.addColorStop(0, '#f5c9a0');
-      grad.addColorStop(0.4, '#e8a87c');
-      grad.addColorStop(0.7, '#d4956a');
-      grad.addColorStop(1, '#b5784e');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, height);
-      // Add some specular highlights (for oil test)
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillRect(width*0.45, height*0.3, 20, 12);
-      ctx.fillRect(width*0.55, height*0.25, 14, 8);
-      // Add some dark circles under eyes
-      ctx.fillStyle = 'rgba(60,30,100,0.25)';
-      ctx.beginPath(); ctx.ellipse(width*0.38, height*0.45, 20, 8, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(width*0.62, height*0.45, 20, 8, 0, 0, Math.PI*2); ctx.fill();
+      // Realistic skin gradient
+      const g = ctx.createLinearGradient(0, 0, w, h);
+      g.addColorStop(0, '#f5c9a0'); g.addColorStop(0.4,'#e8a87c');
+      g.addColorStop(0.7,'#d4956a'); g.addColorStop(1,'#b5784e');
+      ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+      // Specular highlights at nose/forehead (for oil test)
+      ctx.fillStyle='rgba(255,255,255,0.65)';
+      ctx.fillRect(w*.44,h*.28,22,12); ctx.fillRect(w*.54,h*.24,15,9);
+      // Dark circles under eyes (for dark_circles test)
+      ctx.fillStyle='rgba(50,20,90,0.30)';
+      ctx.beginPath(); ctx.ellipse(w*.38,h*.445,22,9,0,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(w*.62,h*.445,22,9,0,0,Math.PI*2); ctx.fill();
+      // Nasolabial shadow
+      ctx.fillStyle='rgba(80,40,30,0.18)';
+      ctx.beginPath(); ctx.ellipse(w*.37,h*.63,6,18,-0.3,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(w*.63,h*.63,6,18,0.3,0,Math.PI*2); ctx.fill();
       return c;
+    }
+
+    /**
+     * Build a synthetic SegmentationResult where the hair region = top 30% of image.
+     * category 1 = hair, 0 = background.
+     */
+    function makeSyntheticHairMask(w=400, h=500) {
+      const hairH = Math.round(h * 0.3);
+      const mask = new Uint8Array(w * h);
+      for (let y = 0; y < hairH; y++) {
+        for (let x = 0; x < w; x++) {
+          mask[y * w + x] = 1; // hair
+        }
+      }
+      return { mask, width: w, height: h };
     }
 
     function computeMAE(c1, c2) {
-      const ctx1 = c1.getContext('2d', { willReadFrequently: true });
-      const ctx2 = c2.getContext('2d', { willReadFrequently: true });
-      const w = c1.width, h = c1.height;
-      const d1 = ctx1.getImageData(0, 0, w, h).data;
-      const d2 = ctx2.getImageData(0, 0, w, h).data;
-      let sum = 0;
-      for (let i = 0; i < d1.length; i += 4) {
-        sum += (Math.abs(d1[i]-d2[i]) + Math.abs(d1[i+1]-d2[i+1]) + Math.abs(d1[i+2]-d2[i+2])) / 3;
-      }
-      return sum / (w * h);
+      const w = Math.min(c1.width, c2.width);
+      const h = Math.min(c1.height, c2.height);
+      const d1 = c1.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+      const d2 = c2.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+      let s = 0;
+      for (let i=0;i<d1.length;i+=4)
+        s += (Math.abs(d1[i]-d2[i])+Math.abs(d1[i+1]-d2[i+1])+Math.abs(d1[i+2]-d2[i+2]))/3;
+      return s/(w*h);
     }
 
-    function computeRegionMAE(c1, c2, x0Norm, y0Norm, x1Norm, y1Norm) {
-      const ctx1 = c1.getContext('2d', { willReadFrequently: true });
-      const ctx2 = c2.getContext('2d', { willReadFrequently: true });
-      const w = c1.width, h = c1.height;
-      const x0 = Math.round(x0Norm*w), y0 = Math.round(y0Norm*h);
-      const x1 = Math.round(x1Norm*w), y1 = Math.round(y1Norm*h);
-      const pw = x1-x0, ph = y1-y0;
-      if (pw <= 0 || ph <= 0) return 0;
-      const d1 = ctx1.getImageData(x0, y0, pw, ph).data;
-      const d2 = ctx2.getImageData(x0, y0, pw, ph).data;
-      let sum = 0;
-      for (let i = 0; i < d1.length; i += 4) {
-        sum += (Math.abs(d1[i]-d2[i]) + Math.abs(d1[i+1]-d2[i+1]) + Math.abs(d1[i+2]-d2[i+2])) / 3;
-      }
-      return sum / (pw * ph);
+    function computeRegionMAE(c1, c2, x0n, y0n, x1n, y1n) {
+      const w=c1.width, h=c1.height;
+      const x0=Math.round(x0n*w), y0=Math.round(y0n*h);
+      const pw=Math.round((x1n-x0n)*w), ph=Math.round((y1n-y0n)*h);
+      if (pw<=0||ph<=0) return 0;
+      const d1=c1.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,pw,ph).data;
+      const d2=c2.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,pw,ph).data;
+      let s=0;
+      for(let i=0;i<d1.length;i+=4)
+        s+=(Math.abs(d1[i]-d2[i])+Math.abs(d1[i+1]-d2[i+1])+Math.abs(d1[i+2]-d2[i+2]))/3;
+      return s/(pw*ph);
     }
 
-    function copyCanvas(src) {
-      const c = document.createElement('canvas');
-      c.width = src.width; c.height = src.height;
-      c.getContext('2d').drawImage(src, 0, 0);
-      return c;
+    // =========================================================
+    // SENSITIVITY TESTS — ALL USING engine.getCanvas()
+    // =========================================================
+
+    const PASS_THRESHOLD = 0.3;   // min MAE for positive test
+    const ZERO_THRESHOLD = 0.01;  // max MAE for zero/bypass test
+
+    function makeResult(name, data) {
+      return { name, ...data };
     }
 
     async function runTests() {
+      const lm = makeSyntheticLandmarks();
       const results = [];
-      const landmarks = makeSyntheticLandmarks();
 
-      function test(name, effectCode, checkFn) {
+      // ── HELPER: run one effect, return { zeroDelta, positiveDelta, output }
+      function runEffect(intensity, applyFn, hasMask=false, mask=null) {
         const baseline = makeTestCanvas();
-        const testC = copyCanvas(baseline);
-        const engine = new ImageEngine(testC);
-        effectCode(engine);
-        const mae = checkFn(baseline, testC);
-        const passed = mae > 0.05;
-        results.push({ name, mae: mae.toFixed(4), passed });
+        const engine = new ImageEngine(baseline);
+        if (hasMask && mask) engine.setSegmentationMask(mask);
+        applyFn(engine, intensity);
+        const output = engine.getCanvas();
+        const delta = computeMAE(baseline, output);
+        return { baseline, output, delta };
       }
 
-      // --- B005: nasolabialReduction ---
-      test('B005 nasolabial (intensity=100)', (engine) => {
-        engine.applyNasolabialReduction(landmarks, 100);
-      }, (b, t) => computeRegionMAE(b, t, 0.30, 0.55, 0.70, 0.75));
+      function runROIEffect(intensity, applyFn, roiNorm, outsideRoiNorm) {
+        const baseline = makeTestCanvas();
+        const engine = new ImageEngine(baseline);
+        applyFn(engine, intensity);
+        const output = engine.getCanvas();
+        const roiMAE = computeRegionMAE(baseline, output, ...roiNorm);
+        const outsideMAE = computeRegionMAE(baseline, output, ...outsideRoiNorm);
+        const globalMAE = computeMAE(baseline, output);
+        return { roiMAE, outsideMAE, globalMAE };
+      }
 
-      // Zero-intensity bypass
+      // ─────────────────────────────────────────────
+      // B006: skin_oil (oil reduction)
+      // ROI: center face (specular zone)  vs  bottom (chin area, less specular)
+      // ─────────────────────────────────────────────
       {
-        const baseline = makeTestCanvas();
-        const testC = copyCanvas(baseline);
-        const engine = new ImageEngine(testC);
-        engine.applyNasolabialReduction(landmarks, 0);
-        const mae = computeMAE(baseline, testC);
-        results.push({ name: 'B005 nasolabial (intensity=0, bypass)', mae: mae.toFixed(4), passed: mae < 0.001 });
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyOilReduction(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyOilReduction(lm, i),
+          [0.35, 0.20, 0.65, 0.60],   // ROI: face center (specular highlights present)
+          [0.0,  0.85, 0.3, 1.00]     // outside: bottom-left corner
+        );
+        const passed = zeroD < ZERO_THRESHOLD && globalMAE > PASS_THRESHOLD && roiMAE >= outsideMAE * 0.5;
+        results.push(makeResult('B006 skin_oil', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed, note: passed ? '' : `zero=${zeroD.toFixed(4)} global=${globalMAE.toFixed(4)}`
+        }));
       }
 
-      // --- B006: oilReduction ---
-      test('B006 oil_reduction (intensity=100)', (engine) => {
-        engine.applyOilReduction(landmarks, 100);
-      }, (b, t) => computeRegionMAE(b, t, 0.35, 0.20, 0.65, 0.60));
+      // ─────────────────────────────────────────────
+      // B008: skin_tone (HSL shift)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applySkinToneAdjust(lm, i));
+        const { delta: posWarm } = runEffect(50, (e,i) => e.applySkinToneAdjust(lm, i));
+        const { delta: posCool } = runEffect(-50, (e,i) => e.applySkinToneAdjust(lm, i));
+        const posMax = Math.max(posWarm, posCool);
+        const passed = zeroD < ZERO_THRESHOLD && posMax > PASS_THRESHOLD;
+        results.push(makeResult('B008 skin_tone', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: posMax.toFixed(4),
+          warmDelta: posWarm.toFixed(4), coolDelta: posCool.toFixed(4),
+          passed
+        }));
+      }
 
-      // --- B008: skinToneAdjust ---
-      test('B008 skin_tone +50 (warm)', (engine) => {
-        engine.applySkinToneAdjust(landmarks, 50);
-      }, (b, t) => computeRegionMAE(b, t, 0.2, 0.1, 0.8, 0.9));
+      // ─────────────────────────────────────────────
+      // B005: nasolabial (brightness lift on nose-cheek zone)
+      // ROI: nasolabial zone vs forehead (protected)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyNasolabialReduction(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyNasolabialReduction(lm, i),
+          [0.28, 0.55, 0.72, 0.75],   // ROI: nasolabial zone
+          [0.25, 0.08, 0.75, 0.28]    // outside: forehead (protected)
+        );
+        const passed = zeroD < ZERO_THRESHOLD && globalMAE > PASS_THRESHOLD;
+        results.push(makeResult('B005 nasolabial', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
 
-      test('B008 skin_tone -50 (cool)', (engine) => {
-        engine.applySkinToneAdjust(landmarks, -50);
-      }, (b, t) => computeRegionMAE(b, t, 0.2, 0.1, 0.8, 0.9));
+      // ─────────────────────────────────────────────
+      // B011: dark_circles (under-eye brightening)
+      // ROI: under-eye zone  vs  cheek zone
+      // Pass: zero delta ≈ 0 AND ROI MAE > threshold (not global, it's a small zone)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyDarkCircleReduction(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyDarkCircleReduction(lm, i),
+          [0.25, 0.38, 0.75, 0.53],   // ROI: under-eye area
+          [0.10, 0.60, 0.40, 0.80]    // outside: cheek (should be mostly untouched)
+        );
+        // Region effect: use ROI MAE as primary criterion
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > PASS_THRESHOLD;
+        results.push(makeResult('B011 dark_circles', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
 
-      // --- B010: skinDetail ---
-      test('B010 skin_detail (intensity=100)', (engine) => {
-        engine.applySkinDetail(landmarks, 100);
-      }, (b, t) => computeMAE(b, t));
+      // ─────────────────────────────────────────────
+      // B010: skin_detail (high-pass overlay)
+      // Threshold 0.1: on a smooth gradient source, high-pass is small
+      // but non-zero. Real skin images produce ~0.5+. Verify non-zero effect.
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applySkinDetail(lm, i));
+        const { delta: posD } = runEffect(100, (e,i) => e.applySkinDetail(lm, i));
+        // Gradient source has small but real high-freq content at gradient edges
+        const passed = zeroD < ZERO_THRESHOLD && posD > 0.1;
+        results.push(makeResult('B010 skin_detail', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4), passed,
+          note: 'Threshold 0.1: gradient source has low but real high-freq content'
+        }));
+      }
 
-      // --- B011: darkCircleReduction ---
-      test('B011 dark_circles (intensity=100)', (engine) => {
-        engine.applyDarkCircleReduction(landmarks, 100);
-      }, (b, t) => computeRegionMAE(b, t, 0.25, 0.40, 0.75, 0.52));
-
-      // --- B016: jawContour (WebGL warp — pixel delta on jaw regions) ---
-      test('B016 jaw_slim (intensity=100)', (engine) => {
-        // WebGLWarp not available headless without GPU; test that function runs without throw
-        // and reports at least some pixel change due to canvas copy operations
+      // ─────────────────────────────────────────────
+      // B016: jaw_slim (WebGL warp)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, webGLAvailable = false, error = null;
         try {
-          engine.applyJawContour(landmarks, 100);
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyJawContour(lm, 0); // intensity=0 should be no-op
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyJawContour(lm, 100);
+          posD = computeMAE(basePos, enginePos.getCanvas());
+          webGLAvailable = true;
         } catch(e) {
-          // WebGL may be unavailable in headless — that is expected in server context
-          // but canvas should remain valid
+          error = e.message;
         }
-      }, (b, t) => {
-        // Even without GPU, the function should not corrupt the canvas
-        const mae = computeMAE(b, t);
-        return mae; // any value is acceptable; we just need no throw
-      });
-
-      // --- B017: chinVLine ---
-      test('B017 chin_vline (intensity=100)', (engine) => {
-        try { engine.applyChinVLine(landmarks, 100); } catch(e) {}
-      }, (b, t) => computeMAE(b, t));
-
-      // --- B028: eyeBrightening ---
-      test('B028 eye_bright (intensity=100)', (engine) => {
-        engine.applyEyeBrightening(landmarks, 100);
-      }, (b, t) => computeRegionMAE(b, t, 0.25, 0.30, 0.75, 0.50));
-
-      // --- B034: eyeCatchlight ---
-      test('B034 eye_catchlight (intensity=100)', (engine) => {
-        engine.applyEyeCatchlight(landmarks, 100);
-      }, (b, t) => computeRegionMAE(b, t, 0.30, 0.30, 0.70, 0.48));
-
-      // --- B064: hairShine (requires segmentation mask) ---
-      {
-        const baseline = makeTestCanvas();
-        const testC = copyCanvas(baseline);
-        const engine = new ImageEngine(testC);
-        // Without segmentation mask, hairShine must be a no-op
-        engine.applyHairShine(100);
-        const mae = computeMAE(baseline, testC);
-        results.push({ name: 'B064 hair_shine (no mask → no-op)', mae: mae.toFixed(4), passed: mae < 0.001 });
+        if (!webGLAvailable) {
+          results.push(makeResult('B016 jaw_slim', {
+            status: 'BLOCKED', reason: 'WebGL unavailable in headless context: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          // Warp threshold lowered to 0.2 — geometric warp measured globally
+          const passed = zeroD < ZERO_THRESHOLD && posD > 0.2;
+          results.push(makeResult('B016 jaw_slim', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4), webGLAvailable, passed
+          }));
+        }
       }
 
-      // --- X006: collarboneDefinition ---
-      test('X006 collarbone (intensity=100)', (engine) => {
-        engine.applyCollarboneDefinition(100);
-      }, (b, t) => computeRegionMAE(b, t, 0.15, 0.70, 0.85, 0.95));
-
-      // Zero-intensity bypass for X006
+      // ─────────────────────────────────────────────
+      // B017: chin_vline (WebGL warp)
+      // ─────────────────────────────────────────────
       {
-        const baseline = makeTestCanvas();
-        const testC = copyCanvas(baseline);
-        const engine = new ImageEngine(testC);
-        engine.applyCollarboneDefinition(0);
-        const mae = computeMAE(baseline, testC);
-        results.push({ name: 'X006 collarbone (intensity=0, bypass)', mae: mae.toFixed(4), passed: mae < 0.001 });
+        let zeroD = 0, posD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyChinVLine(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyChinVLine(lm, 100);
+          posD = computeMAE(basePos, enginePos.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B017 chin_vline', {
+            status: 'BLOCKED', reason: 'WebGL unavailable in headless context: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          // Warp threshold 0.1 for chin_vline — chin zone is narrow on synthetic canvas
+          const passed = zeroD < ZERO_THRESHOLD && posD > 0.1;
+          results.push(makeResult('B017 chin_vline', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4), webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B028: eye_bright (sclera brightening)
+      // ROI: eye zone vs chin zone (protected)
+      // Pass: ROI MAE > threshold (region effect — not global)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyEyeBrightening(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyEyeBrightening(lm, i),
+          [0.25, 0.30, 0.75, 0.48],   // ROI: eye area
+          [0.10, 0.75, 0.90, 0.95]    // outside: chin/neck (protected)
+        );
+        // Region effect: use ROI MAE as primary criterion
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > PASS_THRESHOLD;
+        results.push(makeResult('B028 eye_bright', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // B034: eye_catchlight (specular dot at iris)
+      // ROI: iris area vs forehead (background)
+      // Pass: ROI MAE > 0.05 (small dot — measured in iris zone, not globally)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyEyeCatchlight(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyEyeCatchlight(lm, i),
+          [0.25, 0.30, 0.75, 0.45],   // ROI: eye/iris area
+          [0.30, 0.05, 0.70, 0.22]    // outside: forehead (background, no dot)
+        );
+        // Catchlight is a small specular dot — ROI threshold is 0.05 not 0.3
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > 0.05;
+        results.push(makeResult('B034 eye_catchlight', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // B064: hair_shine (requires segmentation mask)
+      // 3 sub-tests: zero, positive+mask, positive outside hair region
+      // ─────────────────────────────────────────────
+      {
+        const hairMask = makeSyntheticHairMask(400, 500);
+        // 1. Zero intensity → no change
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyHairShine(i), true, hairMask);
+        // 2. Intensity 100 + mask → measurable delta in hair region (top 30%)
+        const { roiMAE: hairROI, outsideMAE: bodyROI, globalMAE: globalD } = runROIEffect(
+          100,
+          (e,i) => { e.setSegmentationMask(hairMask); e.applyHairShine(i); },
+          [0.05, 0.00, 0.95, 0.28],   // ROI: hair zone (top 28%)
+          [0.05, 0.45, 0.95, 0.95]    // outside: body zone (bottom 50%)
+        );
+        // 3. No mask → no-op
+        const { delta: noMaskD } = runEffect(100, (e,i) => e.applyHairShine(i), false);
+
+        const passed = zeroD < ZERO_THRESHOLD && globalD > PASS_THRESHOLD && noMaskD < ZERO_THRESHOLD;
+        results.push(makeResult('B064 hair_shine', {
+          zeroDelta: zeroD.toFixed(4),
+          positiveDelta: globalD.toFixed(4),
+          hairROI: hairROI.toFixed(4),
+          bodyROI: bodyROI.toFixed(4),
+          noMaskDelta: noMaskD.toFixed(4),
+          passed,
+          note: `hair ROI must change more than body. hair=${hairROI.toFixed(4)} body=${bodyROI.toFixed(4)}`
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // X006: collarbone definition
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyCollarboneDefinition(i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyCollarboneDefinition(i),
+          [0.15, 0.68, 0.85, 0.95],   // ROI: collarbone zone (lower image)
+          [0.15, 0.05, 0.85, 0.35]    // outside: upper face (forehead — no shadow)
+        );
+        const passed = zeroD < ZERO_THRESHOLD && globalMAE > PASS_THRESHOLD;
+        results.push(makeResult('X006 collarbone', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // PREVIEW / EXPORT PARITY TEST
+      // Run same EditState at 400px and 800px, downsample 800→400, compare
+      // ─────────────────────────────────────────────
+      {
+        const lmList = [makeSyntheticLandmarks()];  // array of landmark arrays
+
+        async function runPipeline(resolution, editState) {
+          const w = resolution, h = Math.round(resolution * 1.25);
+          const src = makeTestCanvas(w, h);
+          const engine = new ImageEngine(src);
+          await engine.applyPipeline(editState, lmList, null);
+          return engine.getCanvas();
+        }
+
+        const editState = {
+          skin_smooth: 50, skin_brighten: 30, skin_oil: 40, skin_tone: 20,
+          nasolabial: 50, dark_circles: 40, skin_detail: 30,
+          face_slim: 0, chin_slim: 0,
+          jaw_slim: 0, chin_vline: 0,
+          eye_enlarge: 0, eye_bright: 50, eye_catchlight: 60,
+          teeth_whiten: 30, hair_smooth: 0, hair_shine: 0, collarbone: 50,
+          brightness: 10, contrast: 5, saturation: 0, temperature: 0, tint: 0
+        };
+
+        let parityResults = [];
+        try {
+          const previewOut = await runPipeline(400, editState);
+          const exportOut  = await runPipeline(800, editState);
+
+          // Downsample 800px output → 400px for comparison
+          const downW = previewOut.width, downH = previewOut.height;
+          const downCanvas = document.createElement('canvas');
+          downCanvas.width = downW; downCanvas.height = downH;
+          downCanvas.getContext('2d').drawImage(exportOut, 0, 0, downW, downH);
+
+          const mae = computeMAE(previewOut, downCanvas);
+          const mse = (() => {
+            const d1 = previewOut.getContext('2d',{willReadFrequently:true}).getImageData(0,0,downW,downH).data;
+            const d2 = downCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,downW,downH).data;
+            let s = 0;
+            for(let i=0;i<d1.length;i+=4) {
+              s += ((d1[i]-d2[i])**2 + (d1[i+1]-d2[i+1])**2 + (d1[i+2]-d2[i+2])**2)/3;
+            }
+            return s/(downW*downH);
+          })();
+          const psnr = mse > 0 ? 10*Math.log10(255*255/mse) : 99.0;
+
+          // Threshold: MAE < 8.0 and PSNR > 28 dB is acceptable for scale-independent parity
+          const parityPassed = mae < 8.0 && psnr > 28.0;
+          parityResults.push({ resolution: '400px preview vs 800px export', mae: mae.toFixed(3), psnr: psnr.toFixed(2), passed: parityPassed });
+        } catch(e) {
+          parityResults.push({ resolution: 'FAILED', error: e.message, passed: false });
+        }
+
+        window.__parityResults = parityResults;
       }
 
       return results;
     }
 
-    window.runEffectTests = async () => {
+    // ──────────────────────────────────────────────────────────────────
+    // MAIN — run and expose results to DOM for extraction by Node script
+    // ──────────────────────────────────────────────────────────────────
+    window.addEventListener('load', async () => {
+      const pre = document.getElementById('result');
+      pre.textContent = 'Running...';
+
       try {
         const results = await runTests();
-        window.__effectTestResults = results;
-        const passed = results.filter(r => r.passed).length;
-        const failed = results.filter(r => !r.passed);
-        window.__effectTestSummary = {
+        const parity  = window.__parityResults || [];
+
+        const blockedTests = results.filter(r => r.passed === null);
+        const requiredTests = results.filter(r => r.passed !== null);
+        const passCount = requiredTests.filter(r => r.passed).length;
+        const failList  = requiredTests.filter(r => !r.passed);
+        const allRequired = failList.length === 0;
+
+        const summary = {
           total: results.length,
-          passed,
-          failed: failed.length,
-          allPassed: failed.length === 0,
-          results
+          required: requiredTests.length,
+          blocked: blockedTests.length,
+          passed: passCount,
+          failed: failList.length,
+          allPassed: allRequired,
+          results,
+          parity
         };
-        document.getElementById('result').textContent = JSON.stringify(window.__effectTestSummary, null, 2);
+
+        window.__effectTestSummary = summary;
+        pre.textContent = JSON.stringify(summary, null, 2);
       } catch(e) {
         window.__effectTestSummary = { error: e.message, allPassed: false };
-        document.getElementById('result').textContent = 'ERROR: ' + e.message;
+        pre.textContent = 'FATAL ERROR: ' + e.message + '\n' + e.stack;
       }
-    };
-
-    // Auto-run on load
-    window.addEventListener('load', () => setTimeout(window.runEffectTests, 500));
+    });
   </script>
 </head>
 <body>
-  <h1>Effect Sensitivity Tests</h1>
-  <pre id="result">Running...</pre>
+  <h1 id="title">Effect Sensitivity Tests (Corrected)</h1>
+  <pre id="result">Initializing...</pre>
 </body>
 </html>

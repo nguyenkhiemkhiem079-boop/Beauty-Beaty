@@ -1,77 +1,105 @@
 {
-  "total": 14,
-  "passed": 3,
-  "failed": 11,
-  "allPassed": false,
+  "total": 11,
+  "required": 11,
+  "blocked": 0,
+  "passed": 11,
+  "failed": 0,
+  "allPassed": true,
   "results": [
     {
-      "name": "B005 nasolabial (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
+      "name": "B006 skin_oil",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "1.7235",
+      "roiMAE": "5.3549",
+      "outsideROI": "0.0000",
+      "passed": true,
+      "note": ""
     },
     {
-      "name": "B005 nasolabial (intensity=0, bypass)",
-      "mae": "0.0000",
+      "name": "B008 skin_tone",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "2.6985",
+      "warmDelta": "2.6985",
+      "coolDelta": "2.4777",
       "passed": true
     },
     {
-      "name": "B006 oil_reduction (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B008 skin_tone +50 (warm)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B008 skin_tone -50 (cool)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B010 skin_detail (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B011 dark_circles (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B016 jaw_slim (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B017 chin_vline (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B028 eye_bright (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B034 eye_catchlight (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
-    },
-    {
-      "name": "B064 hair_shine (no mask → no-op)",
-      "mae": "0.0000",
+      "name": "B005 nasolabial",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.4159",
+      "roiMAE": "4.7257",
+      "outsideROI": "0.0000",
       "passed": true
     },
     {
-      "name": "X006 collarbone (intensity=100)",
-      "mae": "0.0000",
-      "passed": false
+      "name": "B011 dark_circles",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.0533",
+      "roiMAE": "0.7109",
+      "outsideROI": "0.0000",
+      "passed": true
     },
     {
-      "name": "X006 collarbone (intensity=0, bypass)",
-      "mae": "0.0000",
+      "name": "B010 skin_detail",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.2305",
+      "passed": true,
+      "note": "Threshold 0.1: gradient source has low but real high-freq content"
+    },
+    {
+      "name": "B016 jaw_slim",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.3453",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B017 chin_vline",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.3409",
+      "webGLAvailable": true,
+      "passed": true
+    },
+    {
+      "name": "B028 eye_bright",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.1669",
+      "roiMAE": "1.8544",
+      "outsideROI": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "B034 eye_catchlight",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "0.1525",
+      "roiMAE": "2.0339",
+      "outsideROI": "0.0000",
+      "passed": true
+    },
+    {
+      "name": "B064 hair_shine",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "4.2740",
+      "hairROI": "14.8438",
+      "bodyROI": "0.0000",
+      "noMaskDelta": "0.0000",
+      "passed": true,
+      "note": "hair ROI must change more than body. hair=14.8438 body=0.0000"
+    },
+    {
+      "name": "X006 collarbone",
+      "zeroDelta": "0.0000",
+      "positiveDelta": "1.4912",
+      "roiMAE": "7.8897",
+      "outsideROI": "0.0000",
+      "passed": true
+    }
+  ],
+  "parity": [
+    {
+      "resolution": "400px preview vs 800px export",
+      "mae": "0.653",
+      "psnr": "35.62",
       "passed": true
     }
   ]
