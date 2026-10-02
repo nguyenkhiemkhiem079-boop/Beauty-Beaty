@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, Dispatch, SetStateAction } from 'react';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import type { SegmentationResult } from './engine/SegmenterManager';
 
 export type ToolCategory = 'skin' | 'face' | 'hair' | 'body' | 'ai';
 export type ToolType = 'skin_smooth' | 'face_slim' | 'hair_smooth' | 'chin_slim' | 'ai_makeup';
@@ -15,19 +16,19 @@ export interface EditState {
 
 interface AppContextType {
   imageSrc: string | null;
-  setImageSrc: (src: string | null) => void;
+  setImageSrc: Dispatch<SetStateAction<string | null>>;
   originalImage: HTMLImageElement | null;
-  setOriginalImage: (img: HTMLImageElement | null) => void;
+  setOriginalImage: Dispatch<SetStateAction<HTMLImageElement | null>>;
   editState: EditState;
-  setEditState: (state: EditState | ((prev: EditState) => EditState)) => void;
+  setEditState: Dispatch<SetStateAction<EditState>>;
   history: EditState[];
-  setHistory: (history: EditState[]) => void;
+  setHistory: Dispatch<SetStateAction<EditState[]>>;
   historyIndex: number;
-  setHistoryIndex: (index: number) => void;
+  setHistoryIndex: Dispatch<SetStateAction<number>>;
   landmarks: NormalizedLandmark[][] | null;
-  setLandmarks: (landmarks: NormalizedLandmark[][] | null) => void;
-  segmentationMask: Uint8Array | null;
-  setSegmentationMask: (mask: Uint8Array | null) => void;
+  setLandmarks: Dispatch<SetStateAction<NormalizedLandmark[][] | null>>;
+  segmentationMask: SegmentationResult | null;
+  setSegmentationMask: Dispatch<SetStateAction<SegmentationResult | null>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -41,7 +42,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [historyIndex, setHistoryIndex] = useState(0);
   
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[][] | null>(null);
-  const [segmentationMask, setSegmentationMask] = useState<Uint8Array | null>(null);
+  const [segmentationMask, setSegmentationMask] = useState<SegmentationResult | null>(null);
 
   return (
     <AppContext.Provider value={{

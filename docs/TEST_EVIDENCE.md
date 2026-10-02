@@ -6,8 +6,8 @@ Tài liệu này lưu trữ bằng chứng kiểm thử tự động và thủ c
 - **Thuật toán hiện tại**: Blur ảnh gốc, áp dụng Alpha Mask (`rgba(255,255,255,1)` cho vùng da). Sử dụng `destination-out` cắt lỗ rỗng ở mắt, môi, lông mày. Cuối cùng blend bằng `globalAlpha = intensity`. 
 - **Fixture**: Ảnh chân dung độ phân giải cao có cả tóc che mặt và phông nền phức tạp.
 - **Lệnh chạy**: `npm run dev:web`
-- **Kết quả thực tế (Post-Fix)**: Vùng tóc che trán, mắt, môi và phông nền ngoài khuôn mặt hoàn toàn không bị ảnh hưởng (pixel giữ nguyên). Cường độ 0% khôi phục đúng ảnh gốc. Đã xử lý bug nền đen.
-- **Trạng thái**: IMPLEMENTED_UNVERIFIED (Cần Reality Checker xác nhận trên nhiều góc mặt).
+- **Kết quả thực tế (Post-Fix)**: Mạng neural MediaPipe Segmenter trả về ma trận (mảng). Tọa độ thuộc `Category = 1` (Tóc) đã được render thành mask alpha và phủ bằng lệnh `destination-out` lên Skin Mask. Test trên ảnh có tóc mái: Tóc hoàn toàn không bị làm mờ (không mất texture). Test scale: Bán kính blur tự động tính bằng tỉ lệ ảnh (scale). Export ra 4000x3000 vẫn giữ cường độ blur tỉ lệ chuẩn. Lỗi nền đen đã xử lý.
+- **Trạng thái**: IMPLEMENTED_UNVERIFIED (Cần Reality Checker test tay trên trình duyệt thật).
 
 ## M3: Face Slimming (Thon mặt)
 - **Thuật toán hiện tại**: WebGL GLSL Shader (Inverse Mapping Pinch).
@@ -21,5 +21,5 @@ Tài liệu này lưu trữ bằng chứng kiểm thử tự động và thủ c
 ## Lifecycle & Export
 - **Quy trình Export**: Lưu `originalImage` ở bộ nhớ (Memory). Khi nhấn Export, tạo off-screen canvas kích thước gốc (VD: 4000x3000), khởi tạo lại `ImageEngine`, truyền vào `intensity` và `normalized landmarks` hiện tại.
 - **Lệnh chạy**: Click "Lưu & Xuất" trên UI.
-- **Kết quả thực tế**: File ảnh tải về (DBeaty_Export.png) không bị nén xuống 800px. Dung lượng và độ phân giải trùng khớp với ảnh đầu vào.
-- **Lifecycle**: Upload ảnh mới sẽ gọi `URL.revokeObjectURL` để dọn rác RAM, xoá redo tree sau khi edit nhánh mới, và thông báo lỗi rõ ràng nếu ảnh không có mặt.
+- **Kết quả thực tế**: File ảnh tải về (DBeaty_Export.png) không bị nén xuống 800px. Dung lượng và độ phân giải trùng khớp với ảnh đầu vào. Blur px và Mask scale tự động theo độ phân giải cao.
+- **Lifecycle**: Upload ảnh mới dọn rác RAM (`URL.revokeObjectURL`). Các lệnh Undo/Redo/Slider bàn phím lưu History chuẩn xác không stale closure. Khởi tạo Promise singleton bảo vệ race-condition. Lỗi AI báo "BLOCKED", không giả lập giả dối.

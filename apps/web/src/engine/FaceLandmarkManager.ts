@@ -4,11 +4,14 @@ import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 export class FaceLandmarkManager {
   private landmarker: FaceLandmarker | null = null;
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   async initialize() {
     if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
     
-    let filesetResolver;
+    this.initPromise = (async () => {
+      let filesetResolver;
     try {
       filesetResolver = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
@@ -40,8 +43,11 @@ export class FaceLandmarkManager {
       }
     }
     
-    this.isInitialized = true;
-    console.log("FaceLandmarker initialized successfully");
+      this.isInitialized = true;
+      console.log("FaceLandmarker initialized successfully");
+    })();
+    
+    return this.initPromise;
   }
 
   async detectFaces(imageElement: HTMLImageElement | HTMLCanvasElement): Promise<NormalizedLandmark[][]> {

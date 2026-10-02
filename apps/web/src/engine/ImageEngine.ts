@@ -1,11 +1,12 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine } from './WebGLWarpEngine';
+import type { SegmentationResult } from './SegmenterManager';
 
 export class ImageEngine {
   private originalCanvas: HTMLCanvasElement;
   private workCanvas: HTMLCanvasElement;
   private webGLWarp: WebGLWarpEngine | null = null;
-  private segmentationMask: Uint8Array | null = null;
+  private segmentationMask: SegmentationResult | null = null;
 
   constructor(image: HTMLImageElement | HTMLCanvasElement) {
     this.originalCanvas = document.createElement('canvas');
@@ -29,7 +30,7 @@ export class ImageEngine {
     }
   }
 
-  setSegmentationMask(mask: Uint8Array) {
+  setSegmentationMask(mask: SegmentationResult) {
     this.segmentationMask = mask;
   }
 
@@ -43,18 +44,43 @@ export class ImageEngine {
     ctxWork.drawImage(this.originalCanvas, 0, 0);
   }
 
+  private drawScaledSegmentationMask(targetCtx: CanvasRenderingContext2D, targetW: number, targetH: number, categoryId: number) {
+    if (!this.segmentationMask) return;
+    const { mask, width: sW, height: sH } = this.segmentationMask;
+    
+    const smallCanvas = document.createElement('canvas');
+    smallCanvas.width = sW;
+    smallCanvas.height = sH;
+    const smallCtx = smallCanvas.getContext('2d')!;
+    const mData = smallCtx.createImageData(sW, sH);
+    
+    for (let i = 0; i < mask.length; i++) {
+        const isMatch = mask[i] === categoryId;
+        mData.data[i * 4] = 255;
+        mData.data[i * 4 + 1] = 255;
+        mData.data[i * 4 + 2] = 255;
+        mData.data[i * 4 + 3] = isMatch ? 255 : 0;
+    }
+    smallCtx.putImageData(mData, 0, 0);
+
+    // Scale it to target size
+    targetCtx.drawImage(smallCanvas, 0, 0, targetW, targetH);
+  }
+
   // Effect 1: Skin Smoothing (Mịn da)
   applySkinSmoothing(landmarks: NormalizedLandmark[], intensity: number) {
     if (intensity === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
+    
+    const scale = Math.max(w, h) / 800; // Relative to 800px preview
 
     const blurCanvas = document.createElement('canvas');
     blurCanvas.width = w;
     blurCanvas.height = h;
     const bCtx = blurCanvas.getContext('2d')!;
-    bCtx.filter = `blur(${intensity * 0.15}px)`;
+    bCtx.filter = `blur(${intensity * 0.15 * scale}px)`;
     bCtx.drawImage(this.originalCanvas, 0, 0);
 
     const maskCanvas = document.createElement('canvas');
@@ -76,9 +102,9 @@ export class ImageEngine {
         else mCtx.lineTo(pt.x * w, pt.y * h);
       });
       mCtx.closePath();
-      mCtx.fillStyle = 'rgba(255, 255, 255, 1)'; // Solid alpha
+      mCtx.fillStyle = 'rgba(255, 255, 255, 1)';
       
-      mCtx.filter = 'blur(10px)';
+      mCtx.filter = `blur(${10 * scale}px)`;
       mCtx.fill();
       mCtx.filter = 'none';
 
@@ -93,7 +119,7 @@ export class ImageEngine {
           else mCtx.lineTo(pt.x * w, pt.y * h);
         });
         mCtx.closePath();
-        mCtx.filter = 'blur(8px)'; 
+        mCtx.filter = `blur(${8 * scale}px)`; 
         mCtx.fill();
         mCtx.filter = 'none';
       };
@@ -104,7 +130,13 @@ export class ImageEngine {
       drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46]); // Left Brow
       drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276]); // Right Brow
       
-      // We should also exclude hair if segmentation is available, but for now we rely on faceOval which excludes hair.
+      // Exclude hair using segmentation mask (Hair category = 1)
+      if (this.segmentationMask) {
+        // We draw the hair mask but we blur it slightly so the boundary is smooth
+        mCtx.filter = `blur(${5 * scale}px)`;
+        this.drawScaledSegmentationMask(mCtx, w, h, 1);
+        mCtx.filter = 'none';
+      }
     }
     
     mCtx.globalCompositeOperation = 'source-over';
@@ -112,7 +144,6 @@ export class ImageEngine {
     // Apply alpha mask to the blurred canvas
     bCtx.globalCompositeOperation = 'destination-in';
     bCtx.drawImage(maskCanvas, 0, 0); 
-    // Now blurCanvas only has color inside the mask, transparent outside
 
     // Draw original image first to preserve texture and background
     ctx.save();
@@ -131,34 +162,28 @@ export class ImageEngine {
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
+    
+    const scale = Math.max(w, h) / 800;
 
     const blurCanvas = document.createElement('canvas');
     blurCanvas.width = w;
     blurCanvas.height = h;
     const bCtx = blurCanvas.getContext('2d')!;
-    bCtx.filter = `blur(${intensity * 0.1}px)`;
+    bCtx.filter = `blur(${intensity * 0.1 * scale}px)`;
     bCtx.drawImage(this.workCanvas, 0, 0);
 
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w;
     maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    const mData = mCtx.createImageData(w, h);
     
-    for (let i = 0; i < this.segmentationMask.length; i++) {
-        const isHair = this.segmentationMask[i] === 1;
-        mData.data[i * 4] = 255;
-        mData.data[i * 4 + 1] = 255;
-        mData.data[i * 4 + 2] = 255;
-        mData.data[i * 4 + 3] = isHair ? 255 : 0; // Alpha based on hair
-    }
-    mCtx.putImageData(mData, 0, 0);
+    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = Hair
 
     const blurredMaskCanvas = document.createElement('canvas');
     blurredMaskCanvas.width = w;
     blurredMaskCanvas.height = h;
     const bmCtx = blurredMaskCanvas.getContext('2d')!;
-    bmCtx.filter = 'blur(6px)';
+    bmCtx.filter = `blur(${6 * scale}px)`;
     bmCtx.drawImage(maskCanvas, 0, 0);
 
     ctx.save();

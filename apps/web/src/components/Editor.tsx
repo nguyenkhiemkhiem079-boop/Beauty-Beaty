@@ -24,7 +24,6 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const [activeCategory, setActiveCategory] = useState<ToolCategory>('skin');
   const [activeTool, setActiveTool] = useState<ToolType>('skin_smooth');
   const [isDetecting, setIsDetecting] = useState(false);
-  const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,7 +63,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [originalImage, segmentationMask]);
+  }, [originalImage, segmentationMask, history, historyIndex]);
 
   useEffect(() => {
     applyEffects();
@@ -224,17 +223,23 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   };
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setEditState(history[historyIndex - 1]);
-    }
+    setHistoryIndex(prev => {
+      if (prev > 0) {
+        setEditState(history[prev - 1]);
+        return prev - 1;
+      }
+      return prev;
+    });
   };
 
   const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setEditState(history[historyIndex + 1]);
-    }
+    setHistoryIndex(prev => {
+      if (prev < history.length - 1) {
+        setEditState(history[prev + 1]);
+        return prev + 1;
+      }
+      return prev;
+    });
   };
 
   return (
@@ -308,10 +313,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <h4 className="util-label">Cloud AI</h4>
                   <div className={`tool-btn ${activeTool === 'ai_makeup' ? 'active' : ''}`} onClick={() => {
                     setActiveTool('ai_makeup');
-                    setIsProcessingAI(true);
-                    setTimeout(() => { setIsProcessingAI(false); alert("Giả lập: Kết nối Backend thành công (API Key Missing)."); }, 2000);
+                    alert("Tính năng bị chặn (BLOCKED) do thiếu Meitu API Key.");
                   }}>
-                    {isProcessingAI ? <Loader2 size={16} className="spinner" /> : <Wand2 size={16} />} Trang điểm AI (Cloud)
+                    <Wand2 size={16} /> Trang điểm AI (Cloud)
                   </div>
                 </div>
               )}
@@ -358,6 +362,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   onChange={handleSliderChange}
                   onMouseUp={commitHistory}
                   onTouchEnd={commitHistory}
+                  onKeyUp={commitHistory}
                 />
               </div>
             </div>

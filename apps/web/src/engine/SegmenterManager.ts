@@ -1,13 +1,22 @@
 import { ImageSegmenter, FilesetResolver } from '@mediapipe/tasks-vision';
 
+export interface SegmentationResult {
+  mask: Uint8Array;
+  width: number;
+  height: number;
+}
+
 export class SegmenterManager {
   private segmenter: ImageSegmenter | null = null;
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   async initialize() {
     if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
     
-    let filesetResolver;
+    this.initPromise = (async () => {
+      let filesetResolver;
     try {
       filesetResolver = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
@@ -39,11 +48,15 @@ export class SegmenterManager {
       }
     }
     
-    this.isInitialized = true;
-    console.log("ImageSegmenter initialized successfully");
+      this.isInitialized = true;
+      console.log("ImageSegmenter initialized successfully");
+    })();
+    
+    return this.initPromise;
   }
 
-  async segment(imageElement: HTMLImageElement | HTMLCanvasElement): Promise<Uint8Array | undefined> {
+
+  async segment(imageElement: HTMLImageElement | HTMLCanvasElement): Promise<SegmentationResult | undefined> {
     if (!this.segmenter) {
       await this.initialize();
     }
@@ -55,7 +68,11 @@ export class SegmenterManager {
     const result = this.segmenter.segment(imageElement);
     // return the category mask (0=background, 1=hair, 2=body, 3=face, 4=clothes, 5=others)
     if (result && result.categoryMask) {
-        return result.categoryMask.getAsUint8Array();
+        return {
+          mask: result.categoryMask.getAsUint8Array(),
+          width: result.categoryMask.width,
+          height: result.categoryMask.height
+        };
     }
     return undefined;
   }
