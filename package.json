@@ -15,7 +15,10 @@
     "test": "npm run test --workspace=apps/server && node scripts/run_visual_verification.js",
     "test:server": "npm run test --workspace=apps/server",
     "test:visual": "node scripts/run_visual_verification.js",
-    "lint": "npm run lint --workspace=apps/web"
+    "test:effects": "node scripts/test_new_effects_sensitivity.js",
+    "verify:effects": "node scripts/verify_new_effects.js",
+    "lint": "npm run lint --workspace=apps/web",
+    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
