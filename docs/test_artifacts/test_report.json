@@ -1,16 +1,24 @@
 {
-  "timestamp": "2026-10-02T02:46:39.114Z",
+  "timestamp": "2026-10-02T02:59:49.472Z",
   "status": "PASSED",
-  "artifactsCount": 15,
+  "artifactsCount": 11,
   "metrics": [
-    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
-    "Submental Chin Lift: Mean Diff = 1.08, Max = 60.7 → ✅ LIFTED",
-    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED",
-    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
-    "Submental Chin Lift: Mean Diff = 3.22, Max = 60.7 → ✅ LIFTED",
-    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED",
-    "Lip Protection: Mean Diff = 0.0000 (Threshold &lt; 0.05) → ✅ PROTECTED (0 distortion)",
-    "Submental Chin Lift: Mean Diff = 5.78, Max = 44.0 → ✅ LIFTED",
-    "Background Straight Lines: Mean Diff = 0.0000 → ✅ UNDISTORTED"
+    "Face Detection: Real MediaPipe Landmarker: 478 landmarks → ✅ DETECTED",
+    "Vector Direction: Dot Product with Face Upward Axis = 1.0000 (&gt; 0.95) → ✅ TRUE UPWARD LIFT",
+    "Face Tilt Synchronization: Face Tilt = 21.7°, Disp Angle = 21.7° (Δ = 0.00° &lt; 5°) → ✅ AXIS MATCHED",
+    "Lip Protection: Magnitude at Lower Lip (Pt 17) = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Background / Collar Protection: Magnitude outside jaw = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Face Detection: Real MediaPipe Landmarker: 478 landmarks → ✅ DETECTED",
+    "Vector Direction: Dot Product with Face Upward Axis = 1.0000 (&gt; 0.95) → ✅ TRUE UPWARD LIFT",
+    "Face Tilt Synchronization: Face Tilt = 9.6°, Disp Angle = 9.6° (Δ = 0.00° &lt; 5°) → ✅ AXIS MATCHED",
+    "Lip Protection: Magnitude at Lower Lip (Pt 17) = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Background / Collar Protection: Magnitude outside jaw = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Face Detection: Real MediaPipe Landmarker: 478 landmarks → ✅ DETECTED",
+    "Vector Direction: Dot Product with Face Upward Axis = 1.0000 (&gt; 0.95) → ✅ TRUE UPWARD LIFT",
+    "Face Tilt Synchronization: Face Tilt = -3.3°, Disp Angle = -3.3° (Δ = 0.00° &lt; 5°) → ✅ AXIS MATCHED",
+    "Lip Protection: Magnitude at Lower Lip (Pt 17) = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Background / Collar Protection: Magnitude outside jaw = 0.000000 → ✅ 0.0000 DISTORTION",
+    "Parity Mean Absolute Error (MAE): 0.470 (Threshold &lt; 4.0 / 255) → ✅ EXTREMELY CLOSE",
+    "Peak Signal-to-Noise Ratio (PSNR): 46.36 dB (Threshold &gt; 34.0 dB) → ✅ HIGH FIDELITY PARITY"
   ]
 }

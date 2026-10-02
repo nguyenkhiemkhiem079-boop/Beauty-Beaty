@@ -9,6 +9,7 @@ async function runTest() {
   process.env.PORT = '3099';
   delete process.env.MEITU_API_KEY;
   delete process.env.AI_PROVIDER_KEY;
+  delete process.env.ENABLE_AI_WORKER;
 
   // Dynamically import compiled server
   const serverPath = path.join(__dirname, '../dist/index.js');
@@ -18,11 +19,14 @@ async function runTest() {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   const uploadsDir = path.join(__dirname, '../uploads');
-  const initialFiles = fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : [];
-  console.log(`Initial files in uploads dir: ${initialFiles.length}`);
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
 
-  // Test 1: POST without AI Provider (should return 503 BLOCKED and NOT save file)
-  console.log('\n--- TEST 1: Request without AI Provider ---');
+  // Snapshot existing files to ensure we ONLY clean up test-created files
+  const existingFilesBeforeTest = new Set(fs.readdirSync(uploadsDir));
+  console.log(`Pre-existing files in uploads dir: ${existingFilesBeforeTest.size}`);
+
   const boundary = '----WebKitFormBoundaryTest123456';
   const dummyFileContent = 'fake image binary data content for testing';
   
@@ -51,7 +55,7 @@ async function runTest() {
     }
   };
 
-  const response1 = await new Promise<{ statusCode?: number, body: string }>((resolve, reject) => {
+  const makePostRequest = () => new Promise<{ statusCode?: number; body: string }>((resolve, reject) => {
     const req = http.request(reqOptions, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -62,6 +66,9 @@ async function runTest() {
     req.end();
   });
 
+  // TEST 1: Request without AI Provider (should return 503 BLOCKED and NOT save file)
+  console.log('\n--- TEST 1: Request without AI Provider Key ---');
+  const response1 = await makePostRequest();
   console.log(`Response 1 Status: ${response1.statusCode}`);
   console.log(`Response 1 Body: ${response1.body}`);
 
@@ -70,41 +77,50 @@ async function runTest() {
     throw new Error(`Test 1 Failed: Expected 503 BLOCKED, got ${response1.statusCode} - ${response1.body}`);
   }
 
-  // Verify uploads directory did NOT store unwanted file
-  const currentFiles = fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : [];
-  console.log(`Files in uploads dir after blocked upload: ${currentFiles.length}`);
-  if (currentFiles.length > initialFiles.length) {
-    throw new Error(`Test 1 Failed: Unwanted file was saved to uploads directory! Found: ${currentFiles.join(', ')}`);
+  let currentFiles = fs.readdirSync(uploadsDir);
+  if (currentFiles.length > existingFilesBeforeTest.size) {
+    throw new Error('Test 1 Failed: Unwanted file was saved when provider key is missing!');
   }
-  console.log('✅ TEST 1 PASSED: Endpoint returned 503 BLOCKED and zero files were saved.');
+  console.log('✅ TEST 1 PASSED: Endpoint returned 503 BLOCKED and 0 files were saved.');
 
-  // Test 2: With Provider configured (should accept upload and create pending job)
-  console.log('\n--- TEST 2: Request with AI Provider configured ---');
+  // TEST 2: Request with API Key but adapter NOT implemented (should return 501 NOT_IMPLEMENTED and NOT save file)
+  console.log('\n--- TEST 2: Key configured but Worker Adapter not implemented ---');
   process.env.MEITU_API_KEY = 'test_meitu_mock_key_123';
+  delete process.env.ENABLE_AI_WORKER;
 
-  const response2 = await new Promise<{ statusCode?: number, body: string }>((resolve, reject) => {
-    const req = http.request(reqOptions, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ statusCode: res.statusCode, body: data }));
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-
+  const response2 = await makePostRequest();
   console.log(`Response 2 Status: ${response2.statusCode}`);
   console.log(`Response 2 Body: ${response2.body}`);
 
   const parsed2 = JSON.parse(response2.body);
-  if (response2.statusCode !== 202 || parsed2.status !== 'pending' || !parsed2.jobId) {
-    throw new Error(`Test 2 Failed: Expected 202 pending with jobId, got ${response2.statusCode} - ${response2.body}`);
+  if (response2.statusCode !== 501 || parsed2.status !== 'NOT_IMPLEMENTED') {
+    throw new Error(`Test 2 Failed: Expected 501 NOT_IMPLEMENTED, got ${response2.statusCode} - ${response2.body}`);
   }
 
-  // Test 3: GET /api/jobs/:id
-  console.log('\n--- TEST 3: GET /api/jobs/:id ---');
-  const response3 = await new Promise<{ statusCode?: number, body: string }>((resolve, reject) => {
-    const req = http.get(`http://127.0.0.1:3099/api/jobs/${parsed2.jobId}`, (res) => {
+  currentFiles = fs.readdirSync(uploadsDir);
+  if (currentFiles.length > existingFilesBeforeTest.size) {
+    throw new Error('Test 2 Failed: Unwanted file was saved when adapter is not implemented!');
+  }
+  console.log('✅ TEST 2 PASSED: Endpoint returned 501 NOT_IMPLEMENTED and 0 files were saved.');
+
+  // TEST 3: Request with AI Provider and Worker Adapter enabled
+  console.log('\n--- TEST 3: Key configured AND Worker Adapter enabled ---');
+  process.env.ENABLE_AI_WORKER = 'true';
+
+  const response3 = await makePostRequest();
+  console.log(`Response 3 Status: ${response3.statusCode}`);
+  console.log(`Response 3 Body: ${response3.body}`);
+
+  const parsed3 = JSON.parse(response3.body);
+  if (response3.statusCode !== 202 || parsed3.status !== 'pending' || !parsed3.jobId) {
+    throw new Error(`Test 3 Failed: Expected 202 pending with jobId, got ${response3.statusCode} - ${response3.body}`);
+  }
+  console.log('✅ TEST 3 PASSED: Job accepted as pending with valid jobId.');
+
+  // TEST 4: GET /api/jobs/:id
+  console.log('\n--- TEST 4: GET /api/jobs/:id ---');
+  const response4 = await new Promise<{ statusCode?: number; body: string }>((resolve, reject) => {
+    const req = http.get(`http://127.0.0.1:3099/api/jobs/${parsed3.jobId}`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve({ statusCode: res.statusCode, body: data }));
@@ -112,21 +128,26 @@ async function runTest() {
     req.on('error', reject);
   });
 
-  console.log(`Response 3 Status: ${response3.statusCode}`);
-  console.log(`Response 3 Body: ${response3.body}`);
+  console.log(`Response 4 Status: ${response4.statusCode}`);
+  console.log(`Response 4 Body: ${response4.body}`);
 
-  const parsed3 = JSON.parse(response3.body);
-  if (response3.statusCode !== 200 || parsed3.id !== parsed2.jobId || parsed3.status !== 'pending') {
-    throw new Error(`Test 3 Failed: Expected 200 with job details, got ${response3.statusCode} - ${response3.body}`);
+  const parsed4 = JSON.parse(response4.body);
+  if (response4.statusCode !== 200 || parsed4.id !== parsed3.jobId || parsed4.status !== 'pending') {
+    throw new Error(`Test 4 Failed: Expected 200 with job details, got ${response4.statusCode} - ${response4.body}`);
   }
-  console.log('✅ TEST 3 PASSED: Job retrieved successfully.');
+  console.log('✅ TEST 4 PASSED: Job retrieved successfully.');
 
-  // Clean up any files created during test 2
-  const filesToClean = fs.readdirSync(uploadsDir);
-  for (const f of filesToClean) {
-    fs.unlinkSync(path.join(uploadsDir, f));
+  // CLEANUP: Specifically and ONLY delete files created during this test run
+  console.log('\n--- CLEANUP: Preserving pre-existing uploads, removing only test-created files ---');
+  const filesAfterTest = fs.readdirSync(uploadsDir);
+  let cleanedCount = 0;
+  for (const f of filesAfterTest) {
+    if (!existingFilesBeforeTest.has(f)) {
+      fs.unlinkSync(path.join(uploadsDir, f));
+      cleanedCount++;
+    }
   }
-  console.log('Cleaned up test uploads.');
+  console.log(`Successfully cleaned up ${cleanedCount} test-generated file(s). Pre-existing files left intact: ${existingFilesBeforeTest.size}`);
 
   console.log('\n=== ALL SERVER JOBS ENDPOINT TESTS PASSED SUCCESSFULLY! ===');
   process.exit(0);

@@ -9,6 +9,18 @@ export interface PipelineParams {
   chin_slim: number;
 }
 
+export interface ChinSlimParams {
+  aspect: number;
+  unitUp: { x: number; y: number };
+  tiltAngleDeg: number;
+  center: { x: number; y: number };
+  target: { x: number; y: number };
+  radius: number;
+  maxShift: number;
+  shiftDistance: number;
+  warpPoints: WarpPoint[];
+}
+
 export class ImageEngine {
   private originalCanvas: HTMLCanvasElement;
   private workCanvas: HTMLCanvasElement;
@@ -249,105 +261,128 @@ export class ImageEngine {
     }
   }
 
-  // Effect 4: Double Chin Reduction (Giảm nọng cằm) - B019
-  applyDoubleChinReduction(landmarks: NormalizedLandmark[], intensity: number) {
-    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+  // Geometry calculations for B019 Double Chin Reduction
+  getChinSlimWarpPoints(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return null;
     
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
-    const ctx = this.workCanvas.getContext('2d')!;
     
     const chin = landmarks[152];    // Menton (chin tip)
     const lowerLip = landmarks[17]; // Lower lip center
     
-    if (!chin || !lowerLip) return;
+    if (!chin || !lowerLip) return null;
 
-    if (this.webGLWarp) {
-      const aspect = w / h;
+    const aspect = w / h;
+    const chinToLip = Math.hypot((lowerLip.x - chin.x) * aspect, lowerLip.y - chin.y);
 
-      // In shader coordinate space:
-      // dist = sqrt( ((x1 - x2)*aspect)^2 + (y1 - y2)^2 )
-      // Y is unscaled (1.0 unit = canvas height h). X is scaled by aspect.
-      // Vertical distance deltaY is ALREADY in shader units. We must NOT multiply deltaY by aspect!
-      const chinToLip = Math.hypot((lowerLip.x - chin.x) * aspect, lowerLip.y - chin.y);
+    const forehead = landmarks[10];
+    const faceHeight = forehead 
+      ? Math.hypot((chin.x - forehead.x) * aspect, chin.y - forehead.y)
+      : chinToLip * 5.0;
 
-      // Estimate face height in isotropic shader units
-      const forehead = landmarks[10];
-      const faceHeight = forehead 
-        ? Math.hypot((chin.x - forehead.x) * aspect, chin.y - forehead.y)
-        : chinToLip * 5.0;
+    const dx = lowerLip.x - chin.x;
+    const dy = lowerLip.y - chin.y;
+    const distNorm = Math.hypot(dx, dy);
+    const unitUpX = distNorm > 1e-5 ? dx / distNorm : 0;
+    const unitUpY = distNorm > 1e-5 ? dy / distNorm : -1;
+    const tiltAngleDeg = (Math.atan2(unitUpX, -unitUpY) * 180) / Math.PI;
 
-      // Face orientation vector (from chin towards lower lip/mouth) in normalized coordinates
-      const dx = lowerLip.x - chin.x;
-      const dy = lowerLip.y - chin.y;
-      const distNorm = Math.hypot(dx, dy);
-      const unitUpX = distNorm > 1e-5 ? dx / distNorm : 0;
-      const unitUpY = distNorm > 1e-5 ? dy / distNorm : -1;
+    const submentalOffset = chinToLip * 0.25;
+    const center = {
+      x: chin.x - unitUpX * submentalOffset,
+      y: chin.y - unitUpY * submentalOffset
+    };
 
-      // Position the warp center strictly in the submental zone (under the chin tip)
-      // Moving down along the face axis by 25% of chin-to-lip distance
-      const submentalOffset = chinToLip * 0.25;
-      const center = {
-        x: chin.x - unitUpX * submentalOffset,
-        y: chin.y - unitUpY * submentalOffset
+    const radius = chinToLip * 0.90;
+    const maxShift = Math.min(faceHeight * 0.04, chinToLip * 0.26);
+    const shiftDistance = maxShift * (intensity / 100.0);
+
+    const target = {
+      x: center.x + unitUpX * shiftDistance,
+      y: center.y + unitUpY * shiftDistance
+    };
+
+    const leftJaw = landmarks[148];
+    const rightJaw = landmarks[377];
+    const warpPoints: WarpPoint[] = [
+      { center, target, radius, intensity: 1.0 }
+    ];
+
+    if (leftJaw && rightJaw) {
+      const lateralOffset = chinToLip * 0.18;
+      const lateralRadius = radius * 0.75;
+      const lateralShift = shiftDistance * 0.55;
+
+      const leftCenter = {
+        x: leftJaw.x - unitUpX * lateralOffset,
+        y: leftJaw.y - unitUpY * lateralOffset
+      };
+      const leftTarget = {
+        x: leftCenter.x + unitUpX * lateralShift,
+        y: leftCenter.y + unitUpY * lateralShift
       };
 
-      // Radius in shader space:
-      // Safe radius: Ensure center-to-lip distance (1.25 * chinToLip) > radius (0.90 * chinToLip)
-      // This leaves a 35% margin ensuring the lower lip and mouth are 100% untouched by the warp.
-      const radius = chinToLip * 0.90;
-
-      // Displacement is proportional to face size (chinToLip & faceHeight)
-      // Rather than a fixed 0.1 of image height, max displacement is ~3.5% of face height
-      const maxShift = Math.min(faceHeight * 0.035, chinToLip * 0.22);
-      const shiftDistance = maxShift * (intensity / 100.0);
-
-      // Target position moves upward towards the chin bone along the face axis
-      const target = {
-        x: center.x + unitUpX * shiftDistance,
-        y: center.y + unitUpY * shiftDistance
+      const rightCenter = {
+        x: rightJaw.x - unitUpX * lateralOffset,
+        y: rightJaw.y - unitUpY * lateralOffset
+      };
+      const rightTarget = {
+        x: rightCenter.x + unitUpX * lateralShift,
+        y: rightCenter.y + unitUpY * lateralShift
       };
 
-      // Support bilateral submental contouring along left and right jaw curves if available
-      // Landmarks 148 (left jaw) and 377 (right jaw)
-      const leftJaw = landmarks[148];
-      const rightJaw = landmarks[377];
-      const warpPoints: WarpPoint[] = [
-        { center, target, radius, intensity: 1.0 }
-      ];
-
-      if (leftJaw && rightJaw) {
-        const lateralOffset = chinToLip * 0.18;
-        const lateralRadius = radius * 0.75;
-        const lateralShift = shiftDistance * 0.55;
-
-        const leftCenter = {
-          x: leftJaw.x - unitUpX * lateralOffset,
-          y: leftJaw.y - unitUpY * lateralOffset
-        };
-        const leftTarget = {
-          x: leftCenter.x + unitUpX * lateralShift,
-          y: leftCenter.y + unitUpY * lateralShift
-        };
-
-        const rightCenter = {
-          x: rightJaw.x - unitUpX * lateralOffset,
-          y: rightJaw.y - unitUpY * lateralOffset
-        };
-        const rightTarget = {
-          x: rightCenter.x + unitUpX * lateralShift,
-          y: rightCenter.y + unitUpY * lateralShift
-        };
-
-        warpPoints.push(
-          { center: leftCenter, target: leftTarget, radius: lateralRadius, intensity: 0.8 },
-          { center: rightCenter, target: rightTarget, radius: lateralRadius, intensity: 0.8 }
-        );
-      }
-
-      const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, warpPoints);
-      ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(glCanvas, 0, 0);
+      warpPoints.push(
+        { center: leftCenter, target: leftTarget, radius: lateralRadius, intensity: 0.8 },
+        { center: rightCenter, target: rightTarget, radius: lateralRadius, intensity: 0.8 }
+      );
     }
+
+    return {
+      aspect,
+      unitUp: { x: unitUpX, y: unitUpY },
+      tiltAngleDeg,
+      center,
+      target,
+      radius,
+      maxShift,
+      shiftDistance,
+      warpPoints
+    };
+  }
+
+  // Calculate forward displacement vector at a given normalized coordinate
+  getDisplacementVectorAt(pt: { x: number; y: number }, warpPoints: WarpPoint[], aspect: number) {
+    let shiftX = 0;
+    let shiftY = 0;
+    const tcAdjX = pt.x * aspect;
+    const tcAdjY = pt.y;
+
+    for (const wp of warpPoints) {
+      const cAdjX = wp.center.x * aspect;
+      const cAdjY = wp.center.y;
+      const dist = Math.hypot(tcAdjX - cAdjX, tcAdjY - cAdjY);
+      if (dist < wp.radius) {
+        const t = 1.0 - (dist / wp.radius);
+        const smoothFactor = t * t * (3.0 - 2.0 * t);
+        const factor = smoothFactor * wp.intensity;
+        shiftX += (wp.target.x - wp.center.x) * factor;
+        shiftY += (wp.target.y - wp.center.y) * factor;
+      }
+    }
+    const magnitude = Math.hypot(shiftX * aspect, shiftY);
+    const angleDeg = (Math.atan2(shiftX, -shiftY) * 180) / Math.PI;
+    return { shiftX, shiftY, magnitude, angleDeg };
+  }
+
+  // Effect 4: Double Chin Reduction (Giảm nọng cằm) - B019
+  applyDoubleChinReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    const params = this.getChinSlimWarpPoints(landmarks, intensity);
+    if (!params || !this.webGLWarp) return;
+
+    const ctx = this.workCanvas.getContext('2d')!;
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, params.warpPoints);
+    ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
+    ctx.drawImage(glCanvas, 0, 0);
   }
 }

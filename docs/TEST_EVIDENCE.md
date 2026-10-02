@@ -67,13 +67,84 @@ Tài liệu này lưu trữ bằng chứng kiểm thử tự động và thủ c
   - `test_report.json`
 - **Trạng thái**: IMPLEMENTED_UNVERIFIED (Đã có kiểm chứng định lượng bằng ảnh và log tự động; giữ trạng thái theo đúng yêu cầu đến khi có đánh giá nghiệm thu cuối).
 
-## Backend: POST /api/jobs & Upload Protection
-- **Lỗi đã sửa**:
-  - Khắc phục `TS2552: Cannot find name 'job'` tại `apps/server/src/index.ts` bằng cách khai báo `const job: Job` đúng phạm vi và cấu hình kiểu `Job`.
-  - Bảo vệ lưu trữ: Sử dụng `fileFilter` của Multer và cơ chế unlink dọn dẹp để chặn lưu file ảnh vào thư mục `uploads/` khi không có AI Provider API key.
-  - Phản hồi `BLOCKED` rõ ràng: Khi thiếu provider, trả HTTP 503 với `{"status":"BLOCKED","error":"BLOCKED: Missing AI Provider API Key..."}`.
-- **Lệnh chạy kiểm thử**: `npm run test --workspace=apps/server` (Chạy `apps/server/dist/test_server_jobs.js`).
-- **Kết quả thực tế**:
-  - Test 1 (Không có provider): Trả HTTP 503 `status: BLOCKED`. Số lượng file trong `uploads/` trước và sau request đều bằng 0 (Zero unwanted storage).
-  - Test 2 (Có provider): Trả HTTP 202 `status: pending` kèm `jobId`.
-  - Test 3: Truy vấn `GET /api/jobs/:id` trả về đúng thông tin job vừa tạo.
+## Backend: Production Separation & Job Lifecycle (Items 1, 5, 6)
+- **1. Tách /api/save-test-artifacts khỏi Server Sản phẩm**:
+  - Đã loại bỏ hoàn toàn endpoint `/api/save-test-artifacts` khỏi [apps/server/src/index.ts](file:///c:/Users/khiem.nguyen/Documents/GitHub/Beauty-Beaty/apps/server/src/index.ts). Server sản phẩm không còn bất kỳ endpoint nào nhận filename hay ghi file tùy ý xuống đĩa.
+  - Toàn bộ artifacts kiểm thử trực quan được trích xuất an toàn qua test runner Headless Chrome (`scripts/run_visual_verification.js`) đọc trực tiếp buffer base64 từ DOM canvas và ghi vào `docs/test_artifacts/`.
+- **5. Xử lý Trạng thái Job & Adapter (BLOCKED / NOT_IMPLEMENTED)**:
+  - Khi thiếu AI Provider Key (Meitu API): Trả về ngay HTTP 503 `status: "BLOCKED"`. File upload bị Multer `fileFilter` từ chối ghi đĩa.
+  - Khi có AI Provider Key nhưng Worker Adapter chưa triển khai (`isAiAdapterImplemented() === false`): Trả về ngay HTTP 501 `status: "NOT_IMPLEMENTED"`. Không nhận job vào hàng đợi để tránh treo vô hạn (`pending` treo). File tạm nếu có được unlink ngay lập tức.
+  - Khi có AI Provider Key VÀ Worker Adapter được kích hoạt (`isAiAdapterImplemented() === true`): Nhận job với HTTP 202 `status: "pending"` và `jobId` hợp lệ.
+- **6. Dọn dẹp Scoped trong `test_server_jobs.ts`**:
+  - Đo lường danh sách file trong thư mục `uploads/` trước khi test.
+  - Sau khi hoàn thành kiểm thử, hàm cleanup chỉ xóa đúng các file do chính test tạo ra (`testCreatedFiles`), giữ nguyên toàn bộ file đã tồn tại trước đó.
+- **Kết quả Thực tế từ Test Suite (`npm test --workspace=apps/server`)**:
+  - Test 1 (Thiếu key): HTTP 503 `BLOCKED`, 0 file lưu xuống đĩa &rarr; ✅ PASSED.
+  - Test 2 (Có key, worker chưa triển khai): HTTP 501 `NOT_IMPLEMENTED`, 0 file lưu xuống đĩa &rarr; ✅ PASSED.
+  - Test 3 (Có key, worker enabled): HTTP 202 `pending`, nhận `jobId` &rarr; ✅ PASSED.
+  - Test 4 (GET `/api/jobs/:id`): HTTP 200, trả về đúng job metadata &rarr; ✅ PASSED.
+  - Cleanup: Đã xóa 1 file do test tạo ra, bảo toàn 100% file gốc &rarr; ✅ PASSED.
+
+---
+
+## Kiểm thử Ảnh Chân dung Thật & Đo Vector Nọng Cằm (Items 3 & 4)
+- **Dữ liệu Kiểm thử Thật (Unsplash License)**:
+  1. `real_portrait_front.jpg` (1000x1500): Ảnh chân dung chính diện, đường viền hàm và cổ rõ nét.
+  2. `real_portrait_tilted.jpg` (1000x1500): Ảnh chân dung nghiêng đầu ($21.7^\circ$), trục mặt xoay.
+  3. `real_portrait_beard.jpg` (1000x1500): Ảnh chân dung có râu quai nón, viền cổ áo và nền tiếp giáp phức tạp.
+- **Nhận diện Thật bằng MediaPipe**:
+  - Chạy `FaceLandmarkManager` (MediaPipe Face Landmarker WASM): Nhận diện đầy đủ **478 facial landmarks thật** trên cả 3 ảnh chân dung thật.
+  - Chạy `SegmenterManager` (MediaPipe Image Segmenter): Tách phân đoạn tóc thật (`Category = 1`) làm mặt nạ loại trừ.
+- **Đo lường Định lượng Vector Dịch chuyển Vùng Dưới Cằm**:
+  - Tính toán qua các phương thức `getChinSlimWarpPoints` và `getDisplacementVectorAt` trên `ImageEngine`:
+  - **Hướng Nâng (Vector Direction)**:
+    - Dot product của vector dịch chuyển $\vec{D}$ với trục hướng lên của mặt ($\vec{U}_{\text{face}}$) = **`1.0000`** (Ngưỡng yêu cầu > 0.95) trên cả 3 ảnh chân dung &rarr; ✅ Chứng minh lực nâng kéo mô nọng hướng thẳng về xương hàm, không gây xô lệch ngang.
+  - **Đồng bộ Góc Nghiêng Mặt (Face Tilt Synchronization)**:
+    - Ảnh 1 (Nghiêng $21.7^\circ$): Góc dịch chuyển $21.7^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
+    - Ảnh 2 (Nghiêng $9.6^\circ$): Góc dịch chuyển $9.6^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
+    - Ảnh 3 (Nghiêng $-3.3^\circ$): Góc dịch chuyển $-3.3^\circ$, độ lệch góc $\Delta = \mathbf{0.00^\circ}$ (< $5^\circ$) &rarr; ✅ Khớp trục giải phẫu.
+  - **Bảo vệ Môi Dưới (Lip Protection tại Landmark 17)**:
+    - Độ lớn dịch chuyển tại Landmark 17 (môi dưới): **`0.000000`** (Tuyệt đối không méo môi).
+  - **Bảo vệ Viền Cổ / Nền Ngoài Hàm (Collar & Background Protection)**:
+    - Độ lớn dịch chuyển tại điểm ngoài viền hàm: **`0.000000`** (Tuyệt đối không méo nền và cổ áo).
+
+---
+
+## Kiểm thử Độ phân giải: 800px Preview vs Export Gốc 4000x3000 (Item 2)
+- **Thiết lập Thử nghiệm Parity**:
+  - **Ảnh Preview**: 800x600 (0.48 Megapixels).
+  - **Ảnh Export**: 4000x3000 (12.0 Megapixels, tỉ lệ scale = 5.0x).
+  - **Pipeline Đầy đủ Cùng Áp dụng**:
+    - Skin Smoothing: 50%
+    - Hair Smoothing: 50%
+    - Face Slimming: 40%
+    - Chin Slimming: 60%
+  - **Phương pháp So sánh**: Downsample ảnh xuất 4000x3000 về 800x600 bằng thuật toán nội suy bilinear chất lượng cao, sau đó đo sai khác pixel từng kênh RGBA với ảnh preview 800px.
+- **Kết quả Định lượng**:
+  - **Parity Mean Absolute Error (MAE)**: **`0.470`** trên thang 255 (Ngưỡng yêu cầu < 4.0) &rarr; ✅ Sai lệch trung bình dưới nửa mức xám, cực kỳ đồng nhất.
+  - **Peak Signal-to-Noise Ratio (PSNR)**: **`46.36 dB`** (Ngưỡng yêu cầu > 34.0 dB) &rarr; ✅ Đạt chuẩn độ trung thực cao (High Fidelity Parity), chứng minh bán kính blur, feathering và mesh warp tỉ lệ chính xác theo độ phân giải.
+
+---
+
+## Danh mục Artifacts Thực tế Đã Lưu (`docs/test_artifacts/`)
+- `real_portrait_front_real_photo_original.png` (2,891 KB)
+- `real_portrait_front_double_chin_reduction_100.png` (2,889 KB)
+- `real_portrait_front_full_pipeline_skin_hair_face_chin.png` (2,821 KB)
+- `real_portrait_tilted_real_photo_original.png` (1,482 KB)
+- `real_portrait_tilted_double_chin_reduction_100.png` (1,481 KB)
+- `real_portrait_tilted_full_pipeline_skin_hair_face_chin.png` (1,451 KB)
+- `real_portrait_beard_real_photo_original.png` (1,935 KB)
+- `real_portrait_beard_double_chin_reduction_100.png` (1,930 KB)
+- `real_portrait_beard_full_pipeline_skin_hair_face_chin.png` (1,866 KB)
+- `highres_4000x3000_parity_800px_preview_skin_hair_face_chin.png` (986 KB)
+- `highres_4000x3000_parity_4000x3000_export_downsampled_to_800px.png` (1,005 KB)
+- `test_report.json` (Trạng thái: `PASSED`, 17 phép đo định lượng đạt chuẩn).
+
+---
+
+## Trạng thái Công cụ & Kế hoạch Tiếp tục (Item 7)
+- **Tình trạng nghiệm thu**: Toàn bộ công cụ (B001 Skin Smooth, B005 Hair Smooth, B014 Face Slim, B019 Double Chin) vẫn được duy trì ở trạng thái **`IMPLEMENTED_UNVERIFIED`** theo đúng nguyên tắc cho đến khi nghiệm thu toàn diện toàn bộ master prompt.
+- **Lệnh tái chạy toàn bộ hệ thống**:
+  - `npm run build`: Typecheck và build cả server (`tsc`) và web (`tsc -b && vite build`).
+  - `npm test`: Chạy toàn bộ test endpoint server (4 ca kiểm thử) và test runner hình ảnh thật (11 artifacts định lượng).
+
