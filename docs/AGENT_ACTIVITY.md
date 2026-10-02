@@ -273,4 +273,57 @@ Nhật ký hoạt động và bằng chứng tham gia thực tế của các Age
   - `node scripts/verify_new_effects.js`: 21/21 code structure & wiring verification PASS.
   - `npm run test:visual`: 100% PASS trên 4 chân dung thật.
 
+---
+
+## Batch: BATCH-004-PUBLIC-BETA-UI-AND-CLOUDFLARE (2026-10-02)
+
+| Field | Chi tiết |
+|---|---|
+| **Batch ID** | `BATCH-004-PUBLIC-BETA-UI-AND-CLOUDFLARE` |
+| **Focus Areas** | Public Beta UI/UX Polish, Consumer-friendly Vietnamese Copy, Compact Tool Taxonomy, Real-time Tool Search, Responsive Layout, Cloudflare Pages Deployment Preparation |
+| **Execution Mode** | Orchestrated UI/UX & Deployment Phase with Karpathy Guidelines. Single-agent runtime. |
+| **Status Result** | Public UI & Copy: 100% PASS. Regression: 100% PASS (21/21 effects + 4 real portraits). Cloudflare Pages: READY / BLOCKED_ACCOUNT_CONNECTION. |
+
+### Chi tiết các Role Passes:
+
+#### 1. Agents Orchestrator & Project Shepherd
+- **Source**: `.agents/skills/agency-agents-orchestrator/SKILL.md`, `.agents/skills/agency-project-shepherd/SKILL.md`
+- **Assignment**: Tạm dừng mở rộng backlog để tập trung vào trải nghiệm người dùng thực tế; gỡ bỏ toàn bộ mã nội bộ (B001, B014, B019, X006...) khỏi UI người dùng; tái cơ cấu phân loại công cụ thành các nhóm trực quan; chuẩn bị cấu hình phát hành Cloudflare Pages.
+
+#### 2. Frontend Developer & UI Designer
+- **Source**: `.agents/skills/agency-frontend-developer/SKILL.md`, `.agents/skills/agency-ui-designer/SKILL.md`
+- **Implementation**:
+  - **Loại bỏ Feature ID kỹ thuật**: Tất cả 21+ công cụ trên giao diện người dùng chuyển hoàn toàn sang tên tiếng Việt tự nhiên và thân thiện ("Độ rộng khuôn mặt", "Góc hàm", "Đường viền hàm", "Cằm V-line", "Độ dài cằm", "Giảm nọng cằm", "Gò má", "Thon eo"...).
+  - **Tái cơ cấu Phân loại (Taxonomy)**:
+    - Nhóm **Mặt**: Dáng mặt (Thon mặt, Độ rộng khuôn mặt, Gò má), Hàm & cằm (Góc hàm, Đường viền hàm, Cằm V-line, Độ dài cằm, Giảm nọng cằm).
+    - Nhóm **Mắt**: Hình dáng mắt (Mắt to, Chiều cao mắt, Chiều dài mắt, Nâng mí), Trang điểm mắt (Màu mắt, Mí đôi, Sáng mắt, Điểm sáng).
+    - Nhóm **Da**: Chăm sóc da (Mịn da, Sáng da, Khử bóng dầu, Tông da, Chi tiết da), Khuyết điểm (Xóa thâm mụn, Rãnh cười, Quầng thâm mắt, Bọng mắt).
+    - Nhóm **Vóc dáng (Body)**: Tách riêng Thon eo (`body_slim`) và Xương quai xanh (`collarbone`) khỏi nhóm Mặt.
+    - Nhóm **Tóc**: Mượt tóc, Bóng tóc.
+    - Nhóm **Nụ cười**: Trắng răng.
+    - Nhóm **Chỉnh màu**: Độ sáng, Độ tương phản, Độ bão hòa, Nhiệt độ màu, Sắc thái màu.
+  - **Thẻ điều khiển tham số (Active Tool Controller)**: Khi chọn công cụ, hiển thị thẻ điều khiển trực quan gồm tên công cụ, mô tả dễ hiểu 1 dòng, nút "Đặt lại" cho riêng công cụ đó, và thanh trượt trực quan có nhãn mốc giới hạn (-100 đến +100 hoặc 0 đến 100).
+  - **Tìm kiếm công cụ tức thì (Tool Search)**: Ô tìm kiếm "Tìm công cụ chỉnh sửa..." ở đầu panel hỗ trợ tìm nhanh theo tên, nhóm hoặc chức năng.
+  - **Trang chủ & Trạng thái trống (Landing & Empty State)**: Cập nhật tiêu đề chuẩn "Đẹp theo cách của bạn.", phụ đề "Chỉnh sửa chân dung ngay trên trình duyệt — nhanh, riêng tư và dễ sử dụng.", nút CTA "Chọn ảnh", các nhãn tính năng phụ và cam kết bảo mật rõ ràng: "Ảnh của bạn được xử lý trực tiếp trên trình duyệt đối với các công cụ chỉnh sửa cục bộ."
+  - **Bảo vệ tính năng Cloud AI**: Đặt nhãn "Sắp ra mắt" và thông tin minh bạch, không gửi người dùng vào trạng thái lỗi 501 / 503 hoặc pending vô hạn.
+  - **Responsive Layout**: Hỗ trợ linh hoạt trên Desktop (1920x1080), Laptop (1366x768), Tablet và Mobile (canvas trên, category bar cuộn ngang, controls gọn gàng, zero horizontal overflow).
+
+#### 3. Evidence Collector & Reality Checker
+- **Source**: `.agents/skills/agency-evidence-collector/SKILL.md`, `.agents/skills/agency-reality-checker/SKILL.md`
+- **Verification**:
+  - Không còn bất kỳ mã nội bộ hay thuật ngữ debug nào xuất hiện trên UI.
+  - Bộ kiểm thử độ nhạy 21 hiệu ứng và độ tương đồng Preview/Export đạt 100% PASS (21/21 PASS, MAE = 0.554, PSNR = 38.37 dB).
+  - Bộ kiểm thử chân dung thực tế đạt 100% PASS trên 4 ảnh chân dung thật (Diff = 53.04, tilt sync 100%, 0.0000 distortion).
+  - Quy tắc bảo tồn 0 VERIFIED tiếp tục được duy trì nghiêm ngặt.
+
+#### 4. DevOps Automator
+- **Source**: `.agents/skills/agency-devops-automator/SKILL.md`
+- **Cloudflare Pages Configuration**:
+  - Khởi tạo `.node-version` (Node 20 LTS).
+  - Thêm `apps/web/public/_redirects` với cấu hình SPA fallback `/* /index.html 200`.
+  - Thêm `apps/web/public/_headers` với security headers (nosniff, DENY frame, CORS model assets, immutable cache cho assets và models).
+  - Kiểm tra lệnh build sản xuất: `npm run build:web` biên dịch thành công 1902 modules sang `apps/web/dist` trong 330ms.
+  - Kiểm tra xác thực Cloudflare: Môi trường local chưa gắn token tài khoản Cloudflare; ghi nhận trạng thái `BLOCKED_ACCOUNT_CONNECTION` và hướng dẫn kết nối dashboard trực tiếp.
+
+
 
