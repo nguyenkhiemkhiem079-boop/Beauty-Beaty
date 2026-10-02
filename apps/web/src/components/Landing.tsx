@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, UserRound, Sliders, Palette, LayoutGrid } from 'lucide-react';
 
 interface Props {
   onStart: () => void;
@@ -13,8 +13,7 @@ export const Landing: React.FC<Props> = ({ onStart }) => {
           <div className="brand">D'Beaty</div>
           <div className="menu">
             <a href="#features" className="util-label">Tính năng</a>
-            <a href="#gallery" className="util-label">Thư viện</a>
-            <a href="#pricing" className="util-label">Bảng giá</a>
+            <a href="#privacy" className="util-label">Bảo mật</a>
           </div>
           <button className="btn-primary" onClick={onStart}>Mở Editor</button>
         </div>
@@ -24,21 +23,48 @@ export const Landing: React.FC<Props> = ({ onStart }) => {
         <section className="hero">
           <div className="hero-content">
             <h1 className="display">
-              Vẻ đẹp <br /> <span className="accent-italic">hoàn mỹ</span> <br /> trong tầm tay
+              Đẹp theo cách <br /> <span className="accent-italic">của bạn.</span>
             </h1>
             <p className="hero-body">
-              Công cụ chỉnh sửa ảnh chân dung chuyên nghiệp, mang đến vẻ đẹp tự nhiên chỉ với vài cú click. Ưu tiên xử lý Local-First an toàn và bảo mật.
+              Chỉnh sửa chân dung ngay trên trình duyệt — nhanh, riêng tư và dễ sử dụng.
             </p>
-            <button className="btn-primary btn-large" onClick={onStart} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              Bắt đầu trải nghiệm <ArrowRight size={18} />
-            </button>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '24px' }}>
+              <button className="btn-primary btn-large" onClick={onStart} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                Chọn ảnh <ArrowRight size={18} />
+              </button>
+            </div>
+
+            {/* Secondary feature highlights */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+              <span className="feature-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'rgba(255,255,255,0.7)', borderRadius: '20px', fontSize: '13px', fontWeight: 500, color: '#334155', border: '1px solid rgba(226,232,240,0.8)' }}>
+                <UserRound size={14} color="#d4af37" /> Làm đẹp khuôn mặt
+              </span>
+              <span className="feature-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'rgba(255,255,255,0.7)', borderRadius: '20px', fontSize: '13px', fontWeight: 500, color: '#334155', border: '1px solid rgba(226,232,240,0.8)' }}>
+                <Sliders size={14} color="#d4af37" /> Chỉnh màu
+              </span>
+              <span className="feature-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'rgba(255,255,255,0.7)', borderRadius: '20px', fontSize: '13px', fontWeight: 500, color: '#334155', border: '1px solid rgba(226,232,240,0.8)' }}>
+                <Palette size={14} color="#d4af37" /> Bộ lọc
+              </span>
+              <span className="feature-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'rgba(255,255,255,0.7)', borderRadius: '20px', fontSize: '13px', fontWeight: 500, color: '#334155', border: '1px solid rgba(226,232,240,0.8)' }}>
+                <LayoutGrid size={14} color="#d4af37" /> Ghép ảnh
+              </span>
+            </div>
+
+            {/* Privacy notice banner */}
+            <div id="privacy" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px', padding: '10px 14px', background: 'rgba(241,245,249,0.75)', borderRadius: '8px', fontSize: '12px', color: '#475569', maxWidth: '480px' }}>
+              <ShieldCheck size={16} color="#10b981" style={{ flexShrink: 0 }} />
+              <span>Ảnh của bạn được xử lý trực tiếp trên trình duyệt đối với các công cụ chỉnh sửa cục bộ.</span>
+            </div>
           </div>
+
           <div className="hero-visual">
             <div className="demo-card" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&q=80)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
             </div>
             <div className="floating-badge">
-              <span className="badge-number">01</span>
-              <span className="badge-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Sparkles size={14}/> Mịn da AI</span>
+              <span className="badge-text" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={14} color="#d4af37" /> Xử lý trực tiếp trên trình duyệt
+              </span>
             </div>
           </div>
         </section>

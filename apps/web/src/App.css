@@ -304,85 +304,166 @@ h1.display {
 
 /* Tools Panel Premium UI */
 .tools-panel {
-  width: 320px;
+  width: 350px;
   background-color: var(--color-bg-primary);
-  border-left: 1px solid rgba(0,0,0,0.05);
+  border-left: 1px solid rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
   box-shadow: -10px 0 30px rgba(0,0,0,0.02);
   z-index: 10;
 }
 
-.category-tabs {
-  display: flex;
+/* Tool Search Container */
+.tool-search-container {
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(0,0,0,0.05);
+  background: var(--color-bg-primary);
 }
 
-.tab {
-  flex: 1;
-  padding: 16px 0;
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(38,38,38,0.4);
-  transition: all 0.2s;
+.tool-search-input-wrapper {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: all 0.2s;
 }
 
-.tab:hover {
+.tool-search-input-wrapper:focus-within {
+  border-color: var(--color-accent);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(228, 164, 189, 0.2);
+}
+
+.tool-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  width: 100%;
   color: var(--color-text-primary);
-  background: rgba(0,0,0,0.02);
 }
 
-.tab.active {
-  color: var(--color-accent);
-  border-bottom: 2px solid var(--color-accent);
+.tool-search-input::placeholder {
+  color: rgba(38,38,38,0.4);
 }
 
 .tool-content {
   flex: 1;
-  padding: 24px;
+  padding: 16px 20px;
   overflow-y: auto;
 }
 
 .tool-group {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
-.tool-btn {
+.tool-subgroup-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(38,38,38,0.45);
+  margin: 14px 0 8px 2px;
+}
+
+/* Compact Tool Rows */
+.tool-btn-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease-in-out;
+  color: var(--color-text-primary);
+}
+
+.tool-btn-compact:hover {
+  background: #fdf8f3;
+  border-color: rgba(0,0,0,0.06);
+}
+
+.tool-btn-compact.active {
+  background: #ffffff;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(228, 164, 189, 0.15);
+  font-weight: 600;
+}
+
+.tool-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tool-value-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(228, 164, 189, 0.2);
+  color: var(--color-accent);
+}
+
+/* Active Tool Controller Card */
+.active-tool-card {
+  background: #ffffff;
+  border: 1px solid rgba(228, 164, 189, 0.4);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+}
+
+.active-tool-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.active-tool-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.active-tool-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.active-tool-slider-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  margin-top: 12px;
+}
+
+.slider-bound-label {
+  font-size: 11px;
   font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s;
-}
-
-.tool-btn:hover {
-  background: #fdf8f3;
-  border-color: rgba(0,0,0,0.05);
-}
-
-.tool-btn.active {
-  background: #fff;
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  box-shadow: 0 4px 12px rgba(228, 164, 189, 0.1);
+  color: #94a3b8;
+  min-width: 28px;
 }
 
 .parameter-section {
-  padding: 24px;
+  padding: 16px;
   background: var(--color-bg-secondary);
-  border-radius: 16px;
+  border-radius: 12px;
   margin-top: auto;
 }
 
@@ -390,30 +471,30 @@ h1.display {
 .premium-slider {
   -webkit-appearance: none;
   width: 100%;
-  height: 4px;
-  background: rgba(0,0,0,0.1);
-  border-radius: 2px;
+  height: 6px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 3px;
   outline: none;
 }
 
 .premium-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--color-accent);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(228, 164, 189, 0.4);
+  box-shadow: 0 2px 6px rgba(228, 164, 189, 0.5);
   transition: transform 0.1s;
 }
 
 .premium-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
 .panel-footer {
-  padding: 24px;
+  padding: 16px 20px;
   border-top: 1px solid rgba(0,0,0,0.05);
 }
 
@@ -600,4 +681,80 @@ h1.display {
   color: rgba(38,38,38,0.6);
   margin-top: 4px;
 }
+
+/* Cloud AI Disabled / Coming Soon Card */
+.cloud-ai-card {
+  padding: 20px;
+  background: var(--color-bg-secondary);
+  border-radius: 12px;
+  border: 1px dashed rgba(38,38,38,0.15);
+  text-align: center;
+}
+
+.cloud-ai-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  margin-bottom: 12px;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 900px) {
+  .editor-workspace {
+    flex-direction: column;
+  }
+  .canvas-area {
+    padding: 16px;
+    min-height: 42vh;
+    max-height: 52vh;
+    flex: none;
+  }
+  .tools-panel {
+    width: 100%;
+    flex: 1;
+    max-height: 48vh;
+    border-left: none;
+    border-top: 1px solid rgba(0,0,0,0.08);
+  }
+  .category-tabs {
+    padding: 0 4px;
+  }
+  .tab {
+    padding: 10px 8px;
+    min-width: 58px;
+    font-size: 10px;
+  }
+  .panel-footer {
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-nav {
+    padding: 0 12px;
+    height: 56px;
+  }
+  .nav-left .brand {
+    display: none;
+  }
+  .btn-compare {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .hero-content {
+    padding: 0 16px;
+  }
+  .display {
+    font-size: 2.25rem;
+  }
+  .tool-content {
+    padding: 12px 14px;
+  }
+}
+
 

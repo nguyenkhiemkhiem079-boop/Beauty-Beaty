@@ -1,4 +1,4 @@
-export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai';
+export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'body' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai';
 
 export type ToolType = 
   | 'skin_smooth' 

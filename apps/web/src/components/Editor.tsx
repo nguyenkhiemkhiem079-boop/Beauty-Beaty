@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { 
   Undo2, Redo2, Download, ArrowLeft, Upload, Loader2, Sparkles, 
-  UserRound, Droplets, Scissors, Minimize, Wand2, Eye, Smile, 
+  UserRound, Droplets, Scissors, Minimize, Eye, Smile, 
   Sliders, Palette, LayoutTemplate, SplitSquareVertical, Crop,
-  LayoutGrid, Save, Bookmark, CircleDot
+  LayoutGrid, Save, Bookmark, CircleDot, Search, X, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
@@ -14,6 +14,68 @@ import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
 import { CollageMaker } from './CollageMaker';
 import { saveDraft, loadLatestDraft, clearAllDrafts, type AppDraft } from '../utils/draftStorage';
+
+interface ToolDef {
+  id: ToolType;
+  name: string;
+  category: ToolCategory;
+  subgroup?: string;
+  desc: string;
+  min?: number;
+  max?: number;
+  icon: React.ComponentType<{ size?: number; className?: string; color?: string }>;
+}
+
+const ALL_TOOLS: ToolDef[] = [
+  // Skin
+  { id: 'skin_smooth', name: 'Mịn da', category: 'skin', subgroup: 'Làn da', desc: 'Làm mịn bề mặt da tự nhiên, bảo toàn kết cấu vi mô.', icon: Droplets },
+  { id: 'skin_brighten', name: 'Sáng da', category: 'skin', subgroup: 'Làn da', desc: 'Nâng sáng vùng da tối màu mà không làm cháy sáng.', icon: Sparkles },
+  { id: 'skin_oil', name: 'Khử bóng dầu', category: 'skin', subgroup: 'Làn da', desc: 'Khử vùng phản xạ bóng nhờn, mang lại bề mặt da lì mịn màng.', icon: Droplets },
+  { id: 'skin_tone', name: 'Tông da', category: 'skin', subgroup: 'Làn da', desc: 'Điều chỉnh sắc thái da ấm hoặc trắng hồng tươi tắn.', icon: Palette, min: -100, max: 100 },
+  { id: 'skin_detail', name: 'Chi tiết da', category: 'skin', subgroup: 'Làn da', desc: 'Khôi phục vi chi tiết lỗ chân lông tự nhiên sau khi làm mịn.', icon: Sparkles },
+  { id: 'skin_blemish', name: 'Xóa thâm mụn', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Chấm cọ trực tiếp lên nốt mụn để xóa sạch tự nhiên.', icon: CircleDot },
+  { id: 'nasolabial', name: 'Rãnh cười', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Làm mờ nếp gấp rãnh cười sâu giữa mũi và khóe miệng.', icon: Smile },
+  { id: 'dark_circles', name: 'Quầng thâm mắt', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Khử sắc tối và làm sáng bừng vùng da dưới mắt.', icon: Eye },
+  { id: 'eye_bags', name: 'Bọng mắt', category: 'skin', subgroup: 'Khuyết điểm', desc: 'Co gọn nhẹ nhàng bọng mỡ dưới mí mắt.', icon: Eye },
+
+  // Face
+  { id: 'face_slim', name: 'Thon mặt', category: 'face', subgroup: 'Dáng mặt', desc: 'Thu gọn hai bên má tạo dáng mặt thanh thoát.', icon: Minimize },
+  { id: 'face_width', name: 'Độ rộng khuôn mặt', category: 'face', subgroup: 'Dáng mặt', desc: 'Điều chỉnh khuôn mặt thon gọn hoặc đầy đặn hơn.', icon: Minimize, min: -100, max: 100 },
+  { id: 'cheekbone_width', name: 'Gò má', category: 'face', subgroup: 'Dáng mặt', desc: 'Hạ xương gò má nhô cao giúp đường nét mềm mại.', icon: Minimize },
+  { id: 'jaw_angle', name: 'Góc hàm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Điều chỉnh góc xương hàm mềm mại hoặc góc cạnh.', icon: Minimize },
+  { id: 'jaw_slim', name: 'Đường viền hàm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Nâng và vuốt gọn đường viền hàm dưới từ cằm tới mang tai.', icon: Minimize },
+  { id: 'chin_vline', name: 'Cằm V-line', category: 'face', subgroup: 'Hàm & cằm', desc: 'Thu hẹp đỉnh cằm tạo hình chữ V thanh tú.', icon: Minimize },
+  { id: 'chin_length', name: 'Độ dài cằm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Kéo dài hoặc thu ngắn cằm theo tỷ lệ khuôn mặt.', icon: Minimize, min: -100, max: 100 },
+  { id: 'chin_slim', name: 'Giảm nọng cằm', category: 'face', subgroup: 'Hàm & cằm', desc: 'Nâng mô mỡ dưới cằm, giảm nọng rõ rệt.', icon: Minimize },
+
+  // Eyes
+  { id: 'eye_enlarge', name: 'Mắt to', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Phóng to đôi mắt tự nhiên, long lanh hơn.', icon: Eye },
+  { id: 'eye_height', name: 'Chiều cao mắt', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Mở rộng mí mắt trên và dưới theo chiều dọc.', icon: Eye },
+  { id: 'eye_length', name: 'Chiều dài mắt', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Kéo dài đuôi mắt về phía thái dương sắc sảo.', icon: Eye },
+  { id: 'eyelid_lift', name: 'Nâng mí', category: 'eyes', subgroup: 'Hình dáng mắt', desc: 'Nâng mí mắt trên đỡ sụp, tạo ánh nhìn tươi trẻ.', icon: Eye },
+  { id: 'eye_color', name: 'Màu mắt', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Đổi màu kính áp tròng tự nhiên với bảng màu chọn lọc.', icon: Palette },
+  { id: 'double_eyelid', name: 'Mí đôi', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Tạo đường nếp mí đôi mềm mại uốn cong theo dáng mắt.', icon: Sparkles },
+  { id: 'eye_bright', name: 'Sáng mắt', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Tăng độ trong trẻo cho lòng trắng mắt, khử ánh đỏ.', icon: Eye },
+  { id: 'eye_catchlight', name: 'Điểm sáng', category: 'eyes', subgroup: 'Trang điểm mắt', desc: 'Thêm điểm sáng phản chiếu long lanh trong con ngươi.', icon: Sparkles },
+
+  // Mouth
+  { id: 'teeth_whiten', name: 'Trắng răng', category: 'mouth', subgroup: 'Nụ cười', desc: 'Khử sắc vàng xỉn trong khoang miệng, mang lại nụ cười rạng ngời.', icon: Smile },
+
+  // Hair
+  { id: 'hair_smooth', name: 'Mượt tóc', category: 'hair', subgroup: 'Chăm sóc tóc', desc: 'Làm mềm mượt và giảm xơ rối cho mái tóc.', icon: Scissors },
+  { id: 'hair_shine', name: 'Bóng tóc', category: 'hair', subgroup: 'Chăm sóc tóc', desc: 'Tăng ánh sáng bóng khỏe, chuẩn salon cho mái tóc.', icon: Sparkles },
+
+  // Body
+  { id: 'body_slim', name: 'Thon eo', category: 'body', subgroup: 'Vóc dáng', desc: 'Thu nhỏ vòng eo thon gọn và cân đối.', icon: UserRound },
+  { id: 'collarbone', name: 'Xương quai xanh', category: 'body', subgroup: 'Vóc dáng', desc: 'Tôn rõ đường xương quai xanh quyến rũ.', icon: UserRound },
+
+  // Adjust
+  { id: 'brightness', name: 'Độ sáng', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Điều chỉnh ánh sáng tổng thể của bức ảnh.', icon: Sliders, min: -100, max: 100 },
+  { id: 'contrast', name: 'Độ tương phản', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Tăng giảm độ tương phản giữa vùng sáng và vùng tối.', icon: Sliders, min: -100, max: 100 },
+  { id: 'saturation', name: 'Độ bão hòa', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Điều chỉnh độ rực rỡ của các gam màu.', icon: Sliders, min: -100, max: 100 },
+  { id: 'temperature', name: 'Nhiệt độ màu', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Cân bằng sắc ấm vàng nắng hoặc mát xanh dịu.', icon: Sliders, min: -100, max: 100 },
+  { id: 'tint', name: 'Sắc thái màu', category: 'adjust', subgroup: 'Ánh sáng & Màu sắc', desc: 'Tinh chỉnh sắc thái màu ngả xanh lá hoặc tím hồng.', icon: Sliders, min: -100, max: 100 },
+];
 
 interface Props {
   onExit: () => void;
@@ -32,6 +94,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
   const [activeCategory, setActiveCategory] = useState<ToolCategory>('skin');
   const [activeTool, setActiveTool] = useState<ToolType>('skin_smooth');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeFilterCategory, setActiveFilterCategory] = useState<string>('all');
   const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -633,6 +696,20 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     commitHistory(nextState);
   };
 
+  const handleResetTool = (toolId: ToolType) => {
+    setEditState(prev => {
+      const next = { ...prev };
+      if (toolId === 'eye_color') {
+        next.eye_color = '#3d6b8c';
+        next.eye_color_intensity = 0;
+      } else {
+        (next as any)[toolId] = 0;
+      }
+      return next;
+    });
+    setTimeout(commitHistory, 50);
+  };
+
   const resetCurrentCategory = () => {
     setEditState(prev => {
       const next = { ...prev };
@@ -654,7 +731,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         next.jaw_angle = 0;
         next.chin_length = 0;
         next.cheekbone_width = 0;
+      } else if (activeCategory === 'body') {
         next.body_slim = 0;
+        next.collarbone = 0;
       } else if (activeCategory === 'eyes') {
         next.eye_enlarge = 0;
         next.eye_height = 0;
@@ -676,7 +755,6 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         next.saturation = 0;
         next.temperature = 0;
         next.tint = 0;
-        next.collarbone = 0;
       } else if (activeCategory === 'filters') {
         next.filter_id = '';
       } else if (activeCategory === 'templates') {
@@ -766,21 +844,49 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
       <main className="editor-workspace">
         <div className="canvas-area">
           {!imageSrc ? (
-            <div className="empty-state">
-              <Upload size={48} className="empty-icon" />
-              <h3>Bắt đầu sáng tạo</h3>
-              <p>Tải lên một bức ảnh chân dung để trải nghiệm trọn bộ 82 công cụ D'Beaty AI.</p>
-              <label className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '24px', cursor: 'pointer' }}>
-                <Upload size={18} /> Chọn ảnh từ máy
+            <div className="empty-state" style={{ maxWidth: '520px', padding: '32px 20px', textAlign: 'center' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(228, 164, 189, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <Sparkles size={30} color="var(--color-accent)" />
+              </div>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--color-text-primary)', marginBottom: '8px', letterSpacing: '-0.02em' }}>
+                Đẹp theo cách của bạn.
+              </h2>
+              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: 1.5 }}>
+                Chỉnh sửa chân dung ngay trên trình duyệt — nhanh, riêng tư và dễ sử dụng.
+              </p>
+              <label className="btn-primary btn-large" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '20px' }}>
+                <Upload size={18} /> Chọn ảnh
                 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
               </label>
+
+              {/* Secondary areas */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 12px', background: '#ffffff', borderRadius: '999px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <UserRound size={13} color="#d4af37" /> Làm đẹp khuôn mặt
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 12px', background: '#ffffff', borderRadius: '999px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <Sliders size={13} color="#d4af37" /> Chỉnh màu
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 12px', background: '#ffffff', borderRadius: '999px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <Palette size={13} color="#d4af37" /> Bộ lọc
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '5px 12px', background: '#ffffff', borderRadius: '999px', fontSize: '12px', color: '#475569', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <LayoutGrid size={13} color="#d4af37" /> Ghép ảnh
+                </span>
+              </div>
+
+              {/* Privacy notice */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#64748b', background: 'rgba(255,255,255,0.7)', padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(226,232,240,0.8)' }}>
+                <ShieldCheck size={15} color="#10b981" />
+                <span>Ảnh của bạn được xử lý trực tiếp trên trình duyệt đối với các công cụ chỉnh sửa cục bộ.</span>
+              </div>
             </div>
           ) : (
             <div className="canvas-container">
               {isDetecting && (
                 <div className="loading-overlay">
                   <Loader2 className="spinner" size={32} />
-                  <span>Đang phân tích khuôn mặt & nhận diện AI...</span>
+                  <span>Đang phân tích khuôn mặt...</span>
                 </div>
               )}
               {errorMsg && (
@@ -798,546 +904,605 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           )}
         </div>
 
-        {imageSrc && (
-          <aside className="tools-panel">
-            {/* Category Navigation Bar */}
-            <div className="category-tabs">
-              <button className={`tab ${activeCategory === 'skin' ? 'active' : ''}`} onClick={() => { setActiveCategory('skin'); setActiveTool('skin_smooth'); }}>
-                <Droplets size={18} />Da
-              </button>
-              <button className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
-                <UserRound size={18} />Mặt
-              </button>
-              <button className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
-                <Eye size={18} />Mắt
-              </button>
-              <button className={`tab ${activeCategory === 'mouth' ? 'active' : ''}`} onClick={() => { setActiveCategory('mouth'); setActiveTool('teeth_whiten'); }}>
-                <Smile size={18} />Môi & Răng
-              </button>
-              <button className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => { setActiveCategory('hair'); setActiveTool('hair_smooth'); }}>
-                <Scissors size={18} />Tóc
-              </button>
-              <button className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
-                <Sliders size={18} />Chỉnh màu
-              </button>
-              <button className={`tab ${activeCategory === 'crop' ? 'active' : ''}`} onClick={() => { setActiveCategory('crop'); setActiveTool('crop'); }}>
-                <Crop size={18} />Cắt ảnh
-              </button>
-              <button className={`tab ${activeCategory === 'filters' ? 'active' : ''}`} onClick={() => { setActiveCategory('filters'); }}>
-                <Palette size={18} />Bộ lọc (200+)
-              </button>
-              <button className={`tab ${activeCategory === 'templates' ? 'active' : ''}`} onClick={() => { setActiveCategory('templates'); }}>
-                <LayoutTemplate size={18} />Khung & Bìa
-              </button>
-              <button className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => { setActiveCategory('ai'); setActiveTool('ai_makeup'); }}>
-                <Wand2 size={18} />Cloud AI
-              </button>
-            </div>
+        {imageSrc && (() => {
+          const currentToolDef = ALL_TOOLS.find(t => t.id === activeTool);
+          const activeToolVal = activeTool === 'eye_color' 
+            ? (editState.eye_color_intensity ?? 0) 
+            : ((editState as any)[activeTool] ?? 0);
 
-            <div className="tool-content">
-              {/* SKIN CATEGORY */}
-              {activeCategory === 'skin' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Làm đẹp da</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_smooth' ? 'active' : ''}`} onClick={() => setActiveTool('skin_smooth')}>
-                    <Sparkles size={16} /> B001: Mịn da tự nhiên
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_brighten' ? 'active' : ''}`} onClick={() => setActiveTool('skin_brighten')}>
-                    <Sparkles size={16} /> B009: Sáng da &amp; Nâng tone
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_oil' ? 'active' : ''}`} onClick={() => setActiveTool('skin_oil')}>
-                    <Droplets size={16} /> B006: Khử bóng dầu Matte
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_tone' ? 'active' : ''}`} onClick={() => setActiveTool('skin_tone')}>
-                    <Palette size={16} /> B008: Tông da (Ấm ↔ Hồng)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'nasolabial' ? 'active' : ''}`} onClick={() => setActiveTool('nasolabial')}>
-                    <Sparkles size={16} /> B005: Giảm rãnh cười
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'dark_circles' ? 'active' : ''}`} onClick={() => setActiveTool('dark_circles')}>
-                    <Eye size={16} /> B011: Giảm quầng thâm mắt
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_detail' ? 'active' : ''}`} onClick={() => setActiveTool('skin_detail')}>
-                    <Sparkles size={16} /> B010: Khôi phục chi tiết da
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_bags' ? 'active' : ''}`} onClick={() => setActiveTool('eye_bags')}>
-                    <Eye size={16} /> B012: Giảm bọng mắt (Eye Bags)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'skin_blemish' ? 'active' : ''}`} onClick={() => setActiveTool('skin_blemish')}>
-                    <CircleDot size={16} /> B002: Chấm xóa thâm mụn (Healing Brush)
-                  </div>
-                  {activeTool === 'skin_blemish' && (
-                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '6px', marginTop: '10px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
-                      <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>Cọ xóa thâm mụn:</p>
-                      <p style={{ margin: '0 0 8px 0', color: '#64748b' }}>Nhấp chuột trực tiếp lên nốt mụn/vết thâm trên ảnh để loại bỏ tự nhiên.</p>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span>Kích thước cọ:</span>
-                        <span>{blemishRadius}px</span>
-                      </div>
-                      <input type="range" min="6" max="35" value={blemishRadius} onChange={e => setBlemishRadius(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--color-accent)' }} />
-                    </div>
+          const searchResults = searchQuery.trim() 
+            ? ALL_TOOLS.filter(t => 
+                t.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) || 
+                (t.subgroup && t.subgroup.toLowerCase().includes(searchQuery.toLowerCase().trim())) ||
+                t.desc.toLowerCase().includes(searchQuery.toLowerCase().trim())
+              )
+            : [];
+
+          const renderToolButton = (tool: ToolDef) => {
+            const val = tool.id === 'eye_color' 
+              ? (editState.eye_color_intensity ?? 0) 
+              : ((editState as any)[tool.id] ?? 0);
+            const isModified = val !== 0;
+            const Icon = tool.icon;
+
+            return (
+              <div 
+                key={tool.id} 
+                className={`tool-btn-compact ${activeTool === tool.id ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTool(tool.id);
+                  if (activeCategory !== tool.category) {
+                    setActiveCategory(tool.category);
+                  }
+                }}
+              >
+                <div className="tool-btn-left">
+                  <Icon size={15} />
+                  <span>{tool.name}</span>
+                </div>
+                {isModified && (
+                  <span className="tool-value-badge">
+                    {val > 0 ? `+${val}` : val}
+                  </span>
+                )}
+              </div>
+            );
+          };
+
+          return (
+            <aside className="tools-panel">
+              {/* Tool Search Bar */}
+              <div className="tool-search-container">
+                <div className="tool-search-input-wrapper">
+                  <Search size={15} color="#94a3b8" />
+                  <input 
+                    type="text" 
+                    className="tool-search-input"
+                    placeholder="Tìm công cụ chỉnh sửa..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#94a3b8' }}>
+                      <X size={14} />
+                    </button>
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* FACE CATEGORY */}
-              {activeCategory === 'face' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Định hình khuôn mặt</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'face_slim' ? 'active' : ''}`} onClick={() => setActiveTool('face_slim')}>
-                    <Minimize size={16} /> B013: Thon mặt (V-Line)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'face_width' ? 'active' : ''}`} onClick={() => setActiveTool('face_width')}>
-                    <Minimize size={16} /> B014: Bề rộng mặt (Face Width)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'jaw_angle' ? 'active' : ''}`} onClick={() => setActiveTool('jaw_angle')}>
-                    <Minimize size={16} /> B015: Góc quai hàm (Jaw Angle)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'jaw_slim' ? 'active' : ''}`} onClick={() => setActiveTool('jaw_slim')}>
-                    <Minimize size={16} /> B016: Định hình đường hàm
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'chin_vline' ? 'active' : ''}`} onClick={() => setActiveTool('chin_vline')}>
-                    <Minimize size={16} /> B017: Cằm V-Line thanh tú
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'chin_length' ? 'active' : ''}`} onClick={() => setActiveTool('chin_length')}>
-                    <Minimize size={16} /> B018: Độ dài cằm (Chin Length)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'chin_slim' ? 'active' : ''}`} onClick={() => setActiveTool('chin_slim')}>
-                    <Minimize size={16} /> B019: Giảm nọng cằm Submental
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'cheekbone_width' ? 'active' : ''}`} onClick={() => setActiveTool('cheekbone_width')}>
-                    <Minimize size={16} /> B020: Hạ gò má (Cheekbones)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'body_slim' ? 'active' : ''}`} onClick={() => setActiveTool('body_slim')}>
-                    <UserRound size={16} /> B075: Thon eo (Body Slim)
-                  </div>
+              {/* Category Navigation Bar (when not searching) */}
+              {!searchQuery.trim() && (
+                <div className="category-tabs">
+                  <button className={`tab ${activeCategory === 'skin' ? 'active' : ''}`} onClick={() => { setActiveCategory('skin'); setActiveTool('skin_smooth'); }}>
+                    <Droplets size={16} />Da
+                  </button>
+                  <button className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
+                    <UserRound size={16} />Mặt
+                  </button>
+                  <button className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
+                    <Eye size={16} />Mắt
+                  </button>
+                  <button className={`tab ${activeCategory === 'mouth' ? 'active' : ''}`} onClick={() => { setActiveCategory('mouth'); setActiveTool('teeth_whiten'); }}>
+                    <Smile size={16} />Nụ cười
+                  </button>
+                  <button className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => { setActiveCategory('hair'); setActiveTool('hair_smooth'); }}>
+                    <Scissors size={16} />Tóc
+                  </button>
+                  <button className={`tab ${activeCategory === 'body' ? 'active' : ''}`} onClick={() => { setActiveCategory('body'); setActiveTool('body_slim'); }}>
+                    <UserRound size={16} />Vóc dáng
+                  </button>
+                  <button className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
+                    <Sliders size={16} />Chỉnh màu
+                  </button>
+                  <button className={`tab ${activeCategory === 'crop' ? 'active' : ''}`} onClick={() => { setActiveCategory('crop'); setActiveTool('crop'); }}>
+                    <Crop size={16} />Cắt ảnh
+                  </button>
+                  <button className={`tab ${activeCategory === 'filters' ? 'active' : ''}`} onClick={() => { setActiveCategory('filters'); }}>
+                    <Palette size={16} />Bộ lọc
+                  </button>
+                  <button className={`tab ${activeCategory === 'templates' ? 'active' : ''}`} onClick={() => { setActiveCategory('templates'); }}>
+                    <LayoutTemplate size={16} />Mẫu bìa
+                  </button>
+                  <button className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => { setActiveCategory('ai'); }}>
+                    <Sparkles size={16} />Cloud AI
+                  </button>
                 </div>
               )}
 
-              {/* EYES CATEGORY */}
-              {activeCategory === 'eyes' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Đôi mắt</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_enlarge' ? 'active' : ''}`} onClick={() => setActiveTool('eye_enlarge')}>
-                    <Eye size={16} /> B025: Mắt to tự nhiên (Radial Bulge)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_height' ? 'active' : ''}`} onClick={() => setActiveTool('eye_height')}>
-                    <Eye size={16} /> B026: Chiều cao mắt (Eye Height)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_length' ? 'active' : ''}`} onClick={() => setActiveTool('eye_length')}>
-                    <Eye size={16} /> B027: Chiều dài mắt (Eye Length)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_bright' ? 'active' : ''}`} onClick={() => setActiveTool('eye_bright')}>
-                    <Eye size={16} /> B028: Sáng mắt (Sclera Brightening)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_color' ? 'active' : ''}`} onClick={() => setActiveTool('eye_color')}>
-                    <Palette size={16} /> B029: Màu lens / Màu mắt (Eye Color)
-                  </div>
-                  {activeTool === 'eye_color' && (
-                    <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '6px', marginTop: '6px', marginBottom: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
-                      <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>Bảng màu lens tự nhiên:</p>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {[
-                          { id: '#3d6b8c', name: 'Lam Sapphire' },
-                          { id: '#2a6f97', name: 'Xanh Đại dương' },
-                          { id: '#2e6f40', name: 'Lục Hazel' },
-                          { id: '#8b4513', name: 'Nâu Hổ phách' },
-                          { id: '#5d6b74', name: 'Xám Khói' }
-                        ].map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              setEditState(prev => ({ ...prev, eye_color: c.id, eye_color_intensity: prev.eye_color_intensity || 60 }));
-                              setTimeout(commitHistory, 50);
-                            }}
-                            title={c.name}
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              backgroundColor: c.id,
-                              border: (editState.eye_color || '#3d6b8c') === c.id ? '2px solid #d4af37' : '2px solid #ffffff',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                              cursor: 'pointer'
-                            }}
-                          />
-                        ))}
-                      </div>
+              <div className="tool-content">
+                {/* Search Results Mode */}
+                {searchQuery.trim() ? (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px' }}>
+                      Kết quả tìm kiếm ({searchResults.length})
                     </div>
-                  )}
-                  <div className={`tool-btn ${activeTool === 'eyelid_lift' ? 'active' : ''}`} onClick={() => setActiveTool('eyelid_lift')}>
-                    <Eye size={16} /> B032: Nâng mí sụp (Eyelid Lift)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'double_eyelid' ? 'active' : ''}`} onClick={() => setActiveTool('double_eyelid')}>
-                    <Sparkles size={16} /> B033: Mắt 2 mí (Double Eyelid)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'eye_catchlight' ? 'active' : ''}`} onClick={() => setActiveTool('eye_catchlight')}>
-                    <Sparkles size={16} /> B034: Điểm sáng mắt long lanh (Catchlight)
-                  </div>
-                </div>
-              )}
-
-              {/* MOUTH & TEETH CATEGORY */}
-              {activeCategory === 'mouth' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Môi & Răng</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'teeth_whiten' ? 'active' : ''}`} onClick={() => setActiveTool('teeth_whiten')}>
-                    <Smile size={16} /> B043: Trắng răng tự nhiên
-                  </div>
-                </div>
-              )}
-
-              {/* HAIR CATEGORY */}
-              {activeCategory === 'hair' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Chăm sóc tóc</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'hair_smooth' ? 'active' : ''}`} onClick={() => setActiveTool('hair_smooth')}>
-                    <Scissors size={16} /> B063: Mượt tóc (Hair Segmentation)
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'hair_shine' ? 'active' : ''}`} onClick={() => setActiveTool('hair_shine')}>
-                    <Sparkles size={16} /> B064: Bóng tóc salon (Hair Shine)
-                  </div>
-                </div>
-              )}
-
-              {/* ADJUSTMENTS CATEGORY */}
-              {activeCategory === 'adjust' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="util-label">Chỉnh sửa toàn diện</h4>
-                    <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'brightness' ? 'active' : ''}`} onClick={() => setActiveTool('brightness')}>
-                    <Sliders size={16} /> X022: Độ sáng
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'contrast' ? 'active' : ''}`} onClick={() => setActiveTool('contrast')}>
-                    <Sliders size={16} /> X022: Độ tương phản
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'saturation' ? 'active' : ''}`} onClick={() => setActiveTool('saturation')}>
-                    <Sliders size={16} /> X022: Độ bão hòa màu
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'temperature' ? 'active' : ''}`} onClick={() => setActiveTool('temperature')}>
-                    <Sliders size={16} /> X022: Nhiệt độ ấm / lạnh
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'tint' ? 'active' : ''}`} onClick={() => setActiveTool('tint')}>
-                    <Sliders size={16} /> X022: Cân bằng sắc thái Tint
-                  </div>
-                  <div className={`tool-btn ${activeTool === 'collarbone' ? 'active' : ''}`} onClick={() => setActiveTool('collarbone')}>
-                    <UserRound size={16} /> X006: Xương quai xanh nổi bật
-                  </div>
-                </div>
-              )}
-
-              {/* CROP ASPECT RATIO CATEGORY (B090) */}
-              {activeCategory === 'crop' && (
-                <div className="tool-group">
-                  <h4 className="util-label">Cắt ảnh chuẩn tỷ lệ (B090)</h4>
-                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>Chọn tỷ lệ khung hình chuẩn để cắt ảnh gọn gàng:</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                    {[
-                      { id: 'original', label: 'Nguyên bản (Original)' },
-                      { id: '1:1', label: '1:1 Vuông (Instagram)' },
-                      { id: '4:5', label: '4:5 Chân dung (Portrait)' },
-                      { id: '3:4', label: '3:4 Bìa ảnh (Standard)' },
-                      { id: '9:16', label: '9:16 Story / TikTok' }
-                    ].map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => handleApplyCrop(item.id as any)}
-                        style={{
-                          padding: '12px 10px',
-                          borderRadius: '8px',
-                          border: (editState.crop?.aspectRatio || 'original') === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
-                          background: (editState.crop?.aspectRatio || 'original') === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
-                          cursor: 'pointer',
-                          fontWeight: 500,
-                          fontSize: '12px'
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* CURATED COLOR FILTERS (200+) */}
-              {activeCategory === 'filters' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 className="util-label">200+ Bộ lọc màu nghệ thuật</h4>
-                    {editState.filter_id && (
-                      <button onClick={() => setEditState(prev => ({ ...prev, filter_id: '' }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Bỏ chọn</button>
+                    {searchResults.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8', fontSize: '13px' }}>
+                        Không tìm thấy công cụ phù hợp với "{searchQuery}".
+                      </div>
+                    ) : (
+                      searchResults.map(renderToolButton)
                     )}
                   </div>
-                  
-                  {/* Category Chips */}
-                  <div className="chip-container">
-                    <button className={`filter-chip ${activeFilterCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('all')}>Tất cả (200)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'film' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('film')}>Phim ảnh (35)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'portrait' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('portrait')}>Chân dung (35)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'cinematic' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('cinematic')}>Điện ảnh (35)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'vintage' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('vintage')}>Cổ điển (30)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'nature' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('nature')}>Thiên nhiên (35)</button>
-                    <button className={`filter-chip ${activeFilterCategory === 'artistic' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('artistic')}>Nghệ thuật (30)</button>
-                  </div>
-
-                  {/* Filter Grid */}
-                  <div className="filter-grid">
-                    {filteredFilters.map(filter => (
-                      <div 
-                        key={filter.id}
-                        className={`filter-card ${editState.filter_id === filter.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setEditState(prev => ({ ...prev, filter_id: filter.id }));
-                          setTimeout(commitHistory, 50);
-                        }}
-                      >
-                        <div className="filter-name">{filter.nameVi}</div>
-                        <div className="filter-category">{filter.name}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {editState.filter_id && (
-                    <div style={{ marginTop: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600 }}>Độ đậm bộ lọc</span>
-                        <span style={{ fontSize: '13px', color: 'var(--color-accent)' }}>{editState.filter_intensity ?? 100}%</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        className="premium-slider"
-                        min="0" max="100" 
-                        value={editState.filter_intensity ?? 100} 
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          setEditState(prev => ({ ...prev, filter_intensity: val }));
-                        }}
-                        onMouseUp={commitHistory}
-                        onTouchEnd={commitHistory}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* MAGAZINE & POSTER TEMPLATES WITH FULL EDITABILITY */}
-              {activeCategory === 'templates' && (
-                <div className="tool-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 className="util-label">12 Khung Bìa & Poster</h4>
-                    {editState.template_id && (
-                      <button onClick={() => setEditState(prev => ({ ...prev, template_id: '', template_custom_text: undefined }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Tắt khung</button>
-                    )}
-                  </div>
-                  <div className="template-grid">
-                    {POSTER_TEMPLATES.map(tpl => (
-                      <div 
-                        key={tpl.id}
-                        className={`template-card ${editState.template_id === tpl.id ? 'active' : ''}`}
-                        onClick={() => {
-                          const isSame = editState.template_id === tpl.id;
-                          setEditState(prev => ({ 
-                            ...prev, 
-                            template_id: isSame ? '' : tpl.id,
-                            template_custom_text: isSame ? undefined : {
-                              title: tpl.title,
-                              subtitle: tpl.subtitle,
-                              dateText: tpl.dateText,
-                              tagline: tpl.tagline,
-                              footer: tpl.footer
-                            }
-                          }));
-                          setTimeout(commitHistory, 50);
-                        }}
-                      >
-                        <div className="template-title">{tpl.nameVi}</div>
-                        <div className="template-desc">{tpl.subtitle} • Tỷ lệ {tpl.aspectRatio}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* EDITABLE TEXT & PLACEMENT FORM */}
-                  {editState.template_id && (() => {
-                    const currentTpl = POSTER_TEMPLATES.find(t => t.id === editState.template_id);
-                    if (!currentTpl) return null;
-                    const customText = editState.template_custom_text || {
-                      title: currentTpl.title,
-                      subtitle: currentTpl.subtitle,
-                      dateText: currentTpl.dateText,
-                      tagline: currentTpl.tagline,
-                      footer: currentTpl.footer
-                    };
-
-                    const handleFieldChange = (field: keyof TemplateCustomText, val: string) => {
-                      setEditState(prev => ({
-                        ...prev,
-                        template_custom_text: {
-                          ...customText,
-                          [field]: val
-                        }
-                      }));
-                    };
-
-                    return (
-                      <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 600, color: '#334155' }}>Tùy Chỉnh Chữ & Bố Cục Bìa</h4>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Tiêu đề chính (Title)</label>
-                            <input 
-                              type="text" 
-                              value={customText.title || ''} 
-                              onChange={e => handleFieldChange('title', e.target.value)} 
-                              onBlur={commitHistory}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                            />
+                ) : (
+                  <>
+                    {/* Active Tool Parameter Controller Card */}
+                    {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'crop' && activeCategory !== 'ai' && currentToolDef && (
+                      <div className="active-tool-card">
+                        <div className="active-tool-header">
+                          <div className="active-tool-name">
+                            <span>{currentToolDef.name}</span>
+                            {activeToolVal !== 0 && (
+                              <span className="tool-value-badge">
+                                {activeToolVal > 0 ? `+${activeToolVal}` : activeToolVal}
+                              </span>
+                            )}
                           </div>
+                          {activeToolVal !== 0 && (
+                            <button 
+                              onClick={() => handleResetTool(activeTool)}
+                              style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer' }}
+                              title="Đặt lại công cụ này"
+                            >
+                              <RotateCcw size={12} /> Đặt lại
+                            </button>
+                          )}
+                        </div>
+                        <div className="active-tool-desc">{currentToolDef.desc}</div>
 
+                        {activeTool === 'eye_color' ? (
                           <div>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Phụ đề (Subtitle)</label>
-                            <input 
-                              type="text" 
-                              value={customText.subtitle || ''} 
-                              onChange={e => handleFieldChange('subtitle', e.target.value)} 
-                              onBlur={commitHistory}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Ngày tháng / Số phát hành</label>
-                            <input 
-                              type="text" 
-                              value={customText.dateText || ''} 
-                              onChange={e => handleFieldChange('dateText', e.target.value)} 
-                              onBlur={commitHistory}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Khẩu hiệu (Tagline)</label>
-                            <input 
-                              type="text" 
-                              value={customText.tagline || ''} 
-                              onChange={e => handleFieldChange('tagline', e.target.value)} 
-                              onBlur={commitHistory}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                            />
-                          </div>
-
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Chân trang (Footer Credits)</label>
-                            <input 
-                              type="text" 
-                              value={customText.footer || ''} 
-                              onChange={e => handleFieldChange('footer', e.target.value)} 
-                              onBlur={commitHistory}
-                              style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
-                            />
-                          </div>
-
-                          {/* Text Placement Selection */}
-                          <div style={{ marginTop: '6px' }}>
-                            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>Vị trí chữ</label>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {(['top', 'center', 'bottom'] as const).map(p => (
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                              {[
+                                { id: '#3d6b8c', name: 'Lam Sapphire' },
+                                { id: '#2a6f97', name: 'Xanh Đại dương' },
+                                { id: '#2e6f40', name: 'Lục Hazel' },
+                                { id: '#8b4513', name: 'Nâu Hổ phách' },
+                                { id: '#5d6b74', name: 'Xám Khói' }
+                              ].map(c => (
                                 <button
-                                  key={p}
+                                  key={c.id}
                                   onClick={() => {
-                                    setEditState(prev => ({ ...prev, template_placement: p }));
+                                    setEditState(prev => ({ ...prev, eye_color: c.id, eye_color_intensity: prev.eye_color_intensity || 60 }));
                                     setTimeout(commitHistory, 50);
                                   }}
+                                  title={c.name}
                                   style={{
-                                    flex: 1,
-                                    padding: '6px 0',
-                                    borderRadius: '4px',
-                                    border: (editState.template_placement || 'top') === p ? '1px solid var(--color-accent)' : '1px solid #cbd5e1',
-                                    background: (editState.template_placement || 'top') === p ? 'rgba(212, 175, 55, 0.15)' : '#fff',
-                                    fontWeight: (editState.template_placement || 'top') === p ? 600 : 400,
-                                    fontSize: '11px',
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '50%',
+                                    backgroundColor: c.id,
+                                    border: (editState.eye_color || '#3d6b8c') === c.id ? '2px solid var(--color-accent)' : '2px solid #ffffff',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                                     cursor: 'pointer'
                                   }}
-                                >
-                                  {p === 'top' ? 'Trên cùng' : p === 'center' ? 'Ở giữa' : 'Dưới cùng'}
-                                </button>
+                                />
                               ))}
                             </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">0</span>
+                              <input 
+                                type="range"
+                                className="premium-slider"
+                                min="0"
+                                max="100"
+                                value={editState.eye_color_intensity ?? 0}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory}
+                                onTouchEnd={commitHistory}
+                                onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
                           </div>
+                        ) : activeTool === 'skin_blemish' ? (
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                              <span style={{ color: '#64748b' }}>Kích thước cọ:</span>
+                              <span style={{ fontWeight: 600 }}>{blemishRadius}px</span>
+                            </div>
+                            <input 
+                              type="range"
+                              className="premium-slider"
+                              min="6"
+                              max="35"
+                              value={blemishRadius}
+                              onChange={e => setBlemishRadius(Number(e.target.value))}
+                            />
+                            <div style={{ marginTop: '8px', fontSize: '11px', color: '#94a3b8' }}>
+                              Nhấp chuột trực tiếp lên nốt mụn trên ảnh để xóa.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="active-tool-slider-row">
+                            <span className="slider-bound-label">
+                              {currentToolDef.min === -100 ? '-100' : '0'}
+                            </span>
+                            <input 
+                              type="range"
+                              className="premium-slider"
+                              min={currentToolDef.min === -100 ? '-100' : '0'}
+                              max="100"
+                              value={activeToolVal}
+                              onChange={handleSliderChange}
+                              onMouseUp={commitHistory}
+                              onTouchEnd={commitHistory}
+                              onKeyUp={commitHistory}
+                            />
+                            <span className="slider-bound-label" style={{ textAlign: 'right' }}>+100</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SKIN CATEGORY */}
+                    {activeCategory === 'skin' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Làn da</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+
+                        <div className="tool-subgroup-title">Chăm sóc da</div>
+                        {ALL_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Làn da').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Khuyết điểm</div>
+                        {ALL_TOOLS.filter(t => t.category === 'skin' && t.subgroup === 'Khuyết điểm').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* FACE CATEGORY */}
+                    {activeCategory === 'face' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Định hình khuôn mặt</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+
+                        <div className="tool-subgroup-title">Dáng mặt</div>
+                        {ALL_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Dáng mặt').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Hàm & cằm</div>
+                        {ALL_TOOLS.filter(t => t.category === 'face' && t.subgroup === 'Hàm & cằm').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* EYES CATEGORY */}
+                    {activeCategory === 'eyes' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Đôi mắt</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+
+                        <div className="tool-subgroup-title">Hình dáng mắt</div>
+                        {ALL_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Hình dáng mắt').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Trang điểm mắt</div>
+                        {ALL_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Trang điểm mắt').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* MOUTH CATEGORY */}
+                    {activeCategory === 'mouth' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Nụ cười</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
+                        </div>
+                        {ALL_TOOLS.filter(t => t.category === 'mouth').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* HAIR CATEGORY */}
+                    {activeCategory === 'hair' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Chăm sóc tóc</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
+                        </div>
+                        {ALL_TOOLS.filter(t => t.category === 'hair').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* BODY CATEGORY */}
+                    {activeCategory === 'body' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Vóc dáng</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
+                        </div>
+                        {ALL_TOOLS.filter(t => t.category === 'body').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* ADJUSTMENTS CATEGORY */}
+                    {activeCategory === 'adjust' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Chỉnh màu</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+                        {ALL_TOOLS.filter(t => t.category === 'adjust').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* CROP ASPECT RATIO CATEGORY */}
+                    {activeCategory === 'crop' && (
+                      <div className="tool-group">
+                        <h4 className="util-label" style={{ margin: '0 0 4px 0' }}>Cắt ảnh</h4>
+                        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>Chọn tỷ lệ khung hình chuẩn để cắt ảnh gọn gàng:</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                          {[
+                            { id: 'original', label: 'Gốc' },
+                            { id: '1:1', label: '1:1 Vuông' },
+                            { id: '4:5', label: '4:5 Chân dung' },
+                            { id: '3:4', label: '3:4 Tiêu chuẩn' },
+                            { id: '9:16', label: '9:16 Câu chuyện' }
+                          ].map(item => (
+                            <button
+                              key={item.id}
+                              onClick={() => handleApplyCrop(item.id as any)}
+                              style={{
+                                padding: '12px 10px',
+                                borderRadius: '8px',
+                                border: (editState.crop?.aspectRatio || 'original') === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                                background: (editState.crop?.aspectRatio || 'original') === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                                cursor: 'pointer',
+                                fontWeight: 500,
+                                fontSize: '12px'
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })()}
-                </div>
-              )}
+                    )}
 
-              {/* CLOUD AI CATEGORY */}
-              {activeCategory === 'ai' && (
-                <div className="tool-group">
-                  <h4 className="util-label">Cloud AI (Meitu API Integration)</h4>
-                  <div className={`tool-btn ${activeTool === 'ai_makeup' ? 'active' : ''}`} onClick={() => {
-                    setActiveTool('ai_makeup');
-                    alert("Yêu cầu Meitu API Key & Worker Adapter. Theo kiến trúc độc lập, cloud API trả lỗi BLOCKED / NOT_IMPLEMENTED nếu thiếu entitlement của khách hàng.");
-                  }}>
-                    <Wand2 size={16} /> Trang điểm AI (Cloud Meitu)
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'rgba(38,38,38,0.6)', marginTop: '16px', lineHeight: 1.5 }}>
-                    Mọi tác vụ AI đám mây đều được bảo vệ bởi ownershipToken, giới hạn tải lên 25MB, và xử lý bất đồng bộ chống treo ứng dụng.
-                  </div>
-                </div>
-              )}
+                    {/* CURATED COLOR FILTERS (200+) */}
+                    {activeCategory === 'filters' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Bộ lọc màu</h4>
+                          {editState.filter_id && (
+                            <button onClick={() => setEditState(prev => ({ ...prev, filter_id: '' }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Bỏ chọn</button>
+                          )}
+                        </div>
+                        
+                        {/* Category Chips */}
+                        <div className="chip-container">
+                          <button className={`filter-chip ${activeFilterCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('all')}>Tất cả</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'film' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('film')}>Phim ảnh</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'portrait' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('portrait')}>Chân dung</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'cinematic' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('cinematic')}>Điện ảnh</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'vintage' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('vintage')}>Cổ điển</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'nature' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('nature')}>Thiên nhiên</button>
+                          <button className={`filter-chip ${activeFilterCategory === 'artistic' ? 'active' : ''}`} onClick={() => setActiveFilterCategory('artistic')}>Nghệ thuật</button>
+                        </div>
 
-              {/* PARAMETER SLIDER (Active for adjustable tools) */}
-              {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'crop' && activeCategory !== 'ai' && activeTool !== 'skin_blemish' && (
-                <div className="parameter-section">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Cường độ</span>
-                    <span style={{ fontSize: '14px', color: 'var(--color-accent)' }}>
-                      {activeTool === 'eye_color' ? (editState.eye_color_intensity ?? 0) : ((editState as any)[activeTool] ?? 0)}
-                    </span>
-                  </div>
-                  <input 
-                    type="range" 
-                    className="premium-slider"
-                    min={(['brightness', 'contrast', 'saturation', 'temperature', 'tint', 'skin_tone', 'chin_length', 'face_width'] as ToolType[]).includes(activeTool) ? '-100' : '0'} 
-                    max="100" 
-                    value={activeTool === 'eye_color' ? (editState.eye_color_intensity ?? 0) : ((editState as any)[activeTool] ?? 0)} 
-                    onChange={handleSliderChange}
-                    onMouseUp={commitHistory}
-                    onTouchEnd={commitHistory}
-                    onKeyUp={commitHistory}
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="panel-footer">
-              <label className="btn-secondary" style={{ width: '100%', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
-                Đổi ảnh khác
-                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-              </label>
-            </div>
-          </aside>
-        )}
+                        {/* Filter Grid */}
+                        <div className="filter-grid">
+                          {filteredFilters.map(filter => (
+                            <div 
+                              key={filter.id}
+                              className={`filter-card ${editState.filter_id === filter.id ? 'active' : ''}`}
+                              onClick={() => {
+                                setEditState(prev => ({ ...prev, filter_id: filter.id }));
+                                setTimeout(commitHistory, 50);
+                              }}
+                            >
+                              <div className="filter-name">{filter.nameVi}</div>
+                              <div className="filter-category">{filter.name}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {editState.filter_id && (
+                          <div style={{ marginTop: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600 }}>Độ đậm bộ lọc</span>
+                              <span style={{ fontSize: '13px', color: 'var(--color-accent)' }}>{editState.filter_intensity ?? 100}%</span>
+                            </div>
+                            <input 
+                              type="range" 
+                              className="premium-slider"
+                              min="0" max="100" 
+                              value={editState.filter_intensity ?? 100} 
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                setEditState(prev => ({ ...prev, filter_intensity: val }));
+                              }}
+                              onMouseUp={commitHistory}
+                              onTouchEnd={commitHistory}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* MAGAZINE & POSTER TEMPLATES */}
+                    {activeCategory === 'templates' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Mẫu bìa & Poster</h4>
+                          {editState.template_id && (
+                            <button onClick={() => setEditState(prev => ({ ...prev, template_id: '', template_custom_text: undefined }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Tắt khung</button>
+                          )}
+                        </div>
+                        <div className="template-grid">
+                          {POSTER_TEMPLATES.map(tpl => (
+                            <div 
+                              key={tpl.id}
+                              className={`template-card ${editState.template_id === tpl.id ? 'active' : ''}`}
+                              onClick={() => {
+                                const isSame = editState.template_id === tpl.id;
+                                setEditState(prev => ({ 
+                                  ...prev, 
+                                  template_id: isSame ? '' : tpl.id,
+                                  template_custom_text: isSame ? undefined : {
+                                    title: tpl.title,
+                                    subtitle: tpl.subtitle,
+                                    dateText: tpl.dateText,
+                                    tagline: tpl.tagline,
+                                    footer: tpl.footer
+                                  }
+                                }));
+                                setTimeout(commitHistory, 50);
+                              }}
+                            >
+                              <div className="template-title">{tpl.nameVi}</div>
+                              <div className="template-desc">{tpl.subtitle} • Tỷ lệ {tpl.aspectRatio}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* EDITABLE TEXT & PLACEMENT FORM */}
+                        {editState.template_id && (() => {
+                          const currentTpl = POSTER_TEMPLATES.find(t => t.id === editState.template_id);
+                          if (!currentTpl) return null;
+                          const customText = editState.template_custom_text || {
+                            title: currentTpl.title,
+                            subtitle: currentTpl.subtitle,
+                            dateText: currentTpl.dateText,
+                            tagline: currentTpl.tagline,
+                            footer: currentTpl.footer
+                          };
+
+                          const handleFieldChange = (field: keyof TemplateCustomText, val: string) => {
+                            setEditState(prev => ({
+                              ...prev,
+                              template_custom_text: {
+                                ...customText,
+                                [field]: val
+                              }
+                            }));
+                          };
+
+                          return (
+                            <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 600, color: '#334155' }}>Tùy chỉnh chữ & vị trí bìa</h4>
+                              
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Tiêu đề chính</label>
+                                  <input 
+                                    type="text" 
+                                    value={customText.title || ''} 
+                                    onChange={e => handleFieldChange('title', e.target.value)} 
+                                    onBlur={commitHistory}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Phụ đề</label>
+                                  <input 
+                                    type="text" 
+                                    value={customText.subtitle || ''} 
+                                    onChange={e => handleFieldChange('subtitle', e.target.value)} 
+                                    onBlur={commitHistory}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Ngày tháng / Số phát hành</label>
+                                  <input 
+                                    type="text" 
+                                    value={customText.dateText || ''} 
+                                    onChange={e => handleFieldChange('dateText', e.target.value)} 
+                                    onBlur={commitHistory}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Khẩu hiệu (Tagline)</label>
+                                  <input 
+                                    type="text" 
+                                    value={customText.tagline || ''} 
+                                    onChange={e => handleFieldChange('tagline', e.target.value)} 
+                                    onBlur={commitHistory}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                                  />
+                                </div>
+
+                                <div>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Chân trang (Credits)</label>
+                                  <input 
+                                    type="text" 
+                                    value={customText.footer || ''} 
+                                    onChange={e => handleFieldChange('footer', e.target.value)} 
+                                    onBlur={commitHistory}
+                                    style={{ width: '100%', padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }} 
+                                  />
+                                </div>
+
+                                <div style={{ marginTop: '6px' }}>
+                                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '6px' }}>Vị trí chữ</label>
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    {(['top', 'center', 'bottom'] as const).map(p => (
+                                      <button
+                                        key={p}
+                                        onClick={() => {
+                                          setEditState(prev => ({ ...prev, template_placement: p }));
+                                          setTimeout(commitHistory, 50);
+                                        }}
+                                        style={{
+                                          flex: 1,
+                                          padding: '6px 0',
+                                          borderRadius: '4px',
+                                          border: (editState.template_placement || 'top') === p ? '1px solid var(--color-accent)' : '1px solid #cbd5e1',
+                                          background: (editState.template_placement || 'top') === p ? 'rgba(212, 175, 55, 0.15)' : '#fff',
+                                          fontWeight: (editState.template_placement || 'top') === p ? 600 : 400,
+                                          fontSize: '11px',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        {p === 'top' ? 'Trên cùng' : p === 'center' ? 'Ở giữa' : 'Dưới cùng'}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* CLOUD AI CATEGORY - CLEAN PUBLIC BETA DISABLED NOTICE */}
+                    {activeCategory === 'ai' && (
+                      <div className="cloud-ai-card">
+                        <div className="cloud-ai-badge">Sắp ra mắt</div>
+                        <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 8px 0', color: 'var(--color-text-primary)' }}>
+                          Tính năng Cloud AI
+                        </h4>
+                        <p style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+                          Các tính năng phục dựng phức tạp (mở mắt nhắm, chỉnh form răng, phục dựng tóc AI) đang trong quá trình thử nghiệm và sẽ có mặt trong bản cập nhật tới.
+                        </p>
+                        <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <ShieldCheck size={15} />
+                          <span>Hiện tại 100% công cụ đang dùng đều xử lý cục bộ trên máy bạn.</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              
+              <div className="panel-footer">
+                <label className="btn-secondary" style={{ width: '100%', display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+                  Đổi ảnh khác
+                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </aside>
+          );
+        })()}
       </main>
     </div>
   );
 };
+
