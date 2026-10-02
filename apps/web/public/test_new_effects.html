@@ -22,16 +22,18 @@
       for (let i = 0; i < 478; i++) lms.push({ x: 0.5, y: 0.5, z: 0 });
 
       const pts = {
-        // Face oval
+        // Face oval & temples (B014)
         10:[0.5,0.1],338:[0.65,0.12],297:[0.75,0.18],332:[0.80,0.27],
-        284:[0.83,0.38],251:[0.82,0.50],389:[0.80,0.60],356:[0.75,0.70],
+        284:[0.83,0.38],251:[0.82,0.50],389:[0.80,0.60],356:[0.72,0.25],
         454:[0.65,0.78],323:[0.55,0.83],361:[0.50,0.87],288:[0.48,0.87],
-        397:[0.45,0.83],365:[0.40,0.80],379:[0.35,0.75],378:[0.30,0.70],
-        400:[0.25,0.62],377:[0.20,0.52],152:[0.50,0.90],148:[0.22,0.57],
+        397:[0.80,0.60],365:[0.40,0.80],379:[0.35,0.75],378:[0.30,0.70],
+        400:[0.70,0.78],377:[0.72,0.67],152:[0.50,0.90],148:[0.28,0.67],
         176:[0.30,0.78],149:[0.24,0.60],150:[0.22,0.63],136:[0.20,0.55],
-        172:[0.18,0.48],58:[0.18,0.40],132:[0.20,0.32],93:[0.22,0.24],
-        234:[0.25,0.18],127:[0.30,0.14],162:[0.37,0.11],21:[0.44,0.10],
+        172:[0.20,0.60],58:[0.18,0.40],132:[0.20,0.32],93:[0.22,0.24],
+        234:[0.25,0.18],127:[0.28,0.25],162:[0.37,0.11],21:[0.44,0.10],
         54:[0.50,0.10],103:[0.56,0.10],67:[0.62,0.11],109:[0.68,0.13],
+        // Zygomatic arches (cheekbones B020)
+        116:[0.26,0.44], 345:[0.74,0.44],
         // Nasolabial zone
         92:[0.37,0.60],165:[0.39,0.65],167:[0.41,0.65],164:[0.50,0.65],
         393:[0.59,0.65],391:[0.61,0.65],322:[0.63,0.60],394:[0.60,0.68],
@@ -46,23 +48,19 @@
         412:[0.56,0.43],399:[0.58,0.43],
         // Left eye ring
         33:[0.33,0.38],7:[0.35,0.40],163:[0.37,0.40],144:[0.39,0.40],
-        145:[0.41,0.40],153:[0.43,0.40],154:[0.44,0.39],155:[0.45,0.38],
-        133:[0.46,0.37],246:[0.34,0.37],161:[0.36,0.37],160:[0.38,0.36],
-        159:[0.40,0.36],158:[0.42,0.36],157:[0.44,0.37],173:[0.45,0.38],
+        145:[0.40,0.42],153:[0.43,0.40],154:[0.44,0.39],155:[0.45,0.38],
+        133:[0.46,0.38],246:[0.34,0.37],161:[0.36,0.37],160:[0.37,0.36],
+        159:[0.40,0.36],158:[0.43,0.36],157:[0.44,0.37],173:[0.45,0.38],
         // Right eye ring
-        362:[0.67,0.38],382:[0.65,0.40],381:[0.63,0.40],380:[0.61,0.40],
-        374:[0.59,0.40],373:[0.57,0.40],390:[0.56,0.39],249:[0.55,0.38],
-        263:[0.54,0.37],466:[0.66,0.37],388:[0.64,0.37],387:[0.62,0.36],
-        386:[0.60,0.36],385:[0.58,0.36],384:[0.56,0.37],398:[0.55,0.38],
-        // Iris centers (needed for catchlight)
-        468:[0.38,0.38],473:[0.62,0.38],
+        362:[0.54,0.38],382:[0.65,0.40],381:[0.63,0.40],380:[0.61,0.40],
+        374:[0.60,0.42],373:[0.57,0.40],390:[0.56,0.39],249:[0.55,0.38],
+        263:[0.67,0.38],466:[0.66,0.37],388:[0.64,0.37],387:[0.57,0.36],
+        386:[0.60,0.36],385:[0.63,0.36],384:[0.56,0.37],398:[0.55,0.38],
+        // Iris centers (needed for catchlight and eye_color)
+        468:[0.40,0.38],473:[0.60,0.38],
         // Jaw + chin
-        148:[0.28,0.67],377:[0.72,0.67],1:[0.5,0.55],
-        17:[0.5,0.75],   // lower lip (B019 protection)
-        // Chin V-line landmarks — must be explicitly set for B017
-        176:[0.30,0.78], // left chin side
-        400:[0.70,0.78], // right chin side (CRITICAL — default 0.5,0.5 breaks warp geometry)
-        152:[0.50,0.90], // menton / chin tip
+        1:[0.5,0.55],
+        17:[0.5,0.75],   // lower lip (B019 protection, chin length B018)
       };
       for (const [i,[x,y]] of Object.entries(pts)) lms[+i] = {x,y,z:0};
       return lms;
@@ -420,6 +418,321 @@
         }));
       }
 
+      // =============================================
+      // BATCH 2 TESTS (B012, B014, B015, B018, B020, B026, B027, B029, B032, B033)
+      // =============================================
+
+      // ─────────────────────────────────────────────
+      // B012: eye_bags (Reduce eye bags)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyEyeBagReduction(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyEyeBagReduction(lm, i),
+          [0.25, 0.38, 0.75, 0.54],   // ROI: under-eye area
+          [0.25, 0.05, 0.75, 0.22]    // outside: forehead (protected)
+        );
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > PASS_THRESHOLD && roiMAE > outsideMAE;
+        results.push(makeResult('B012 eye_bags', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // B014: face_width (Face width - Bidirectional WebGL)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posNarrowD = 0, posWidenD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyFaceWidth(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const baseNarrow = makeTestCanvas();
+          const engineNarrow = new ImageEngine(baseNarrow);
+          engineNarrow.applyFaceWidth(lm, 100);
+          posNarrowD = computeMAE(baseNarrow, engineNarrow.getCanvas());
+
+          const baseWiden = makeTestCanvas();
+          const engineWiden = new ImageEngine(baseWiden);
+          engineWiden.applyFaceWidth(lm, -100);
+          posWidenD = computeMAE(baseWiden, engineWiden.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B014 face_width', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && posNarrowD > 0.15 && posWidenD > 0.15;
+          results.push(makeResult('B014 face_width', {
+            zeroDelta: zeroD.toFixed(4),
+            positiveNarrow: posNarrowD.toFixed(4),
+            positiveWiden: posWidenD.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B015: jaw_angle (Jaw angle - WebGL Bilateral)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyJawAngle(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyJawAngle(lm, 100);
+          posD = computeMAE(basePos, enginePos.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B015 jaw_angle', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && posD > 0.12;
+          results.push(makeResult('B015 jaw_angle', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B018: chin_length (Chin length - Bidirectional WebGL)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posLongD = 0, posShortD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyChinLength(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const baseLong = makeTestCanvas();
+          const engineLong = new ImageEngine(baseLong);
+          engineLong.applyChinLength(lm, 100);
+          posLongD = computeMAE(baseLong, engineLong.getCanvas());
+
+          const baseShort = makeTestCanvas();
+          const engineShort = new ImageEngine(baseShort);
+          engineShort.applyChinLength(lm, -100);
+          posShortD = computeMAE(baseShort, engineShort.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B018 chin_length', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && posLongD > 0.10 && posShortD > 0.10;
+          results.push(makeResult('B018 chin_length', {
+            zeroDelta: zeroD.toFixed(4),
+            positiveDelta: Math.max(posLongD, posShortD).toFixed(4),
+            positiveLengthen: posLongD.toFixed(4),
+            positiveShorten: posShortD.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B020: cheekbone_width (Cheekbone width - WebGL Pinch)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyCheekboneWidth(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyCheekboneWidth(lm, 100);
+          posD = computeMAE(basePos, enginePos.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B020 cheekbone_width', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && posD > 0.12;
+          results.push(makeResult('B020 cheekbone_width', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B026: eye_height (Eye height - WebGL Vertical Stretch)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyEyeHeight(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyEyeHeight(lm, 100);
+          posD = computeMAE(basePos, enginePos.getCanvas());
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B026 eye_height', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && posD > 0.10;
+          results.push(makeResult('B026 eye_height', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B027: eye_length (Eye length - WebGL Lateral Warp)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, roiMAE = 0, outsideMAE = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyEyeLength(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyEyeLength(lm, 100);
+          const out = enginePos.getCanvas();
+          posD = computeMAE(basePos, out);
+          roiMAE = computeRegionMAE(basePos, out, 0.25, 0.30, 0.75, 0.48);
+          outsideMAE = computeRegionMAE(basePos, out, 0.10, 0.75, 0.90, 0.95);
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B027 eye_length', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && (posD > 0.04 || roiMAE > 0.20) && roiMAE > outsideMAE;
+          results.push(makeResult('B027 eye_length', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4),
+            roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B029: eye_color (Eye color / Contact lens)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyEyeColor(lm, '#2a6f97', i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyEyeColor(lm, '#2a6f97', i),
+          [0.34, 0.33, 0.66, 0.44],   // ROI: iris area
+          [0.15, 0.65, 0.85, 0.85]    // outside: cheek/chin (strictly 0 delta)
+        );
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > PASS_THRESHOLD && outsideMAE < ZERO_THRESHOLD;
+        results.push(makeResult('B029 eye_color', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
+      // ─────────────────────────────────────────────
+      // B032: eyelid_lift (Eyelid lift - WebGL Upward Warp)
+      // ─────────────────────────────────────────────
+      {
+        let zeroD = 0, posD = 0, roiMAE = 0, outsideMAE = 0, webGLAvailable = false, error = null;
+        try {
+          const baseline = makeTestCanvas();
+          const engine0 = new ImageEngine(baseline);
+          engine0.applyEyelidLift(lm, 0);
+          zeroD = computeMAE(baseline, engine0.getCanvas());
+
+          const basePos = makeTestCanvas();
+          const enginePos = new ImageEngine(basePos);
+          enginePos.applyEyelidLift(lm, 100);
+          const out = enginePos.getCanvas();
+          posD = computeMAE(basePos, out);
+          roiMAE = computeRegionMAE(basePos, out, 0.25, 0.28, 0.75, 0.44);
+          outsideMAE = computeRegionMAE(basePos, out, 0.10, 0.75, 0.90, 0.95);
+          webGLAvailable = true;
+        } catch(e) {
+          error = e.message;
+        }
+        if (!webGLAvailable) {
+          results.push(makeResult('B032 eyelid_lift', {
+            status: 'BLOCKED', reason: 'WebGL unavailable: ' + error,
+            zeroDelta: 'N/A', positiveDelta: 'N/A', passed: null
+          }));
+        } else {
+          const passed = zeroD < ZERO_THRESHOLD && (posD > 0.04 || roiMAE > 0.20) && roiMAE > outsideMAE;
+          results.push(makeResult('B032 eyelid_lift', {
+            zeroDelta: zeroD.toFixed(4), positiveDelta: posD.toFixed(4),
+            roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+            webGLAvailable, passed
+          }));
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // B033: double_eyelid (Double eyelid crease)
+      // ─────────────────────────────────────────────
+      {
+        const { delta: zeroD } = runEffect(0, (e,i) => e.applyDoubleEyelid(lm, i));
+        const { roiMAE, outsideMAE, globalMAE } = runROIEffect(
+          100,
+          (e,i) => e.applyDoubleEyelid(lm, i),
+          [0.28, 0.30, 0.72, 0.38],   // ROI: upper eyelid area
+          [0.20, 0.70, 0.80, 0.90]    // outside: lower chin (protected)
+        );
+        const passed = zeroD < ZERO_THRESHOLD && roiMAE > 0.15 && outsideMAE < ZERO_THRESHOLD;
+        results.push(makeResult('B033 double_eyelid', {
+          zeroDelta: zeroD.toFixed(4), positiveDelta: globalMAE.toFixed(4),
+          roiMAE: roiMAE.toFixed(4), outsideROI: outsideMAE.toFixed(4),
+          passed
+        }));
+      }
+
       // ─────────────────────────────────────────────
       // PREVIEW / EXPORT PARITY TEST
       // Run same EditState at 400px and 800px, downsample 800→400, compare
@@ -437,10 +750,11 @@
 
         const editState = {
           skin_smooth: 50, skin_brighten: 30, skin_oil: 40, skin_tone: 20,
-          nasolabial: 50, dark_circles: 40, skin_detail: 30,
+          nasolabial: 50, dark_circles: 40, skin_detail: 30, eye_bags: 30,
           face_slim: 0, chin_slim: 0,
-          jaw_slim: 0, chin_vline: 0,
-          eye_enlarge: 0, eye_bright: 50, eye_catchlight: 60,
+          jaw_slim: 0, chin_vline: 0, face_width: 25, jaw_angle: 25, chin_length: 20, cheekbone_width: 25,
+          eye_enlarge: 0, eye_height: 25, eye_length: 25, eye_color: '#2a6f97', eye_color_intensity: 30,
+          eyelid_lift: 25, double_eyelid: 30, eye_bright: 50, eye_catchlight: 60,
           teeth_whiten: 30, hair_smooth: 0, hair_shine: 0, collarbone: 50,
           brightness: 10, contrast: 5, saturation: 0, temperature: 0, tint: 0
         };

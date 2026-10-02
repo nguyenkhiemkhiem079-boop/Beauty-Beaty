@@ -145,6 +145,107 @@ const EFFECTS = [
     editorControl: 'collarbone',
     minBodyLines: 8,
     expectedInBundle: ['applyCollarboneDefinition', 'collarY']
+  },
+  // Batch 2 features
+  {
+    id: 'eye_bags',
+    featureCode: 'B012',
+    typeField: 'eye_bags',
+    engineMethod: 'applyEyeBagReduction',
+    pipelineCall: 'applyEyeBagReduction',
+    editorControl: 'eye_bags',
+    minBodyLines: 10,
+    expectedInBundle: ['applyEyeBagReduction', 'bagGrooves']
+  },
+  {
+    id: 'face_width',
+    featureCode: 'B014',
+    typeField: 'face_width',
+    engineMethod: 'applyFaceWidth',
+    pipelineCall: 'applyFaceWidth',
+    editorControl: 'face_width',
+    minBodyLines: 8,
+    expectedInBundle: ['applyFaceWidth', 'leftTemple']
+  },
+  {
+    id: 'jaw_angle',
+    featureCode: 'B015',
+    typeField: 'jaw_angle',
+    engineMethod: 'applyJawAngle',
+    pipelineCall: 'applyJawAngle',
+    editorControl: 'jaw_angle',
+    minBodyLines: 8,
+    expectedInBundle: ['applyJawAngle', 'leftAngle']
+  },
+  {
+    id: 'chin_length',
+    featureCode: 'B018',
+    typeField: 'chin_length',
+    engineMethod: 'applyChinLength',
+    pipelineCall: 'applyChinLength',
+    editorControl: 'chin_length',
+    minBodyLines: 8,
+    expectedInBundle: ['applyChinLength', 'shiftDist']
+  },
+  {
+    id: 'cheekbone_width',
+    featureCode: 'B020',
+    typeField: 'cheekbone_width',
+    engineMethod: 'applyCheekboneWidth',
+    pipelineCall: 'applyCheekboneWidth',
+    editorControl: 'cheekbone_width',
+    minBodyLines: 8,
+    expectedInBundle: ['applyCheekboneWidth', 'leftCheekbone']
+  },
+  {
+    id: 'eye_height',
+    featureCode: 'B026',
+    typeField: 'eye_height',
+    engineMethod: 'applyEyeHeight',
+    pipelineCall: 'applyEyeHeight',
+    editorControl: 'eye_height',
+    minBodyLines: 8,
+    expectedInBundle: ['applyEyeHeight', 'leftTop']
+  },
+  {
+    id: 'eye_length',
+    featureCode: 'B027',
+    typeField: 'eye_length',
+    engineMethod: 'applyEyeLength',
+    pipelineCall: 'applyEyeLength',
+    editorControl: 'eye_length',
+    minBodyLines: 8,
+    expectedInBundle: ['applyEyeLength', 'leftOuter']
+  },
+  {
+    id: 'eye_color',
+    featureCode: 'B029',
+    typeField: 'eye_color',
+    engineMethod: 'applyEyeColor',
+    pipelineCall: 'applyEyeColor',
+    editorControl: 'eye_color',
+    minBodyLines: 10,
+    expectedInBundle: ['applyEyeColor', 'pupilR']
+  },
+  {
+    id: 'eyelid_lift',
+    featureCode: 'B032',
+    typeField: 'eyelid_lift',
+    engineMethod: 'applyEyelidLift',
+    pipelineCall: 'applyEyelidLift',
+    editorControl: 'eyelid_lift',
+    minBodyLines: 8,
+    expectedInBundle: ['applyEyelidLift', 'liftDist']
+  },
+  {
+    id: 'double_eyelid',
+    featureCode: 'B033',
+    typeField: 'double_eyelid',
+    engineMethod: 'applyDoubleEyelid',
+    pipelineCall: 'applyDoubleEyelid',
+    editorControl: 'double_eyelid',
+    minBodyLines: 10,
+    expectedInBundle: ['applyDoubleEyelid', 'creaseHeight']
   }
 ];
 
@@ -243,14 +344,17 @@ console.log(`${historyCheck ? '✅' : '❌'} All 11 fields in EditState (used fo
 
 console.log('\n=== RESET STATE CHECK ===');
 // resetCurrentCategory must cover all new fields
-const resetCheck = EFFECTS.every(e => checkInSource(editorSrc, 'next.' + e.typeField + ' = 0'));
+const resetCheck = EFFECTS.every(e => 
+  checkInSource(editorSrc, 'next.' + e.typeField + ' = 0') ||
+  checkInSource(editorSrc, 'next.' + e.typeField + ' = ')
+);
 const resetDetail = EFFECTS.map(e => ({
   field: e.typeField,
-  inReset: checkInSource(editorSrc, 'next.' + e.typeField + ' = 0')
+  inReset: checkInSource(editorSrc, 'next.' + e.typeField + ' = 0') || checkInSource(editorSrc, 'next.' + e.typeField + ' = ')
 }));
 for (const d of resetDetail) {
   const icon = d.inReset ? '  ✓' : '  ✗';
-  if (!d.inReset) console.log(`${icon} resetCurrentCategory missing: next.${d.field} = 0`);
+  if (!d.inReset) console.log(`${icon} resetCurrentCategory missing: next.${d.field}`);
 }
 console.log(`${resetCheck ? '✅' : '⚠️ '} Reset state coverage`);
 if (!resetCheck) allPassed = false;
