@@ -27,7 +27,7 @@ Bảng dưới đây liệt kê toàn bộ 82 tính năng xử lý theo yêu c�
 | B016 | Cân xứng khuôn mặt | PLANNED | |
 | B017 | Làm ngắn mặt | PLANNED | |
 | B018 | Thu hẹp trán | PLANNED | |
-| B019 | Giảm nọng cằm | PLANNED | |
+| B019 | Giảm nọng cằm | IMPLEMENTED_UNVERIFIED | M2/M3: Submental upward lift WebGL warp theo trục mặt. |
 | B020 | Tạo cằm chẻ | PLANNED | |
 
 ## Mắt (Eyes)
