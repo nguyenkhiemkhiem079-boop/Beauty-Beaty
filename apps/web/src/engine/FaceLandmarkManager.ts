@@ -8,9 +8,10 @@ export class FaceLandmarkManager {
   async initialize() {
     if (this.isInitialized) return;
     
+    let filesetResolver;
     try {
-      const filesetResolver = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      filesetResolver = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
       
       this.landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
@@ -22,13 +23,25 @@ export class FaceLandmarkManager {
         runningMode: "IMAGE",
         numFaces: 1
       });
-      
-      this.isInitialized = true;
-      console.log("FaceLandmarker initialized successfully");
-    } catch (error) {
-      console.error("Failed to initialize FaceLandmarker", error);
-      throw error;
+    } catch (gpuError) {
+      console.warn("GPU FaceLandmarker init failed, falling back to CPU", gpuError);
+      if (filesetResolver) {
+        this.landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+          baseOptions: {
+            modelAssetPath: "/models/face_landmarker.task",
+            delegate: "CPU"
+          },
+          outputFaceBlendshapes: true,
+          runningMode: "IMAGE",
+          numFaces: 1
+        });
+      } else {
+        throw gpuError;
+      }
     }
+    
+    this.isInitialized = true;
+    console.log("FaceLandmarker initialized successfully");
   }
 
   async detectFaces(imageElement: HTMLImageElement | HTMLCanvasElement): Promise<NormalizedLandmark[][]> {

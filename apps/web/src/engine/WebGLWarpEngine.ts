@@ -11,7 +11,6 @@ export class WebGLWarpEngine {
     this.width = canvas.width;
     this.height = canvas.height;
     
-    // Use an offscreen canvas for WebGL processing to keep the original context type intact
     const glCanvas = document.createElement('canvas');
     glCanvas.width = this.width;
     glCanvas.height = this.height;
@@ -48,19 +47,27 @@ export class WebGLWarpEngine {
         vec2 centerLAdj = vec2(u_centerL.x * u_aspect, u_centerL.y);
         vec2 centerRAdj = vec2(u_centerR.x * u_aspect, u_centerR.y);
 
-        // Pinch logic: pull cheeks towards nose
+        // Pinch logic: pull cheeks towards nose. 
+        // Inverse mapping: To shrink the face, a point near the cheek should sample from further outside.
+        // Therefore we subtract the inward vector.
+        
         float distL = distance(tcAdj, centerLAdj);
         if (distL < u_radius) {
             float factor = (1.0 - (distL / u_radius)) * u_intensity;
-            tc.x += (u_nose.x - tc.x) * factor;
+            // Vector from cheek to nose
+            vec2 shift = (u_nose - u_centerL) * factor;
+            tc -= shift;
         }
 
         float distR = distance(tcAdj, centerRAdj);
         if (distR < u_radius) {
             float factor = (1.0 - (distR / u_radius)) * u_intensity;
-            tc.x += (u_nose.x - tc.x) * factor;
+            vec2 shift = (u_nose - u_centerR) * factor;
+            tc -= shift;
         }
 
+        // Clamp to edge to avoid sampling outside
+        tc = clamp(tc, 0.0, 1.0);
         gl_FragColor = texture2D(u_image, tc);
       }
     `;
@@ -68,7 +75,6 @@ export class WebGLWarpEngine {
     this.program = this.createProgram(vsSource, fsSource)!;
     this.gl.useProgram(this.program);
 
-    // Buffers
     this.positionBuffer = this.gl.createBuffer()!;
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([
@@ -105,10 +111,6 @@ export class WebGLWarpEngine {
     this.gl.attachShader(prog, vShader);
     this.gl.attachShader(prog, fShader);
     this.gl.linkProgram(prog);
-    if (!this.gl.getProgramParameter(prog, this.gl.LINK_STATUS)) {
-      console.error(this.gl.getProgramInfoLog(prog));
-      return null;
-    }
     return prog;
   }
 
@@ -120,7 +122,6 @@ export class WebGLWarpEngine {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
 
-    // Setup attributes
     const posLoc = this.gl.getAttribLocation(this.program, "a_position");
     this.gl.enableVertexAttribArray(posLoc);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.positionBuffer);
@@ -131,7 +132,6 @@ export class WebGLWarpEngine {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.texCoordBuffer);
     this.gl.vertexAttribPointer(texLoc, 2, this.gl.FLOAT, false, 0, 0);
 
-    // Uniforms
     this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_intensity"), (intensity / 100.0) * 0.3);
     this.gl.uniform2f(this.gl.getUniformLocation(this.program, "u_centerL"), leftCheek.x, leftCheek.y);
     this.gl.uniform2f(this.gl.getUniformLocation(this.program, "u_centerR"), rightCheek.x, rightCheek.y);
@@ -140,11 +140,9 @@ export class WebGLWarpEngine {
     const aspect = this.width / this.height;
     this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_aspect"), aspect);
     
-    // radius proportional to face width
     const faceW = Math.abs((rightCheek.x - leftCheek.x) * aspect);
-    this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_radius"), faceW * 0.7);
+    this.gl.uniform1f(this.gl.getUniformLocation(this.program, "u_radius"), faceW * 0.6);
 
-    // Draw
     this.gl.viewport(0, 0, this.width, this.height);
     this.gl.clearColor(0,0,0,0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);

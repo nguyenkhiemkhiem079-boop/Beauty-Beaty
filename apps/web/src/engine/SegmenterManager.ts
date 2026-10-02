@@ -7,9 +7,10 @@ export class SegmenterManager {
   async initialize() {
     if (this.isInitialized) return;
     
+    let filesetResolver;
     try {
-      const filesetResolver = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      filesetResolver = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
       
       this.segmenter = await ImageSegmenter.createFromOptions(filesetResolver, {
@@ -21,13 +22,25 @@ export class SegmenterManager {
         outputCategoryMask: true,
         outputConfidenceMasks: false
       });
-      
-      this.isInitialized = true;
-      console.log("ImageSegmenter initialized successfully");
-    } catch (error) {
-      console.error("Failed to initialize ImageSegmenter", error);
-      throw error;
+    } catch (gpuError) {
+      console.warn("GPU Segmenter init failed, falling back to CPU", gpuError);
+      if (filesetResolver) {
+        this.segmenter = await ImageSegmenter.createFromOptions(filesetResolver, {
+          baseOptions: {
+            modelAssetPath: "/models/selfie_multiclass.tflite",
+            delegate: "CPU"
+          },
+          runningMode: "IMAGE",
+          outputCategoryMask: true,
+          outputConfidenceMasks: false
+        });
+      } else {
+        throw gpuError;
+      }
     }
+    
+    this.isInitialized = true;
+    console.log("ImageSegmenter initialized successfully");
   }
 
   async segment(imageElement: HTMLImageElement | HTMLCanvasElement): Promise<Uint8Array | undefined> {

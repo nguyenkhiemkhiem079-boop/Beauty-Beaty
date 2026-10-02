@@ -62,8 +62,8 @@ export class ImageEngine {
     maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
     
-    mCtx.fillStyle = 'black';
-    mCtx.fillRect(0, 0, w, h);
+    // Transparent background, so alpha is 0 outside the face
+    mCtx.clearRect(0, 0, w, h);
 
     if (landmarks && landmarks.length > 0) {
       const faceOval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
@@ -76,7 +76,7 @@ export class ImageEngine {
         else mCtx.lineTo(pt.x * w, pt.y * h);
       });
       mCtx.closePath();
-      mCtx.fillStyle = 'white';
+      mCtx.fillStyle = 'rgba(255, 255, 255, 1)'; // Solid alpha
       
       mCtx.filter = 'blur(10px)';
       mCtx.fill();
@@ -93,7 +93,7 @@ export class ImageEngine {
           else mCtx.lineTo(pt.x * w, pt.y * h);
         });
         mCtx.closePath();
-        mCtx.filter = 'blur(5px)'; 
+        mCtx.filter = 'blur(8px)'; 
         mCtx.fill();
         mCtx.filter = 'none';
       };
@@ -103,16 +103,23 @@ export class ImageEngine {
       drawFeature([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]); // Lips
       drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46]); // Left Brow
       drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276]); // Right Brow
+      
+      // We should also exclude hair if segmentation is available, but for now we rely on faceOval which excludes hair.
     }
     
     mCtx.globalCompositeOperation = 'source-over';
 
+    // Apply alpha mask to the blurred canvas
+    bCtx.globalCompositeOperation = 'destination-in';
+    bCtx.drawImage(maskCanvas, 0, 0); 
+    // Now blurCanvas only has color inside the mask, transparent outside
+
+    // Draw original image first to preserve texture and background
     ctx.save();
+    ctx.globalAlpha = 1.0;
     ctx.drawImage(this.originalCanvas, 0, 0);
     
-    bCtx.globalCompositeOperation = 'destination-in';
-    bCtx.drawImage(maskCanvas, 0, 0);
-    
+    // Overlay the blurred masked regions
     ctx.globalAlpha = intensity / 100.0;
     ctx.drawImage(blurCanvas, 0, 0);
     ctx.restore();
@@ -125,41 +132,35 @@ export class ImageEngine {
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
 
-    // Blur the current workCanvas
     const blurCanvas = document.createElement('canvas');
     blurCanvas.width = w;
     blurCanvas.height = h;
     const bCtx = blurCanvas.getContext('2d')!;
-    // Directional or standard blur
     bCtx.filter = `blur(${intensity * 0.1}px)`;
     bCtx.drawImage(this.workCanvas, 0, 0);
 
-    // Create mask canvas
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w;
     maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
     const mData = mCtx.createImageData(w, h);
     
-    // Category 1 is hair in selfie_multiclass
     for (let i = 0; i < this.segmentationMask.length; i++) {
         const isHair = this.segmentationMask[i] === 1;
-        mData.data[i * 4] = isHair ? 255 : 0;
-        mData.data[i * 4 + 1] = isHair ? 255 : 0;
-        mData.data[i * 4 + 2] = isHair ? 255 : 0;
-        mData.data[i * 4 + 3] = isHair ? 255 : 0;
+        mData.data[i * 4] = 255;
+        mData.data[i * 4 + 1] = 255;
+        mData.data[i * 4 + 2] = 255;
+        mData.data[i * 4 + 3] = isHair ? 255 : 0; // Alpha based on hair
     }
     mCtx.putImageData(mData, 0, 0);
 
-    // Soften mask edge
     const blurredMaskCanvas = document.createElement('canvas');
     blurredMaskCanvas.width = w;
     blurredMaskCanvas.height = h;
     const bmCtx = blurredMaskCanvas.getContext('2d')!;
-    bmCtx.filter = 'blur(4px)';
+    bmCtx.filter = 'blur(6px)';
     bmCtx.drawImage(maskCanvas, 0, 0);
 
-    // Apply
     ctx.save();
     bCtx.globalCompositeOperation = 'destination-in';
     bCtx.drawImage(blurredMaskCanvas, 0, 0);
@@ -188,7 +189,6 @@ export class ImageEngine {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(glCanvas, 0, 0);
     } else {
-        // Fallback to basic transform if webgl failed (omitted for brevity)
         console.warn("WebGL Warp not available");
     }
   }

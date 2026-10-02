@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Landing } from './components/Landing';
 import { Editor } from './components/Editor';
+import { AppProvider } from './context';
 import './App.css';
 
-function App() {
+function AppContent() {
   const [mode, setMode] = useState<'landing' | 'editor'>('landing');
 
   return (
@@ -14,6 +15,14 @@ function App() {
         <Editor onExit={() => setMode('landing')} />
       )}
     </>
+  );
+}
+
+function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }
 
