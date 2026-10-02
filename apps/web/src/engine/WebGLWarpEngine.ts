@@ -131,6 +131,14 @@ export class WebGLWarpEngine {
   }
 
   public applyWarp(image: HTMLCanvasElement, points: WarpPoint[]): HTMLCanvasElement {
+    if (this.width !== image.width || this.height !== image.height) {
+      this.width = image.width;
+      this.height = image.height;
+      const glCanvas = this.gl.canvas as HTMLCanvasElement;
+      glCanvas.width = this.width;
+      glCanvas.height = this.height;
+    }
+
     this.gl.useProgram(this.program);
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);

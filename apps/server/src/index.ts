@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 
+import { meituProcessor, cancelActiveJob } from './adapters/meituAdapter';
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -14,6 +16,8 @@ const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+
+const LEDGER_FILE = path.join(uploadDir, 'jobs_ledger.json');
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
@@ -37,6 +41,30 @@ export type JobProcessor = (job: Job, filePath: string) => Promise<{ resultUrl: 
 export const jobs = new Map<string, Job>();
 export const processors = new Map<string, JobProcessor>();
 
+export function saveJobsLedger() {
+  try {
+    const list = Array.from(jobs.values());
+    fs.writeFileSync(LEDGER_FILE, JSON.stringify(list, null, 2));
+  } catch (err) {
+    console.warn('Failed to save jobs ledger:', err);
+  }
+}
+
+export function loadJobsLedger() {
+  try {
+    if (fs.existsSync(LEDGER_FILE)) {
+      const data = fs.readFileSync(LEDGER_FILE, 'utf8');
+      const list: Job[] = JSON.parse(data);
+      for (const j of list) {
+        jobs.set(j.id, j);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load jobs ledger:', err);
+  }
+}
+loadJobsLedger();
+
 export function registerProcessor(tool: string, processor: JobProcessor) {
   processors.set(tool, processor);
 }
@@ -48,6 +76,10 @@ export function unregisterProcessor(tool: string) {
 export function hasProcessorFor(tool: string): boolean {
   return processors.has(tool);
 }
+
+// Auto-register official Meitu cloud processor adapter
+registerProcessor('ai_enhance', meituProcessor);
+registerProcessor('ai_makeup', meituProcessor);
 
 const hasAiProviderConfigured = () => Boolean(process.env.MEITU_API_KEY || process.env.AI_PROVIDER_KEY);
 
@@ -126,11 +158,13 @@ app.post('/api/jobs', upload.single('image'), (req, res) => {
     createdAt: Date.now()
   };
   jobs.set(jobId, job);
+  saveJobsLedger();
 
   // Dispatch immediately to registered real processor (No infinite hanging pending jobs)
   const processor = processors.get(tool)!;
   setImmediate(async () => {
     job.status = 'processing';
+    saveJobsLedger();
     try {
       const result = await processor(job, file.path);
       job.status = 'completed';
@@ -140,10 +174,39 @@ app.post('/api/jobs', upload.single('image'), (req, res) => {
       job.status = 'failed';
       job.error = err.message || 'Worker processing failed';
       job.completedAt = Date.now();
+    } finally {
+      saveJobsLedger();
     }
   });
 
   res.status(202).json({ jobId, ownershipToken, status: 'pending', tool });
+});
+
+// POST /api/jobs/:id/cancel - Aborts running provider request and cancels job
+app.post('/api/jobs/:id/cancel', (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+
+  const clientToken = req.headers['x-ownership-token'] || req.query.token || req.body?.token;
+  if (!clientToken || clientToken !== job.ownershipToken) {
+    return res.status(403).json({
+      error: 'FORBIDDEN: Invalid or missing ownership token. Access to cancel job denied.'
+    });
+  }
+
+  const aborted = cancelActiveJob(job.id);
+  job.status = 'failed';
+  job.error = 'Job cancelled by user request';
+  job.completedAt = Date.now();
+  saveJobsLedger();
+
+  res.json({
+    status: 'cancelled',
+    jobId: job.id,
+    abortedActiveRequest: aborted
+  });
 });
 
 // GET /api/jobs/:id - Enforces ownership token check for privacy
@@ -213,6 +276,25 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
   }
   next();
 });
+
+// Background cleanup routine: removes old temporary files older than 1 hour (unref so process can exit cleanly)
+const cleanupTimer = setInterval(() => {
+  try {
+    const now = Date.now();
+    const files = fs.readdirSync(uploadDir);
+    for (const file of files) {
+      if (file === 'jobs_ledger.json' || file === '.gitkeep') continue;
+      const fp = path.join(uploadDir, file);
+      const stats = fs.statSync(fp);
+      if (now - stats.mtimeMs > 3600 * 1000) {
+        fs.unlinkSync(fp);
+      }
+    }
+  } catch (err) {
+    console.warn('Periodic cleanup warning:', err);
+  }
+}, 30 * 60 * 1000);
+cleanupTimer.unref();
 
 const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, () => {

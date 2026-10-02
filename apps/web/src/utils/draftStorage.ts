@@ -2,7 +2,9 @@ import type { EditState } from '../types';
 
 export interface AppDraft {
   id: string;
-  imageDataUrl: string;
+  originalDataUrl: string; // Immutable unedited full-resolution original image
+  originalWidth: number;
+  originalHeight: number;
   editState: EditState;
   history: EditState[];
   historyIndex: number;
@@ -10,7 +12,7 @@ export interface AppDraft {
 }
 
 const DB_NAME = 'dbeaty_drafts_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented for schema update with originalDataUrl
 const STORE_NAME = 'drafts';
 
 function openDb(): Promise<IDBDatabase> {
@@ -26,22 +28,43 @@ function openDb(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onerror = () => reject(request.error || new Error('Failed to open IndexedDB'));
   });
 }
 
-export async function saveDraft(draft: AppDraft): Promise<void> {
+export async function saveDraft(draft: AppDraft): Promise<{ success: boolean; error?: string }> {
   try {
     const db = await openDb();
-    return new Promise((resolve, reject) => {
+    return await new Promise<{ success: boolean; error?: string }>((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
+
+      tx.onerror = (ev) => {
+        const error = (ev.target as any)?.error;
+        const msg = error?.name === 'QuotaExceededError' 
+          ? 'Bộ nhớ IndexedDB đã đầy (QuotaExceededError). Hãy giải phóng dung lượng trình duyệt.' 
+          : (error?.message || 'Lỗi lưu bản thảo vào IndexedDB');
+        console.warn('IndexedDB transaction error:', msg);
+        resolve({ success: false, error: msg });
+      };
+
+      tx.onabort = (ev) => {
+        const error = (ev.target as any)?.error;
+        resolve({ success: false, error: error?.message || 'Giao dịch lưu bản thảo bị hủy bỏ' });
+      };
+
       const req = store.put(draft);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        resolve({ success: true });
+      };
+      req.onerror = (ev) => {
+        const error = (ev.target as any)?.error;
+        resolve({ success: false, error: error?.message || 'Lỗi ghi dữ liệu bản thảo' });
+      };
     });
-  } catch (e) {
+  } catch (e: any) {
     console.warn('Failed to save draft to IndexedDB:', e);
+    return { success: false, error: e?.message || 'Không thể mở cơ sở dữ liệu IndexedDB' };
   }
 }
 

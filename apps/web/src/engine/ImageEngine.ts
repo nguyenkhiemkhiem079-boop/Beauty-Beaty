@@ -1,23 +1,41 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine, type WarpPoint } from './WebGLWarpEngine';
 import type { SegmentationResult } from './SegmenterManager';
+import type { CropOperation, HealingOperation } from '../types';
 import { COLOR_FILTERS } from '../presets/filters';
 
 export interface PipelineParams {
-  skin_smooth: number;      // B001
-  skin_brighten?: number;   // B004
-  face_slim: number;        // B013
-  chin_slim: number;        // B019
-  eye_enlarge?: number;     // B025
-  teeth_whiten?: number;    // B043
-  hair_smooth: number;      // B063
-  brightness?: number;      // X018
-  contrast?: number;        // X018
-  saturation?: number;      // X019
-  temperature?: number;     // X020
-  tint?: number;            // X020 color balance / tint
-  filter_id?: string;       // X024
-  filter_intensity?: number;// X024
+  // Skin
+  skin_smooth: number;        // B001
+  skin_brighten?: number;     // B009 shadow lift
+  skin_oil?: number;          // B006 oil/specular reduction
+  skin_tone?: number;         // B008 HSL tone shift
+  nasolabial?: number;        // B005 nasolabial folds lift
+  dark_circles?: number;      // B011 dark circle reduction
+  skin_detail?: number;       // B010 high-pass grain overlay
+  // Face geometry
+  face_slim: number;          // B013
+  chin_slim: number;          // B019
+  jaw_slim?: number;          // B016 jaw contour
+  chin_vline?: number;        // B017 chin V-line
+  eye_enlarge?: number;       // B025
+  eye_bright?: number;        // B028 sclera brightening
+  eye_catchlight?: number;    // B034 catchlight
+  teeth_whiten?: number;      // B043
+  hair_smooth: number;        // B063
+  hair_shine?: number;        // B064
+  collarbone?: number;        // X006
+  body_slim?: number;         // B075
+  // Global adjustments
+  brightness?: number;        // X022
+  contrast?: number;          // X022
+  saturation?: number;        // X022
+  temperature?: number;       // X022
+  tint?: number;              // X022
+  filter_id?: string;         // X024
+  filter_intensity?: number;  // X024
+  crop?: CropOperation;       // X020
+  healings?: HealingOperation[]; // B002
 }
 
 export interface ChinSlimParams {
@@ -72,6 +90,7 @@ export class ImageEngine {
   private workCanvas: HTMLCanvasElement;
   private webGLWarp: WebGLWarpEngine | null = null;
   private segmentationMask: SegmentationResult | null = null;
+  private currentCropNorm = { x: 0, y: 0, w: 1, h: 1 };
 
   constructor(image: HTMLImageElement | HTMLCanvasElement) {
     this.originalCanvas = document.createElement('canvas');
@@ -104,6 +123,9 @@ export class ImageEngine {
   }
 
   reset() {
+    this.currentCropNorm = { x: 0, y: 0, w: 1, h: 1 };
+    this.workCanvas.width = this.originalCanvas.width;
+    this.workCanvas.height = this.originalCanvas.height;
     const ctxWork = this.workCanvas.getContext('2d')!;
     ctxWork.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctxWork.drawImage(this.originalCanvas, 0, 0);
@@ -128,8 +150,13 @@ export class ImageEngine {
     }
     smallCtx.putImageData(mData, 0, 0);
 
-    // Scale it to target size
-    targetCtx.drawImage(smallCanvas, 0, 0, targetW, targetH);
+    // Scale and clip to cropped region
+    const sx = Math.max(0, Math.round(this.currentCropNorm.x * sW));
+    const sy = Math.max(0, Math.round(this.currentCropNorm.y * sH));
+    const sw = Math.min(sW - sx, Math.max(1, Math.round(this.currentCropNorm.w * sW)));
+    const sh = Math.min(sH - sy, Math.max(1, Math.round(this.currentCropNorm.h * sH)));
+
+    targetCtx.drawImage(smallCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
   }
 
   // Effect 1: Skin Smoothing (Mịn da - B001)
@@ -292,6 +319,244 @@ export class ImageEngine {
     ctx.restore();
   }
 
+  // Effect 1c: Nasolabial Folds Reduction (Giảm rãnh cười - B005)
+  applyNasolabialReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    // Nasolabial zone: pts between nose wings and lip corners
+    const zones = [
+      [92, 165, 167, 164, 393, 391],   // right nasolabial fold
+      [322, 391, 394, 395, 165, 92]    // left nasolabial fold
+    ];
+
+    zones.forEach(pts => {
+      const brightCanvas = document.createElement('canvas');
+      brightCanvas.width = w;
+      brightCanvas.height = h;
+      const bCtx = brightCanvas.getContext('2d')!;
+      const brightnessVal = 100 + (intensity * 0.18);
+      bCtx.filter = `brightness(${brightnessVal}%)`;
+      bCtx.drawImage(this.workCanvas, 0, 0);
+      bCtx.filter = 'none';
+
+      const mCanvas = document.createElement('canvas');
+      mCanvas.width = w;
+      mCanvas.height = h;
+      const mCtx = mCanvas.getContext('2d')!;
+      mCtx.clearRect(0, 0, w, h);
+      mCtx.beginPath();
+      pts.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) mCtx.moveTo(pt.x * w, pt.y * h);
+        else mCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      mCtx.closePath();
+      mCtx.fillStyle = 'white';
+      mCtx.filter = `blur(${14 * scale}px)`;
+      mCtx.fill();
+      mCtx.filter = 'none';
+
+      bCtx.globalCompositeOperation = 'destination-in';
+      bCtx.drawImage(mCanvas, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha = (intensity / 100.0) * 0.7;
+      ctx.drawImage(brightCanvas, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  // Effect 1d: Oil/Specular Reduction (Khử bóng dầu - B006)
+  applyOilReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    // Build a quick skin polygon from face oval to identify region
+    const faceOval = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+    const roiCanvas = document.createElement('canvas');
+    roiCanvas.width = w;
+    roiCanvas.height = h;
+    const rCtx = roiCanvas.getContext('2d')!;
+    if (landmarks && landmarks.length > 0) {
+      rCtx.beginPath();
+      faceOval.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) rCtx.moveTo(pt.x * w, pt.y * h);
+        else rCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      rCtx.closePath();
+      rCtx.fillStyle = 'white';
+      rCtx.fill();
+    } else {
+      rCtx.fillStyle = 'white';
+      rCtx.fillRect(0, 0, w, h);
+    }
+    const roiMask = rCtx.getImageData(0, 0, w, h);
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    const factor = intensity / 100.0;
+    const threshold = 220 - (intensity * 0.5); // pixels brighter than this get compressed
+
+    for (let i = 0; i < data.length; i += 4) {
+      if (roiMask.data[i + 3] < 64) continue;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum > threshold) {
+        const excess = lum - threshold;
+        const reduction = excess * factor * 0.55;
+        data[i]   = Math.max(0, Math.min(255, r - Math.round(reduction * (r / lum))));
+        data[i+1] = Math.max(0, Math.min(255, g - Math.round(reduction * (g / lum))));
+        data[i+2] = Math.max(0, Math.min(255, b - Math.round(reduction * (b / lum))));
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Effect 1e: Skin Tone Adjust (Điều chỉnh tông da - B008)
+  applySkinToneAdjust(landmarks: NormalizedLandmark[], toneShift: number) {
+    if (toneShift === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    // Mask: face oval only
+    const faceOval = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+    const mCanvas = document.createElement('canvas');
+    mCanvas.width = w; mCanvas.height = h;
+    const mCtx = mCanvas.getContext('2d')!;
+    mCtx.clearRect(0, 0, w, h);
+    if (landmarks && landmarks.length > 0) {
+      mCtx.beginPath();
+      faceOval.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) mCtx.moveTo(pt.x * w, pt.y * h);
+        else mCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      mCtx.closePath();
+      mCtx.fillStyle = 'white';
+      mCtx.fill();
+    }
+    const maskData = mCtx.getImageData(0, 0, w, h);
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+    // toneShift: -50 (warm tan) to +50 (cool pink-white)
+    const hShift = toneShift > 0 ? -8 * (toneShift / 50) : 6 * (Math.abs(toneShift) / 50); // cool = pink, warm = amber
+    const sShift = toneShift > 0 ? -0.05 * (toneShift / 50) : 0.04 * (Math.abs(toneShift) / 50);
+    const lShift = toneShift > 0 ? 0.04 * (toneShift / 50) : -0.02 * (Math.abs(toneShift) / 50);
+
+    for (let i = 0; i < data.length; i += 4) {
+      if (maskData.data[i + 3] < 64) continue;
+      const alpha = maskData.data[i + 3] / 255;
+      const [h2, s, l] = rgbToHsl(data[i], data[i+1], data[i+2]);
+      const [nr, ng, nb] = hslToRgb(h2 + hShift, Math.max(0, Math.min(1, s + sShift)), Math.max(0, Math.min(1, l + lShift)));
+      data[i]   = Math.round(data[i] * (1 - alpha) + nr * alpha);
+      data[i+1] = Math.round(data[i+1] * (1 - alpha) + ng * alpha);
+      data[i+2] = Math.round(data[i+2] * (1 - alpha) + nb * alpha);
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
+  // Effect 1f: High-Frequency Skin Detail Restoration (Chi tiết da - B010)
+  applySkinDetail(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    // Get blurred version (low frequency)
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = w; blurCanvas.height = h;
+    const bCtx = blurCanvas.getContext('2d', { willReadFrequently: true })!;
+    bCtx.filter = `blur(${1.2 * scale}px)`;
+    bCtx.drawImage(this.workCanvas, 0, 0);
+    bCtx.filter = 'none';
+
+    const origData = ctx.getImageData(0, 0, w, h);
+    const blurData = bCtx.getImageData(0, 0, w, h);
+    const outData = ctx.createImageData(w, h);
+    const factor = (intensity / 100.0) * 0.55;
+
+    // Add high-pass = orig - blur (offset by 128) back as overlay
+    for (let i = 0; i < origData.data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const highPass = (origData.data[i+c] - blurData.data[i+c] + 128);
+        // soft light blend
+        const base = origData.data[i+c] / 255;
+        const blend = highPass / 255;
+        let result: number;
+        if (blend <= 0.5) {
+          result = base * (2 * blend) * 255;
+        } else {
+          result = (2 * base * (1 - blend) + (2 * blend - 1)) * 255;
+        }
+        outData.data[i+c] = Math.round(origData.data[i+c] * (1 - factor) + result * factor);
+      }
+      outData.data[i+3] = origData.data[i+3];
+    }
+    ctx.putImageData(outData, 0, 0);
+  }
+
+  // Effect 1g: Dark Circle Reduction (Giảm quầng thâm - B011)
+  applyDarkCircleReduction(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    // Under-eye ROI landmarks
+    const zones = [
+      [111, 117, 118, 119, 120, 121, 128, 245, 188, 174],  // left under-eye
+      [340, 346, 347, 348, 349, 350, 357, 465, 412, 399]   // right under-eye
+    ];
+
+    zones.forEach(pts => {
+      const brightCanvas = document.createElement('canvas');
+      brightCanvas.width = w; brightCanvas.height = h;
+      const bCtx = brightCanvas.getContext('2d')!;
+      const lightenVal = 100 + (intensity * 0.22);
+      bCtx.filter = `brightness(${lightenVal}%) saturate(${100 - intensity * 0.3}%)`;
+      bCtx.drawImage(this.workCanvas, 0, 0);
+      bCtx.filter = 'none';
+
+      const mCanvas = document.createElement('canvas');
+      mCanvas.width = w; mCanvas.height = h;
+      const mCtx = mCanvas.getContext('2d')!;
+      mCtx.clearRect(0, 0, w, h);
+      mCtx.beginPath();
+      pts.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) mCtx.moveTo(pt.x * w, pt.y * h);
+        else mCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      mCtx.closePath();
+      mCtx.fillStyle = 'white';
+      mCtx.filter = `blur(${12 * scale}px)`;
+      mCtx.fill();
+      mCtx.filter = 'none';
+
+      bCtx.globalCompositeOperation = 'destination-in';
+      bCtx.drawImage(mCanvas, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha = (intensity / 100.0) * 0.8;
+      ctx.drawImage(brightCanvas, 0, 0);
+      ctx.restore();
+    });
+  }
+
   // Effect 2: Hair Smoothing (Mượt tóc - B063) based on segmentation mask
   applyHairSmoothing(intensity: number) {
     if (intensity === 0 || !this.segmentationMask) return;
@@ -328,6 +593,47 @@ export class ImageEngine {
     ctx.save();
     ctx.globalAlpha = intensity / 100.0;
     ctx.drawImage(blurCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  // Effect 2b: Hair Shine (Bóng tóc - B064)
+  applyHairShine(intensity: number) {
+    if (intensity === 0 || !this.segmentationMask) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    // Draw hair mask
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w; maskCanvas.height = h;
+    const mCtx = maskCanvas.getContext('2d')!;
+    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = hair
+
+    // Shine strip: radial gradient on top portion of image
+    const shineCanvas = document.createElement('canvas');
+    shineCanvas.width = w; shineCanvas.height = h;
+    const sCtx = shineCanvas.getContext('2d')!;
+    const grad = sCtx.createLinearGradient(w * 0.25, h * 0.05, w * 0.75, h * 0.4);
+    grad.addColorStop(0, `rgba(255,255,255,${(intensity / 100.0) * 0.38})`);
+    grad.addColorStop(0.5, `rgba(255,255,255,${(intensity / 100.0) * 0.18})`);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    sCtx.fillStyle = grad;
+    sCtx.fillRect(0, 0, w, h);
+
+    // Clip shine to hair mask
+    const blurMask = document.createElement('canvas');
+    blurMask.width = w; blurMask.height = h;
+    const bmCtx = blurMask.getContext('2d')!;
+    bmCtx.filter = `blur(${8 * scale}px)`;
+    bmCtx.drawImage(maskCanvas, 0, 0);
+
+    sCtx.globalCompositeOperation = 'destination-in';
+    sCtx.drawImage(blurMask, 0, 0);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(shineCanvas, 0, 0);
     ctx.restore();
   }
 
@@ -595,6 +901,60 @@ export class ImageEngine {
     return { shiftX, shiftY, magnitude, angleDeg };
   }
 
+  // Effect 5b: Jaw Contour (Định hình đường hàm - B016)
+  applyJawContour(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const leftJaw = landmarks[148];
+    const rightJaw = landmarks[377];
+    const chin = landmarks[152];
+    const nose = landmarks[1];
+    if (!leftJaw || !rightJaw || !chin || !nose) return;
+
+    const faceW = Math.abs((rightJaw.x - leftJaw.x) * aspect);
+    const radius = faceW * 0.45;
+    const mappedIntensity = (intensity / 100.0) * 0.14;
+
+    // Pull jaw edges inward toward center-bottom
+    const centerX = (leftJaw.x + rightJaw.x) / 2;
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftJaw, target: { x: leftJaw.x + (centerX - leftJaw.x) * mappedIntensity * 2.5, y: leftJaw.y - (chin.y - leftJaw.y) * mappedIntensity * 0.3 }, radius, intensity: 0.9, mode: 0 },
+      { center: rightJaw, target: { x: rightJaw.x + (centerX - rightJaw.x) * mappedIntensity * 2.5, y: rightJaw.y - (chin.y - rightJaw.y) * mappedIntensity * 0.3 }, radius, intensity: 0.9, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
+  // Effect 5c: Chin V-Line (Cằm V-Line - B017)
+  applyChinVLine(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !this.webGLWarp) return;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const aspect = w / h;
+
+    const chin = landmarks[152];
+    const leftChinSide = landmarks[176];
+    const rightChinSide = landmarks[400];
+    const lowerLip = landmarks[17];
+    if (!chin || !leftChinSide || !rightChinSide || !lowerLip) return;
+
+    const faceW = Math.abs((rightChinSide.x - leftChinSide.x) * aspect);
+    const radius = faceW * 0.5;
+    const mappedIntensity = (intensity / 100.0) * 0.18;
+
+    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.0, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
+      { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.0, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
   // Effect 6: Double Chin Reduction (Giảm nọng cằm - B019)
   applyDoubleChinReduction(landmarks: NormalizedLandmark[], intensity: number) {
     const params = this.getChinSlimWarpPoints(landmarks, intensity);
@@ -805,6 +1165,134 @@ export class ImageEngine {
     ctx.putImageData(imgData, x0, y0);
   }
 
+  // Effect 9b: Sclera / Eye Brightening (Sáng mắt - B028)
+  applyEyeBrightening(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    const eyeZones = [
+      [33, 7, 163, 144, 145, 153, 154, 155, 133, 246, 161, 160, 159, 158, 157, 173],   // left eye
+      [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]  // right eye
+    ];
+
+    eyeZones.forEach(pts => {
+      const brightCanvas = document.createElement('canvas');
+      brightCanvas.width = w; brightCanvas.height = h;
+      const bCtx = brightCanvas.getContext('2d')!;
+      bCtx.filter = `brightness(${100 + intensity * 0.28}%) saturate(${100 - intensity * 0.2}%)`;
+      bCtx.drawImage(this.workCanvas, 0, 0);
+      bCtx.filter = 'none';
+
+      const mCanvas = document.createElement('canvas');
+      mCanvas.width = w; mCanvas.height = h;
+      const mCtx = mCanvas.getContext('2d')!;
+      mCtx.clearRect(0, 0, w, h);
+      mCtx.beginPath();
+      pts.forEach((idx, i) => {
+        const pt = landmarks[idx];
+        if (!pt) return;
+        if (i === 0) mCtx.moveTo(pt.x * w, pt.y * h);
+        else mCtx.lineTo(pt.x * w, pt.y * h);
+      });
+      mCtx.closePath();
+      mCtx.fillStyle = 'white';
+      mCtx.filter = `blur(${6 * scale}px)`;
+      mCtx.fill();
+      mCtx.filter = 'none';
+
+      bCtx.globalCompositeOperation = 'destination-in';
+      bCtx.drawImage(mCanvas, 0, 0);
+
+      ctx.save();
+      ctx.globalAlpha = (intensity / 100.0) * 0.85;
+      ctx.drawImage(brightCanvas, 0, 0);
+      ctx.restore();
+    });
+  }
+
+  // Effect 9c: Eye Catchlight (Điểm sáng mắt - B034)
+  applyEyeCatchlight(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    // Iris center landmarks: 468 (left iris center) and 473 (right iris center)
+    const irisCenters = [468, 473];
+    const eyeWidthRef = [
+      { inner: 133, outer: 33 },  // left eye
+      { inner: 362, outer: 263 }  // right eye
+    ];
+
+    irisCenters.forEach((irisIdx, zi) => {
+      const iris = landmarks[irisIdx];
+      if (!iris) return;
+      const eyeRef = eyeWidthRef[zi];
+      const inner = landmarks[eyeRef.inner];
+      const outer = landmarks[eyeRef.outer];
+      if (!inner || !outer) return;
+
+      const eyeW = Math.hypot((outer.x - inner.x) * w, (outer.y - inner.y) * h);
+      const dotR = Math.max(2, eyeW * 0.1);
+      const offsetX = -dotR * 0.8;
+      const offsetY = -dotR * 0.8;
+
+      const cx = iris.x * w + offsetX;
+      const cy = iris.y * h + offsetY;
+
+      ctx.save();
+      ctx.globalAlpha = (intensity / 100.0) * 0.9;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, dotR);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.6, 'rgba(255,255,255,0.5)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  // Effect 9d: Collarbone Definition (Xương quai xanh - X006)
+  applyCollarboneDefinition(intensity: number) {
+    if (intensity === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+
+    // Add a subtle shadow below collar zone (lower 1/4 of face area, centered)
+    const collarY = h * 0.78;
+    const collarH = h * 0.12;
+
+    // Shadow (darken below collarbone line)
+    const shadowGrad = ctx.createLinearGradient(0, collarY - collarH * 0.3, 0, collarY + collarH);
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    shadowGrad.addColorStop(0.4, `rgba(0,0,0,${(intensity / 100.0) * 0.18})`);
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    // Highlight above collarbone
+    const hlGrad = ctx.createLinearGradient(0, collarY - collarH * 0.8, 0, collarY);
+    hlGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    hlGrad.addColorStop(1, `rgba(255,255,255,${(intensity / 100.0) * 0.1})`);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(w * 0.15, collarY - collarH * 0.3, w * 0.7, collarH * 1.3);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = hlGrad;
+    ctx.fillRect(w * 0.2, collarY - collarH * 0.8, w * 0.6, collarH * 0.8);
+    ctx.restore();
+  }
+
   // Effect 10: Body Slim / Waist Reshape (B070)
   applyBodySlim(intensity: number, centerYNorm = 0.65) {
     if (intensity === 0 || !this.webGLWarp) return;
@@ -880,32 +1368,136 @@ export class ImageEngine {
   // Unified Pipeline Executor for Preview and Export
   applyPipeline(params: PipelineParams, landmarks?: NormalizedLandmark[]) {
     this.reset();
-    
-    // Stage 1: Skin Enhancements
-    if (params.skin_smooth > 0 && landmarks) {
-      this.applySkinSmoothing(landmarks, params.skin_smooth);
-    }
-    if (params.skin_brighten && params.skin_brighten > 0 && landmarks) {
-      this.applySkinBrightening(landmarks, params.skin_brighten);
+
+    // Stage 0A: Unified Crop Operation with Coordinate Mapping
+    let x_n = 0, y_n = 0, w_n = 1, h_n = 1;
+    let isCropped = false;
+
+    if (params.crop && params.crop.aspectRatio !== 'original') {
+      isCropped = true;
+      let targetRatio = 1.0;
+      switch (params.crop.aspectRatio) {
+        case '1:1': targetRatio = 1.0; break;
+        case '4:5': targetRatio = 4 / 5; break;
+        case '3:4': targetRatio = 3 / 4; break;
+        case '9:16': targetRatio = 9 / 16; break;
+      }
+
+      const origW = this.originalCanvas.width;
+      const origH = this.originalCanvas.height;
+      const currentRatio = origW / origH;
+
+      if (params.crop.width && params.crop.height && params.crop.width > 0 && params.crop.height > 0 && params.crop.width < 1.0) {
+        x_n = params.crop.x;
+        y_n = params.crop.y;
+        w_n = params.crop.width;
+        h_n = params.crop.height;
+      } else {
+        if (currentRatio > targetRatio) {
+          w_n = targetRatio / currentRatio;
+          h_n = 1.0;
+          x_n = (1.0 - w_n) / 2;
+          y_n = 0.0;
+        } else {
+          w_n = 1.0;
+          h_n = currentRatio / targetRatio;
+          x_n = 0.0;
+          y_n = (1.0 - h_n) / 2;
+        }
+      }
+
+      const cropX = Math.round(x_n * origW);
+      const cropY = Math.round(y_n * origH);
+      const cropW = Math.max(1, Math.round(w_n * origW));
+      const cropH = Math.max(1, Math.round(h_n * origH));
+
+      this.workCanvas.width = cropW;
+      this.workCanvas.height = cropH;
+      const ctx = this.workCanvas.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(this.originalCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
     }
 
-    // Stage 2: Geometric Feature Shaping
-    if (params.face_slim > 0 && landmarks) {
-      this.applyFaceSlimming(landmarks, params.face_slim);
-    }
-    if (params.chin_slim > 0 && landmarks) {
-      this.applyDoubleChinReduction(landmarks, params.chin_slim);
-    }
-    if (params.eye_enlarge && params.eye_enlarge > 0 && landmarks) {
-      this.applyEyeEnlargement(landmarks, params.eye_enlarge);
+    this.currentCropNorm = { x: x_n, y: y_n, w: w_n, h: h_n };
+
+    // Coordinate mapping for landmarks into cropped coordinate space
+    let mappedLandmarks = landmarks;
+    if (landmarks && isCropped) {
+      mappedLandmarks = landmarks.map(lm => ({
+        ...lm,
+        x: (lm.x - x_n) / w_n,
+        y: (lm.y - y_n) / h_n,
+        z: lm.z / w_n
+      }));
     }
 
-    // Stage 3: Facial Details
-    if (params.teeth_whiten && params.teeth_whiten > 0 && landmarks) {
-      this.applyTeethWhitening(landmarks, params.teeth_whiten);
+    // Stage 0B: Replay Blemish Healing operations (B002)
+    if (params.healings && params.healings.length > 0) {
+      for (const op of params.healings) {
+        const u = (op.x - x_n) / w_n;
+        const v = (op.y - y_n) / h_n;
+        const radiusPx = (op.radiusNorm / h_n) * this.workCanvas.height;
+        this.applyBlemishHealing({ x: u, y: v }, radiusPx);
+      }
+    }
+
+    // Stage 1: Skin Enhancements (2D Canvas, mask-based)
+    if (params.skin_smooth > 0 && mappedLandmarks) {
+      this.applySkinSmoothing(mappedLandmarks, params.skin_smooth);
+    }
+    if (params.skin_brighten && params.skin_brighten > 0 && mappedLandmarks) {
+      this.applySkinBrightening(mappedLandmarks, params.skin_brighten);
+    }
+    if (params.skin_oil && params.skin_oil > 0) {
+      this.applyOilReduction(mappedLandmarks || [], params.skin_oil);
+    }
+    if (params.skin_tone && params.skin_tone !== 0 && mappedLandmarks) {
+      this.applySkinToneAdjust(mappedLandmarks, params.skin_tone);
+    }
+    if (params.nasolabial && params.nasolabial > 0 && mappedLandmarks) {
+      this.applyNasolabialReduction(mappedLandmarks, params.nasolabial);
+    }
+    if (params.dark_circles && params.dark_circles > 0 && mappedLandmarks) {
+      this.applyDarkCircleReduction(mappedLandmarks, params.dark_circles);
+    }
+    if (params.skin_detail && params.skin_detail > 0 && mappedLandmarks) {
+      this.applySkinDetail(mappedLandmarks, params.skin_detail);
+    }
+
+    // Stage 2: Geometric Feature Shaping (WebGL Warp)
+    if (params.face_slim > 0 && mappedLandmarks) {
+      this.applyFaceSlimming(mappedLandmarks, params.face_slim);
+    }
+    if (params.jaw_slim && params.jaw_slim > 0 && mappedLandmarks) {
+      this.applyJawContour(mappedLandmarks, params.jaw_slim);
+    }
+    if (params.chin_vline && params.chin_vline > 0 && mappedLandmarks) {
+      this.applyChinVLine(mappedLandmarks, params.chin_vline);
+    }
+    if (params.chin_slim > 0 && mappedLandmarks) {
+      this.applyDoubleChinReduction(mappedLandmarks, params.chin_slim);
+    }
+    if (params.eye_enlarge && params.eye_enlarge > 0 && mappedLandmarks) {
+      this.applyEyeEnlargement(mappedLandmarks, params.eye_enlarge);
+    }
+
+    // Stage 3: Facial Details (2D Canvas)
+    if (params.eye_bright && params.eye_bright > 0 && mappedLandmarks) {
+      this.applyEyeBrightening(mappedLandmarks, params.eye_bright);
+    }
+    if (params.eye_catchlight && params.eye_catchlight > 0 && mappedLandmarks) {
+      this.applyEyeCatchlight(mappedLandmarks, params.eye_catchlight);
+    }
+    if (params.teeth_whiten && params.teeth_whiten > 0 && mappedLandmarks) {
+      this.applyTeethWhitening(mappedLandmarks, params.teeth_whiten);
     }
     if (params.hair_smooth > 0) {
       this.applyHairSmoothing(params.hair_smooth);
+    }
+    if (params.hair_shine && params.hair_shine > 0) {
+      this.applyHairShine(params.hair_shine);
+    }
+    if (params.collarbone && params.collarbone > 0) {
+      this.applyCollarboneDefinition(params.collarbone);
     }
 
     // Stage 4: Global Tone & Color Filters
@@ -920,6 +1512,11 @@ export class ImageEngine {
     }
     if (params.filter_id) {
       this.applyFilter(params.filter_id, params.filter_intensity ?? 100);
+    }
+
+    // Stage 5: Body Slim
+    if (params.body_slim && params.body_slim > 0) {
+      this.applyBodySlim(params.body_slim);
     }
   }
 

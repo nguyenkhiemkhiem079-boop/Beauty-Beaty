@@ -3,11 +3,24 @@ export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'adjust
 export type ToolType = 
   | 'skin_smooth' 
   | 'skin_brighten'
+  | 'skin_blemish'
+  | 'skin_oil'
+  | 'skin_tone'
+  | 'nasolabial'
+  | 'dark_circles'
+  | 'skin_detail'
   | 'face_slim' 
-  | 'chin_slim' 
+  | 'chin_slim'
+  | 'jaw_slim'
+  | 'chin_vline'
+  | 'body_slim'
   | 'eye_enlarge'
+  | 'eye_bright'
+  | 'eye_catchlight'
   | 'teeth_whiten'
-  | 'hair_smooth' 
+  | 'hair_smooth'
+  | 'hair_shine'
+  | 'collarbone'
   | 'brightness'
   | 'contrast'
   | 'saturation'
@@ -24,36 +37,85 @@ export interface TemplateCustomText {
   footer?: string;
 }
 
+export interface HealingOperation {
+  id?: string;
+  x: number;          // normalized x (0..1) relative to canvas
+  y: number;          // normalized y (0..1) relative to canvas
+  radiusNorm: number; // normalized radius relative to canvas height
+}
+
+export interface CropOperation {
+  aspectRatio: 'original' | '1:1' | '4:5' | '3:4' | '9:16';
+  x: number;      // normalized crop origin x in source image (0..1)
+  y: number;      // normalized crop origin y in source image (0..1)
+  width: number;  // normalized crop width in source image (0..1)
+  height: number; // normalized crop height in source image (0..1)
+}
+
 export interface EditState {
-  skin_smooth: number;
-  skin_brighten: number;
-  face_slim: number;
-  chin_slim: number;
-  eye_enlarge: number;
-  teeth_whiten: number;
-  hair_smooth: number;
+  // Skin (B001-B012)
+  skin_smooth: number;    // B001
+  skin_brighten: number;  // B009 tone lift
+  skin_oil: number;       // B006 oil/specular reduction
+  skin_tone: number;      // B008 skin tone adjust
+  nasolabial: number;     // B005 nasolabial folds
+  dark_circles: number;   // B011 dark circles under eyes
+  skin_detail: number;    // B010 high-freq detail restoration
+  // Face (B013-B024)
+  face_slim: number;      // B013 V-line
+  chin_slim: number;      // B019 double chin
+  jaw_slim: number;       // B016 jaw contour
+  chin_vline: number;     // B017 chin v-shape
+  // Eyes (B025-B034)
+  eye_enlarge: number;    // B025
+  eye_bright: number;     // B028 sclera brightening
+  eye_catchlight: number; // B034 catchlight
+  // Mouth (B043)
+  teeth_whiten: number;   // B043
+  // Hair (B063-B064)
+  hair_smooth: number;    // B063
+  hair_shine: number;     // B064 hair shine
+  // Body (B075)
+  body_slim?: number;     // B075
+  // Extra features
+  collarbone?: number;    // X006 collarbone definition
+  // Global adjustments
   brightness: number;
   contrast: number;
   saturation: number;
   temperature: number;
   tint: number;
+  // Filter/Template/Crop/Healing
   filter_id?: string;
   filter_intensity?: number;
   template_id?: string;
   template_custom_text?: TemplateCustomText;
   template_placement?: 'top' | 'center' | 'bottom';
-  crop_aspect_ratio?: 'original' | '1:1' | '4:5' | '3:4' | '9:16';
+  crop?: CropOperation;
+  healings?: HealingOperation[];
   ai_makeup?: number;
 }
 
 export const DEFAULT_EDIT_STATE: EditState = {
   skin_smooth: 0,
   skin_brighten: 0,
+  skin_oil: 0,
+  skin_tone: 0,
+  nasolabial: 0,
+  dark_circles: 0,
+  skin_detail: 0,
   face_slim: 0,
   chin_slim: 0,
+  jaw_slim: 0,
+  chin_vline: 0,
   eye_enlarge: 0,
+  eye_bright: 0,
+  eye_catchlight: 0,
   teeth_whiten: 0,
   hair_smooth: 0,
+  hair_shine: 0,
+  body_slim: 0,
+  collarbone: 0,
   brightness: 0,
   contrast: 0,
   saturation: 0,
@@ -63,5 +125,12 @@ export const DEFAULT_EDIT_STATE: EditState = {
   filter_intensity: 100,
   template_id: '',
   template_placement: 'top',
-  crop_aspect_ratio: 'original'
+  crop: {
+    aspectRatio: 'original',
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1
+  },
+  healings: []
 };

@@ -9,7 +9,7 @@ import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
 import { ImageEngine } from '../engine/ImageEngine';
 import { useAppContext, DEFAULT_EDIT_STATE } from '../context';
-import type { ToolCategory, ToolType, TemplateCustomText } from '../context';
+import type { ToolCategory, ToolType, TemplateCustomText, CropOperation, HealingOperation, EditState } from '../context';
 import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
 import { CollageMaker } from './CollageMaker';
@@ -44,6 +44,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ImageEngine | null>(null);
   const uploadTokenRef = useRef(0);
+  const originalDataUrlRef = useRef<string | null>(null);
 
   // Filter list by category
   const filteredFilters = useMemo(() => {
@@ -138,14 +139,38 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     }
   };
 
+  const getOriginalDataUrl = (): string | null => {
+    if (originalDataUrlRef.current) return originalDataUrlRef.current;
+    if (!originalImage) return null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = originalImage.width;
+      c.height = originalImage.height;
+      const ctx = c.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(originalImage, 0, 0);
+      const dataUrl = c.toDataURL('image/png');
+      originalDataUrlRef.current = dataUrl;
+      return dataUrl;
+    } catch (e) {
+      console.warn('Failed to generate original data URL:', e);
+      return null;
+    }
+  };
+
   const applyEffects = () => {
     if (!engineRef.current || !canvasRef.current || !originalImage) return;
     
     const faceLandmarks = landmarks?.[0];
     engineRef.current.applyPipeline(editState, faceLandmarks);
     
-    const ctx = canvasRef.current.getContext('2d');
     const workCanvas = engineRef.current.getCanvas();
+    if (canvasRef.current.width !== workCanvas.width || canvasRef.current.height !== workCanvas.height) {
+      canvasRef.current.width = workCanvas.width;
+      canvasRef.current.height = workCanvas.height;
+    }
+
+    const ctx = canvasRef.current.getContext('2d');
     if (ctx) {
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       ctx.drawImage(workCanvas, 0, 0);
@@ -231,12 +256,16 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
   // Auto-save draft to IndexedDB on edits
   useEffect(() => {
-    if (!originalImage || !canvasRef.current) return;
+    if (!originalImage) return;
     const timer = setTimeout(async () => {
+      const origUrl = getOriginalDataUrl();
+      if (!origUrl) return;
       try {
         const draft: AppDraft = {
           id: 'latest_active_draft',
-          imageDataUrl: canvasRef.current!.toDataURL('image/jpeg', 0.85),
+          originalDataUrl: origUrl,
+          originalWidth: originalImage.width,
+          originalHeight: originalImage.height,
           editState,
           history,
           historyIndex,
@@ -251,35 +280,100 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   }, [editState, history, historyIndex, originalImage]);
 
   const handleManualSaveDraft = async () => {
-    if (!canvasRef.current) return;
+    const origUrl = getOriginalDataUrl();
+    if (!origUrl || !originalImage) {
+      setErrorMsg('Không tìm thấy ảnh gốc để lưu bản thảo.');
+      setTimeout(() => setErrorMsg(null), 3000);
+      return;
+    }
     try {
       const draft: AppDraft = {
         id: 'latest_active_draft',
-        imageDataUrl: canvasRef.current.toDataURL('image/jpeg', 0.85),
+        originalDataUrl: origUrl,
+        originalWidth: originalImage.width,
+        originalHeight: originalImage.height,
         editState,
         history,
         historyIndex,
         timestamp: Date.now()
       };
-      await saveDraft(draft);
-      setDraftToast('Đã lưu bản thảo vào IndexedDB thành công!');
-      setTimeout(() => setDraftToast(null), 3000);
-    } catch (e) {
+      const res = await saveDraft(draft);
+      if (res.success) {
+        setDraftToast('Đã lưu bản thảo vào IndexedDB thành công!');
+        setTimeout(() => setDraftToast(null), 3000);
+      } else {
+        setErrorMsg(res.error || 'Lưu bản thảo thất bại');
+        setTimeout(() => setErrorMsg(null), 4000);
+      }
+    } catch (e: any) {
       console.error(e);
+      setErrorMsg(e?.message || 'Lỗi lưu bản thảo');
+      setTimeout(() => setErrorMsg(null), 4000);
     }
   };
 
   const handleRestoreDraft = (draft: AppDraft) => {
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       setOriginalImage(img);
-      setImageSrc(draft.imageDataUrl);
+      originalDataUrlRef.current = draft.originalDataUrl;
+      setImageSrc(draft.originalDataUrl);
       setEditState(draft.editState);
       setHistory(draft.history);
       setHistoryIndex(draft.historyIndex);
       setDraftAvailable(null);
+
+      const MAX_SIZE = 800;
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+        width *= ratio;
+        height *= ratio;
+      }
+
+      if (canvasRef.current) {
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
+        const ctx = canvasRef.current.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        if (engineRef.current) {
+          engineRef.current.dispose();
+        }
+        engineRef.current = new ImageEngine(canvasRef.current);
+
+        setIsDetecting(true);
+        try {
+          await Promise.all([
+            faceLandmarkManager.initialize(),
+            segmenterManager.initialize()
+          ]);
+          const [detectedLandmarks, segResult] = await Promise.all([
+            faceLandmarkManager.detectFaces(canvasRef.current),
+            segmenterManager.segment(canvasRef.current)
+          ]);
+          setLandmarks(detectedLandmarks);
+          setSegmentationMask(segResult || null);
+          if (engineRef.current && segResult) {
+            engineRef.current.setSegmentationMask(segResult);
+          }
+          if (engineRef.current) {
+            engineRef.current.applyPipeline(draft.editState, detectedLandmarks?.[0]);
+            const work = engineRef.current.getCanvas();
+            canvasRef.current.width = work.width;
+            canvasRef.current.height = work.height;
+            const c = canvasRef.current.getContext('2d');
+            c?.drawImage(work, 0, 0);
+          }
+        } catch (err: any) {
+          console.warn('AI init on restore error:', err);
+        } finally {
+          setIsDetecting(false);
+        }
+      }
     };
-    img.src = draft.imageDataUrl;
+    img.src = draft.originalDataUrl;
   };
 
   const handleDiscardDraft = async () => {
@@ -292,6 +386,17 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     if (file) {
       const currentToken = ++uploadTokenRef.current;
       const url = URL.createObjectURL(file);
+      setImageSrc(url);
+      setLandmarks(null);
+      setSegmentationMask(null);
+      setErrorMsg(null);
+
+      // Read file to preserve original immutable data URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        originalDataUrlRef.current = reader.result as string;
+      };
+      reader.readAsDataURL(file);
       setImageSrc(url);
       setLandmarks(null);
       setSegmentationMask(null);
@@ -388,11 +493,6 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     const faceLandmarks = landmarks?.[0];
     exportEngine.applyPipeline(editState, faceLandmarks);
 
-    // Apply crop if selected
-    if (editState.crop_aspect_ratio && editState.crop_aspect_ratio !== 'original') {
-      exportEngine.cropToAspectRatio(editState.crop_aspect_ratio as any);
-    }
-
     const resultCanvas = exportEngine.getCanvas();
     const resultCtx = resultCanvas.getContext('2d');
 
@@ -425,8 +525,10 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     setEditState(prev => ({ ...prev, [activeTool]: val }));
   };
 
-  const commitHistory = () => {
-    const currentState = editState;
+  const commitHistory = (stateToCommit?: EditState | React.SyntheticEvent | unknown) => {
+    const currentState = (stateToCommit && typeof stateToCommit === 'object' && 'skin_smooth' in stateToCommit)
+      ? (stateToCommit as EditState)
+      : editState;
     const previousState = history[historyIndex];
     
     if (JSON.stringify(currentState) === JSON.stringify(previousState)) {
@@ -439,32 +541,92 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     setHistoryIndex(newHistory.length - 1);
   };
 
-  // Spot Blemish Healing on Canvas Click (B002)
+  // Spot Blemish Healing on Canvas Click (B002) - Declarative Graph Operation
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== ('skin_blemish' as any) || !canvasRef.current || !engineRef.current) return;
+    if (activeTool !== 'skin_blemish' || !canvasRef.current || !engineRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
+    const u = (e.clientX - rect.left) / rect.width;
+    const v = (e.clientY - rect.top) / rect.height;
 
-    engineRef.current.applyBlemishHealing({ x, y }, blemishRadius);
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      ctx.drawImage(engineRef.current.getCanvas(), 0, 0);
-    }
-    commitHistory();
+    // Coordinate mapping: from current canvas space into uncropped original image normalized space
+    const cropX = editState.crop?.x ?? 0;
+    const cropY = editState.crop?.y ?? 0;
+    const cropW = editState.crop?.width ?? 1;
+    const cropH = editState.crop?.height ?? 1;
+
+    const origX = cropX + u * cropW;
+    const origY = cropY + v * cropH;
+    const radiusNorm = (blemishRadius / canvasRef.current.height) * cropH;
+
+    const newOp: HealingOperation = {
+      id: 'heal_' + Date.now(),
+      x: origX,
+      y: origY,
+      radiusNorm
+    };
+
+    const nextState: EditState = {
+      ...editState,
+      healings: [...(editState.healings || []), newOp]
+    };
+
+    setEditState(nextState);
+    commitHistory(nextState);
   };
 
-  // Direct Aspect Ratio Crop (B090)
-  const handleApplyCrop = (ratio: '1:1' | '4:5' | '3:4' | '9:16') => {
-    if (!engineRef.current || !canvasRef.current) return;
-    engineRef.current.cropToAspectRatio(ratio);
-    canvasRef.current.width = engineRef.current.getCanvas().width;
-    canvasRef.current.height = engineRef.current.getCanvas().height;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx?.drawImage(engineRef.current.getCanvas(), 0, 0);
-    setEditState(prev => ({ ...prev, crop_aspect_ratio: ratio }));
-    commitHistory();
+  // Direct Aspect Ratio Crop (B090 / X020) - Declarative Graph Operation
+  const handleApplyCrop = (ratio: '1:1' | '4:5' | '3:4' | '9:16' | 'original') => {
+    if (!originalImage) return;
+
+    let cropOp: CropOperation = {
+      aspectRatio: ratio,
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1
+    };
+
+    if (ratio !== 'original') {
+      let targetRatio = 1.0;
+      switch (ratio) {
+        case '1:1': targetRatio = 1.0; break;
+        case '4:5': targetRatio = 4 / 5; break;
+        case '3:4': targetRatio = 3 / 4; break;
+        case '9:16': targetRatio = 9 / 16; break;
+      }
+      const origW = originalImage.width;
+      const origH = originalImage.height;
+      const currentRatio = origW / origH;
+
+      let w_n = 1.0, h_n = 1.0, x_n = 0.0, y_n = 0.0;
+      if (currentRatio > targetRatio) {
+        w_n = targetRatio / currentRatio;
+        h_n = 1.0;
+        x_n = (1.0 - w_n) / 2;
+        y_n = 0.0;
+      } else {
+        w_n = 1.0;
+        h_n = currentRatio / targetRatio;
+        x_n = 0.0;
+        y_n = (1.0 - h_n) / 2;
+      }
+
+      cropOp = {
+        aspectRatio: ratio,
+        x: x_n,
+        y: y_n,
+        width: w_n,
+        height: h_n
+      };
+    }
+
+    const nextState: EditState = {
+      ...editState,
+      crop: cropOp
+    };
+
+    setEditState(nextState);
+    commitHistory(nextState);
   };
 
   const resetCurrentCategory = () => {
@@ -473,21 +635,33 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
       if (activeCategory === 'skin') {
         next.skin_smooth = 0;
         next.skin_brighten = 0;
+        next.skin_oil = 0;
+        next.skin_tone = 0;
+        next.nasolabial = 0;
+        next.dark_circles = 0;
+        next.skin_detail = 0;
       } else if (activeCategory === 'face') {
         next.face_slim = 0;
         next.chin_slim = 0;
+        next.jaw_slim = 0;
+        next.chin_vline = 0;
+        next.body_slim = 0;
       } else if (activeCategory === 'eyes') {
         next.eye_enlarge = 0;
+        next.eye_bright = 0;
+        next.eye_catchlight = 0;
       } else if (activeCategory === 'mouth') {
         next.teeth_whiten = 0;
       } else if (activeCategory === 'hair') {
         next.hair_smooth = 0;
+        next.hair_shine = 0;
       } else if (activeCategory === 'adjust') {
         next.brightness = 0;
         next.contrast = 0;
         next.saturation = 0;
         next.temperature = 0;
         next.tint = 0;
+        next.collarbone = 0;
       } else if (activeCategory === 'filters') {
         next.filter_id = '';
       } else if (activeCategory === 'templates') {
@@ -603,7 +777,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 ref={canvasRef} 
                 className="main-canvas" 
                 onClick={handleCanvasClick}
-                style={{ cursor: activeTool === ('skin_blemish' as any) ? 'crosshair' : 'default' }}
+                style={{ cursor: activeTool === 'skin_blemish' ? 'crosshair' : 'default' }}
               />
             </div>
           )}
@@ -657,12 +831,27 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     <Sparkles size={16} /> B001: Mịn da tự nhiên
                   </div>
                   <div className={`tool-btn ${activeTool === 'skin_brighten' ? 'active' : ''}`} onClick={() => setActiveTool('skin_brighten')}>
-                    <Sparkles size={16} /> B004: Sáng da & Nâng tone
+                    <Sparkles size={16} /> B009: Sáng da &amp; Nâng tone
                   </div>
-                  <div className={`tool-btn ${activeTool === ('skin_blemish' as any) ? 'active' : ''}`} onClick={() => setActiveTool('skin_blemish' as any)}>
+                  <div className={`tool-btn ${activeTool === 'skin_oil' ? 'active' : ''}`} onClick={() => setActiveTool('skin_oil')}>
+                    <Droplets size={16} /> B006: Khử bóng dầu Matte
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'skin_tone' ? 'active' : ''}`} onClick={() => setActiveTool('skin_tone')}>
+                    <Palette size={16} /> B008: Tông da (Ấm ↔ Hồng)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'nasolabial' ? 'active' : ''}`} onClick={() => setActiveTool('nasolabial')}>
+                    <Sparkles size={16} /> B005: Giảm rãnh cười
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'dark_circles' ? 'active' : ''}`} onClick={() => setActiveTool('dark_circles')}>
+                    <Eye size={16} /> B011: Giảm quầng thâm mắt
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'skin_detail' ? 'active' : ''}`} onClick={() => setActiveTool('skin_detail')}>
+                    <Sparkles size={16} /> B010: Khôi phục chi tiết da
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'skin_blemish' ? 'active' : ''}`} onClick={() => setActiveTool('skin_blemish')}>
                     <CircleDot size={16} /> B002: Chấm xóa thâm mụn (Healing Brush)
                   </div>
-                  {activeTool === ('skin_blemish' as any) && (
+                  {activeTool === 'skin_blemish' && (
                     <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: '6px', marginTop: '10px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
                       <p style={{ margin: '0 0 6px 0', fontWeight: 600 }}>Cọ xóa thâm mụn:</p>
                       <p style={{ margin: '0 0 8px 0', color: '#64748b' }}>Nhấp chuột trực tiếp lên nốt mụn/vết thâm trên ảnh để loại bỏ tự nhiên.</p>
@@ -686,8 +875,17 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'face_slim' ? 'active' : ''}`} onClick={() => setActiveTool('face_slim')}>
                     <Minimize size={16} /> B013: Thon mặt (V-Line)
                   </div>
+                  <div className={`tool-btn ${activeTool === 'jaw_slim' ? 'active' : ''}`} onClick={() => setActiveTool('jaw_slim')}>
+                    <Minimize size={16} /> B016: Định hình đường hàm
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'chin_vline' ? 'active' : ''}`} onClick={() => setActiveTool('chin_vline')}>
+                    <Minimize size={16} /> B017: Cằm V-Line thanh tú
+                  </div>
                   <div className={`tool-btn ${activeTool === 'chin_slim' ? 'active' : ''}`} onClick={() => setActiveTool('chin_slim')}>
                     <Minimize size={16} /> B019: Giảm nọng cằm Submental
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'body_slim' ? 'active' : ''}`} onClick={() => setActiveTool('body_slim')}>
+                    <UserRound size={16} /> B075: Thon eo (Body Slim)
                   </div>
                 </div>
               )}
@@ -701,6 +899,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   </div>
                   <div className={`tool-btn ${activeTool === 'eye_enlarge' ? 'active' : ''}`} onClick={() => setActiveTool('eye_enlarge')}>
                     <Eye size={16} /> B025: Mắt to tự nhiên (Radial Bulge)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'eye_bright' ? 'active' : ''}`} onClick={() => setActiveTool('eye_bright')}>
+                    <Eye size={16} /> B028: Sáng mắt (Sclera Brightening)
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'eye_catchlight' ? 'active' : ''}`} onClick={() => setActiveTool('eye_catchlight')}>
+                    <Sparkles size={16} /> B034: Điểm sáng mắt long lanh (Catchlight)
                   </div>
                 </div>
               )}
@@ -728,6 +932,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <div className={`tool-btn ${activeTool === 'hair_smooth' ? 'active' : ''}`} onClick={() => setActiveTool('hair_smooth')}>
                     <Scissors size={16} /> B063: Mượt tóc (Hair Segmentation)
                   </div>
+                  <div className={`tool-btn ${activeTool === 'hair_shine' ? 'active' : ''}`} onClick={() => setActiveTool('hair_shine')}>
+                    <Sparkles size={16} /> B064: Bóng tóc salon (Hair Shine)
+                  </div>
                 </div>
               )}
 
@@ -739,19 +946,22 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none' }}>Đặt lại</button>
                   </div>
                   <div className={`tool-btn ${activeTool === 'brightness' ? 'active' : ''}`} onClick={() => setActiveTool('brightness')}>
-                    <Sliders size={16} /> X018: Độ sáng
+                    <Sliders size={16} /> X022: Độ sáng
                   </div>
                   <div className={`tool-btn ${activeTool === 'contrast' ? 'active' : ''}`} onClick={() => setActiveTool('contrast')}>
-                    <Sliders size={16} /> X018: Độ tương phản
+                    <Sliders size={16} /> X022: Độ tương phản
                   </div>
                   <div className={`tool-btn ${activeTool === 'saturation' ? 'active' : ''}`} onClick={() => setActiveTool('saturation')}>
-                    <Sliders size={16} /> X019: Độ bão hòa màu
+                    <Sliders size={16} /> X022: Độ bão hòa màu
                   </div>
                   <div className={`tool-btn ${activeTool === 'temperature' ? 'active' : ''}`} onClick={() => setActiveTool('temperature')}>
-                    <Sliders size={16} /> X020: Nhiệt độ ấm / lạnh
+                    <Sliders size={16} /> X022: Nhiệt độ ấm / lạnh
                   </div>
                   <div className={`tool-btn ${activeTool === 'tint' ? 'active' : ''}`} onClick={() => setActiveTool('tint')}>
-                    <Sliders size={16} /> X020: Cân bằng sắc thái Tint (Lục/Tím)
+                    <Sliders size={16} /> X022: Cân bằng sắc thái Tint
+                  </div>
+                  <div className={`tool-btn ${activeTool === 'collarbone' ? 'active' : ''}`} onClick={() => setActiveTool('collarbone')}>
+                    <UserRound size={16} /> X006: Xương quai xanh nổi bật
                   </div>
                 </div>
               )}
@@ -763,6 +973,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>Chọn tỷ lệ khung hình chuẩn để cắt ảnh gọn gàng:</p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                     {[
+                      { id: 'original', label: 'Nguyên bản (Original)' },
                       { id: '1:1', label: '1:1 Vuông (Instagram)' },
                       { id: '4:5', label: '4:5 Chân dung (Portrait)' },
                       { id: '3:4', label: '3:4 Bìa ảnh (Standard)' },
@@ -774,8 +985,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         style={{
                           padding: '12px 10px',
                           borderRadius: '8px',
-                          border: editState.crop_aspect_ratio === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
-                          background: editState.crop_aspect_ratio === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                          border: (editState.crop?.aspectRatio || 'original') === item.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                          background: (editState.crop?.aspectRatio || 'original') === item.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
                           cursor: 'pointer',
                           fontWeight: 500,
                           fontSize: '12px'
@@ -1018,18 +1229,18 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
               )}
 
               {/* PARAMETER SLIDER (Active for adjustable tools) */}
-              {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'crop' && activeCategory !== 'ai' && activeTool !== ('skin_blemish' as any) && (
+              {activeCategory !== 'filters' && activeCategory !== 'templates' && activeCategory !== 'crop' && activeCategory !== 'ai' && activeTool !== 'skin_blemish' && (
                 <div className="parameter-section">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                     <span style={{ fontWeight: 600, fontSize: '14px' }}>Cường độ</span>
-                    <span style={{ fontSize: '14px', color: 'var(--color-accent)' }}>{(editState as any)[activeTool]}</span>
+                    <span style={{ fontSize: '14px', color: 'var(--color-accent)' }}>{(editState as any)[activeTool] ?? 0}</span>
                   </div>
                   <input 
                     type="range" 
                     className="premium-slider"
-                    min={activeCategory === 'adjust' ? "-100" : "0"} 
+                    min={(['brightness', 'contrast', 'saturation', 'temperature', 'tint', 'skin_tone'] as ToolType[]).includes(activeTool) ? '-100' : '0'} 
                     max="100" 
-                    value={(editState as any)[activeTool] || 0} 
+                    value={(editState as any)[activeTool] ?? 0} 
                     onChange={handleSliderChange}
                     onMouseUp={commitHistory}
                     onTouchEnd={commitHistory}
