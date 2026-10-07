@@ -49,14 +49,14 @@
     {
       "name": "B016 jaw_slim",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.3453",
+      "positiveDelta": "0.3296",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B017 chin_vline",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.3409",
+      "positiveDelta": "0.3371",
       "webGLAvailable": true,
       "passed": true
     },
@@ -97,54 +97,54 @@
     {
       "name": "B012 eye_bags",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.1621",
-      "roiMAE": "2.0264",
+      "positiveDelta": "0.1651",
+      "roiMAE": "2.0638",
       "outsideROI": "0.0000",
       "passed": true
     },
     {
       "name": "B014 face_width",
       "zeroDelta": "0.0000",
-      "positiveNarrow": "0.1718",
-      "positiveWiden": "0.1850",
+      "positiveNarrow": "0.1634",
+      "positiveWiden": "0.1769",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B015 jaw_angle",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.2567",
+      "positiveDelta": "0.2105",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B018 chin_length",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.3113",
-      "positiveLengthen": "0.2785",
-      "positiveShorten": "0.3113",
+      "positiveDelta": "0.3077",
+      "positiveLengthen": "0.3077",
+      "positiveShorten": "0.2858",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B020 cheekbone_width",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.1482",
+      "positiveDelta": "0.1414",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B026 eye_height",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.2444",
+      "positiveDelta": "0.2406",
       "webGLAvailable": true,
       "passed": true
     },
     {
       "name": "B027 eye_length",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.1194",
-      "roiMAE": "1.2784",
+      "positiveDelta": "0.1178",
+      "roiMAE": "1.2683",
       "outsideROI": "0.0000",
       "webGLAvailable": true,
       "passed": true
@@ -160,8 +160,8 @@
     {
       "name": "B032 eyelid_lift",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.2538",
-      "roiMAE": "3.1201",
+      "positiveDelta": "0.2399",
+      "roiMAE": "2.9565",
       "outsideROI": "0.0000",
       "webGLAvailable": true,
       "passed": true
@@ -178,8 +178,8 @@
   "parity": [
     {
       "resolution": "400px preview vs 800px export",
-      "mae": "0.554",
-      "psnr": "38.37",
+      "mae": "0.641",
+      "psnr": "38.46",
       "passed": true
     }
   ]

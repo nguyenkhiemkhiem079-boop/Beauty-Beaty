@@ -13,3 +13,4 @@ uploads/
 .DS_Store
 test-results/
 playwright-report/
+docs/test_artifacts/playwright-report/

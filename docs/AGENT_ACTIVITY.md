@@ -501,4 +501,39 @@ Nhật ký hoạt động và bằng chứng tham gia thực tế của các Age
     - Xác nhận trạng thái Cloudflare đang ở `BLOCKED_ACCOUNT_CONNECTION`, không có liên kết ảo.
 - **ARTIFACT**: Phê duyệt chính thức trong `docs/FINAL_E2E_REPORT.md`.
 - **FINDINGS**: Mọi tiêu chí của đợt kiểm toán E2E đã được hoàn thành trung thực, minh bạch, có bằng chứng toán học và thị giác đối chứng.
-- **DECISION**: **CHÍNH THỨC PHÊ DUYỆT BỘ KIỂM TOÁN E2E**. Kích hoạt **LỆNH DỪNG (STOP)** trước khi triển khai công khai để người dùng nghiệm thu.
+- **DECISION**: **CHÍNH THỨC PHÊ DUYỆT BỘ KIỂM TOÁN E2E**.
+
+---
+
+## Batch: BATCH-004-RESPONSIVE-TAXONOMY-AND-SECURITY (2026-10-07)
+
+| Field | Chi tiết |
+|---|---|
+| **Batch ID** | `BATCH-004-RESPONSIVE-TAXONOMY-AND-SECURITY` |
+| **Feature / Bug IDs** | Shell-quote CVE override, Strict 10 Vietnamese Categories (`Da`, `Khuôn mặt`, `Mắt`, `Môi & Răng`, `Tóc`, `Cơ thể`, `Chỉnh màu`, `Cắt ảnh`, `Bộ lọc`, `Mẫu`), Active Tool Card (Tool name, desc, Cường độ, slider, Đặt lại), 5 Responsive Breakpoints (1920x1080, 1366x768, 1024x768, 768x1024, 390x844), CI Artifacts upload expansion |
+| **Execution Mode** | **Autonomous Coordinated Multi-Role Pipeline** |
+| **Role Instruction Sources** | `.agents/skills/agency-*/SKILL.md`, `.agents/skills/karpathy-guidelines/SKILL.md` |
+
+### Chi tiết các Role Passes:
+
+#### 1. DevOps Automator & Security
+- **Action**: Giải quyết triệt để 2 lỗ hổng bảo mật critical trong `shell-quote` thông qua npm override (`"shell-quote": "^1.12.0"`). Chạy `npm audit` đạt chuẩn **0 vulnerabilities**.
+
+#### 2. UI/UX Designer & Frontend Developer
+- **Action**:
+  - Chuẩn hóa 10 danh mục người dùng thuần Việt: `Da`, `Khuôn mặt`, `Mắt`, `Môi & Răng`, `Tóc`, `Cơ thể`, `Chỉnh màu`, `Cắt ảnh`, `Bộ lọc`, `Mẫu`. Loại bỏ hoàn toàn tab kỹ thuật `Cloud AI`.
+  - Cập nhật chiều cao hàng công cụ chuẩn 48px (nằm trong ngưỡng 44–52px), viền và nền hồng nhạt khi được chọn.
+  - Tái cấu trúc thẻ điều khiển công cụ: Tên công cụ, mô tả ngắn, dòng trạng thái "Cường độ" kèm giá trị số, thanh trượt, và nút "Đặt lại".
+  - Sửa lỗi tracking chữ hoa tiếng Việt bằng cách giảm `letter-spacing` từ 0.4em xuống 0.05em.
+
+#### 3. Responsive Acceptance & Cross-Device Engineering
+- **Action**:
+  - Khắc phục triệt để hiện tượng tràn ngang (horizontal overflow) trên Landing và Editor: bổ sung `overflow-x: hidden`, thiết kế lại hero layout dạng grid tự co cụm ở 1024px, 900px, 640px.
+  - Xây dựng test suite tự động `e2e/responsive_viewports.spec.ts` kiểm thử 5 kích thước màn hình: 1920x1080 (Desktop), 1366x768 (Laptop), 1024x768 (Tablet Landscape), 768x1024 (Tablet Portrait), 390x844 (Mobile).
+  - Kết quả: **5/5 viewports PASSED** với 0 pixel tràn ngang, các nút và thanh trượt hoạt động mượt mà.
+
+#### 4. Evidence Collector
+- **Action**: Lưu trữ 5 ảnh chụp màn hình kiểm thử đa thiết bị `docs/test_artifacts/responsive_*.png` và cập nhật `.github/workflows/ci.yml` để tự động tải lên GitHub Actions Artifacts.
+
+#### 5. Reality Checker
+- **Action**: Xác nhận 8/8 test case Playwright E2E vượt qua, 0 cảnh báo linter lỗi, 0 lỗi TypeScript, 21/21 hiệu ứng nhạy và bảo tồn giải phẫu ảnh thật.

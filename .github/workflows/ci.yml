@@ -170,4 +170,5 @@ jobs:
             docs/test_artifacts/playwright-report/
             docs/test_artifacts/playwright_e2e_export.png
             docs/test_artifacts/progression_*.png
+            docs/test_artifacts/responsive_*.png
             docs/test_artifacts/monotonic_progression_report.json
