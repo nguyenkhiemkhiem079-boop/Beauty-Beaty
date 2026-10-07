@@ -14,11 +14,11 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 | Trạng thái | Số lượng | Tỷ lệ | Diễn giải |
 |---|---|---|---|
-| **`VERIFIED`** | **0** | **0%** | **Tuyệt đối khóa 0 VERIFIED** cho đến khi nghiệm thu toàn diện độc lập cuối cùng, không có ngoại lệ. |
-| **`IMPLEMENTED_UNVERIFIED`** | **61** | **51.7%** | Đã có code thực thi và test định lượng. Batch 1 (11 effects): B005, B006, B008, B010, B011, B016, B017, B028, B034, B064, X006. Batch 2 (10 effects): B012, B014, B015, B018, B020, B026, B027, B029, B032, B033 — full UI/State/Engine/Pipeline/Tests wired. |
-| **`PLANNED`** | **51** | **43.2%** | Backlog tính năng chuyên sâu chưa có mã nguồn hoặc đang chuẩn bị giải thuật. |
-| **`BLOCKED_EXTERNAL`** | **6** | **5.1%** | Phụ thuộc Meitu API Key / Cloud Worker trả phí (B031, B044, B062, X010, X011, I006). |
-| **TỔNG CỘNG** | **118** | **100%** | Bao gồm 82 công cụ Beauty B001-B082, 27 tính năng mở rộng X-prefixed, 9 thành phần hạ tầng I-prefixed. |
+| **`VERIFIED`** | **0** | **0%** | Giữ khóa 0 VERIFIED trong requirement ledger; trạng thái nghiệm thu E2E được theo dõi riêng tại `docs/E2E_FUNCTION_MATRIX.md`. |
+| **`IMPLEMENTED_UNVERIFIED`** | **62** | **56.4%** | Có mã nguồn triển khai nhưng vẫn cần đối chiếu bằng bằng chứng E2E theo từng yêu cầu. |
+| **`PLANNED`** | **40** | **36.4%** | Backlog chưa có triển khai đủ để nghiệm thu. |
+| **`BLOCKED_EXTERNAL`** | **8** | **7.3%** | Phụ thuộc provider/API bên ngoài theo từng dòng yêu cầu trong ledger. |
+| **TỔNG CỘNG** | **110** | **100%** | 110 yêu cầu được khai báo thực tế trong bảng chi tiết: 82 B-prefixed, 19 X-prefixed và 9 I-prefixed. Không suy diễn các ID X còn trống thành yêu cầu mới. |
 
 ---
 
