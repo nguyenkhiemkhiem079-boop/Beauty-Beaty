@@ -34,6 +34,9 @@ jobs:
       - name: Code Linter (oxlint)
         run: npm run lint
 
+      - name: Verify Feature Ledger Integrity
+        run: npm run verify:matrix
+
       - name: Production Bundle Build
         run: npm run build
 
