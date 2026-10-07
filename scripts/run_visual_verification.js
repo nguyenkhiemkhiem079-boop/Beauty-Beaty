@@ -129,6 +129,7 @@ async function main() {
         /ALL REAL-WORLD & RESOLUTION TESTS PASSED|VERIFICATION FAILED/.test(
           document.querySelector('#results')?.textContent || ''
         ),
+      undefined,
       { timeout: 180000 }
     );
 
