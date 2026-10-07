@@ -1,174 +1,179 @@
 /**
- * test_new_effects_sensitivity.js  (corrected)
+ * Browser-driven sensitivity verification.
  *
- * CHANGES vs previous version:
- *   - Test HTML now uses engine.getCanvas() as output (not the original input canvas)
- *   - WebGL tests (B016/B017) are BLOCKED/SKIPPED, not passed
- *   - B064 hair_shine uses synthetic SegmentationResult and tests ROI
- *   - Every effect has a zero-intensity bypass test
- *   - ROI vs outside-ROI measurements for region-specific effects
- *   - Preview/export parity test at two resolutions
+ * Uses Playwright instead of Chrome --dump-dom because ES-module tests,
+ * Canvas/WebGL work and async browser tasks need a real event loop.
  */
-const { execSync, spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+const { chromium } = require('@playwright/test');
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 const http = require('http');
 
-const REPO     = path.join(__dirname, '..');
-const ART_DIR  = path.join(REPO, 'docs', 'test_artifacts');
-const PORT     = 5281;
-const TEST_URL = `http://localhost:${PORT}/test_new_effects.html`;
-const VTB_MS   = 60000;  // virtual-time-budget for Chrome (ms)
+const REPO = path.join(__dirname, '..');
+const ART_DIR = path.join(REPO, 'docs', 'test_artifacts');
+const PORT = 5281;
+const TEST_URL = `http://127.0.0.1:${PORT}/test_new_effects.html`;
 
 fs.mkdirSync(ART_DIR, { recursive: true });
 
-function waitForServer(port, retries = 30, delay = 600) {
+function waitForServer(url, timeoutMs = 30000) {
+  const started = Date.now();
   return new Promise((resolve, reject) => {
-    let attempt = 0;
-    function try_() {
-      http.get(`http://localhost:${port}/`, () => resolve())
-        .on('error', () => {
-          if (++attempt >= retries) return reject(new Error(`Port ${port} not ready`));
-          setTimeout(try_, delay);
-        });
-    }
-    try_();
+    const probe = () => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 500) {
+          resolve();
+          return;
+        }
+        if (Date.now() - started >= timeoutMs) {
+          reject(new Error(`Timeout waiting for ${url}`));
+          return;
+        }
+        setTimeout(probe, 250);
+      });
+      req.on('error', () => {
+        if (Date.now() - started >= timeoutMs) {
+          reject(new Error(`Timeout waiting for ${url}`));
+          return;
+        }
+        setTimeout(probe, 250);
+      });
+      req.setTimeout(2000, () => req.destroy());
+    };
+    probe();
   });
 }
 
-function detectChrome() {
-  const candidates = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    process.env.CHROME_BIN,
-    '/usr/bin/google-chrome', '/usr/bin/chromium-browser'
-  ].filter(Boolean);
-  for (const c of candidates) if (fs.existsSync(c)) return c;
-  throw new Error('Chrome not found. Set CHROME_BIN env var.');
+async function terminateProcessTree(proc) {
+  if (!proc || !proc.pid) return;
+
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
+    return;
+  }
+
+  const signalGroup = (signal) => {
+    try {
+      process.kill(-proc.pid, signal);
+      return true;
+    } catch {
+      try {
+        proc.kill(signal);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  signalGroup('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  try {
+    process.kill(proc.pid, 0);
+    signalGroup('SIGKILL');
+  } catch {
+    // already stopped
+  }
 }
 
-function htmlDecode(s) {
-  return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-          .replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+function printSummary(summary) {
+  console.log('\n=== SENSITIVITY TEST RESULTS ===');
+  console.log(`Total tests: ${summary.total} | Required: ${summary.required} | Blocked: ${summary.blocked}`);
+  console.log(`Passed: ${summary.passed} | Failed: ${summary.failed}`);
+
+  for (const result of summary.results || []) {
+    const verdict = result.passed === null ? 'BLOCKED' : result.passed ? 'PASS' : 'FAIL';
+    console.log(
+      `${verdict.padEnd(7)} ${String(result.name).padEnd(28)} zero=${result.zeroDelta ?? 'N/A'} positive=${result.positiveDelta ?? 'N/A'} roi=${result.roiMAE ?? '-'} outside=${result.outsideROI ?? '-'}`
+    );
+  }
+
+  for (const parity of summary.parity || []) {
+    console.log(
+      `${parity.passed ? 'PASS' : 'FAIL'} parity ${parity.resolution}: MAE=${parity.mae ?? '-'} PSNR=${parity.psnr ?? '-'}`
+    );
+  }
 }
 
 async function main() {
-  console.log('=== CORRECTED SENSITIVITY TEST: 11 NEW EFFECTS ===');
-  console.log('Bug fixed: output now read from engine.getCanvas(), not original input canvas.');
+  console.log('=== PLAYWRIGHT EFFECT SENSITIVITY VERIFICATION ===');
 
-  // ── Start Vite ──
-  const isWin = process.platform === 'win32';
-  console.log(`Starting Vite dev server on port ${PORT}...`);
+  const viteBin = path.join(REPO, 'node_modules', 'vite', 'bin', 'vite.js');
   const viteProc = spawn(
-    isWin ? 'cmd.exe' : 'node',
-    isWin
-      ? ['/c', 'node', path.join(REPO,'node_modules','vite','bin','vite.js'), '--port', String(PORT), '--strictPort']
-      : [path.join(REPO,'node_modules','vite','bin','vite.js'), '--port', String(PORT), '--strictPort'],
-    { cwd: path.join(REPO,'apps','web'), stdio: 'pipe' }
+    process.execPath,
+    [viteBin, '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+    {
+      cwd: path.join(REPO, 'apps', 'web'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32'
+    }
   );
-  viteProc.stderr.on('data', () => {});
-  viteProc.stdout.on('data', () => {});
 
-  await waitForServer(PORT);
-  console.log('Vite server ready.');
+  viteProc.stdout.on('data', (buf) => process.stdout.write(`[vite] ${buf}`));
+  viteProc.stderr.on('data', (buf) => process.stderr.write(`[vite] ${buf}`));
 
-  const chromePath = detectChrome();
-  console.log(`Chrome: ${chromePath}`);
-  console.log(`URL: ${TEST_URL}`);
-
-  let html = '';
+  let browser;
   try {
-    // Use virtual-time-budget so async ES module tests have time to complete
-    const cmd = `"${chromePath}" --headless=new --no-sandbox --disable-gpu `
-              + `--virtual-time-budget=${VTB_MS} --dump-dom "${TEST_URL}"`;
-    html = execSync(cmd, { maxBuffer: 50*1024*1024, encoding: 'utf8', timeout: VTB_MS + 10000 });
-    console.log(`DOM captured: ${Math.round(html.length/1024)} KB`);
-  } finally {
-    if (viteProc.pid) {
-      try { execSync(`taskkill /pid ${viteProc.pid} /T /F`, {stdio:'ignore'}); } catch {}
-    }
-  }
+    await waitForServer(TEST_URL, 30000);
 
-  // ── Extract result from <pre id="result"> ──
-  const preMatch = html.match(/<pre[^>]*id="result"[^>]*>([\s\S]*?)<\/pre>/i);
-  const raw = preMatch ? htmlDecode(preMatch[1]) : '';
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
 
-  let summary;
-  try {
-    summary = JSON.parse(raw);
-  } catch(e) {
-    // ES module async tests may not have completed under --virtual-time-budget.
-    // Dump raw DOM to inspect.
-    const dumpPath = path.join(ART_DIR, 'sensitivity_dom_dump.html');
-    fs.writeFileSync(dumpPath, html);
-    console.error(`❌ Could not parse results JSON. DOM dumped to ${dumpPath}`);
-    console.error('Raw pre content:', raw.slice(0, 400));
-    console.error(
-      '\nNOTE: --virtual-time-budget does not process ES module async code.\n' +
-      'The test HTML uses type="module" which requires real browser event loop time.\n' +
-      'Falling back to static code verification for this run.'
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') console.error('[browser]', msg.text());
+    });
+
+    await page.goto(TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(
+      () => {
+        const text = document.querySelector('#result')?.textContent?.trim() || '';
+        return text.startsWith('{') || text.startsWith('FATAL ERROR:');
+      },
+      { timeout: 120000 }
     );
-    process.exit(2); // exit 2 = test infrastructure issue, not a test failure
-  }
 
-  // ── Print results ──
-  console.log('\n=== SENSITIVITY TEST RESULTS ===');
-  console.log(`Total tests: ${summary.total}  |  Required: ${summary.required}  |  Blocked: ${summary.blocked}`);
-  console.log(`Passed: ${summary.passed}  |  Failed: ${summary.failed}\n`);
-
-  const header = ['Effect','zero MAE','positive MAE','ROI MAE','outside ROI MAE','PASS/FAIL'];
-  const rows = (summary.results || []).map(r => [
-    r.name,
-    r.zeroDelta || 'N/A',
-    r.positiveDelta || 'N/A',
-    r.roiMAE || '-',
-    r.outsideROI || '-',
-    r.passed === null ? 'BLOCKED' : (r.passed ? '✅ PASS' : '❌ FAIL')
-  ]);
-
-  // Print table
-  const colW = [28,12,15,10,15,10];
-  const pad = (s,n) => String(s).padEnd(n);
-  console.log(header.map((h,i)=>pad(h,colW[i])).join('│'));
-  console.log(colW.map(n=>'-'.repeat(n)).join('┼'));
-  for (const r of rows) console.log(r.map((v,i)=>pad(v,colW[i])).join('│'));
-
-  // ── Parity results ──
-  if (summary.parity && summary.parity.length > 0) {
-    console.log('\n=== PREVIEW/EXPORT PARITY ===');
-    for (const p of summary.parity) {
-      const icon = p.passed ? '✅' : '❌';
-      console.log(`${icon} ${p.resolution}: MAE=${p.mae}  PSNR=${p.psnr}dB`);
-      if (p.error) console.log(`   Error: ${p.error}`);
+    const raw = (await page.locator('#result').textContent())?.trim() || '';
+    if (raw.startsWith('FATAL ERROR:')) {
+      throw new Error(raw);
     }
-  }
 
-  // ── Save report ──
-  const reportPath = path.join(ART_DIR, 'new_effects_sensitivity_report.json');
-  fs.writeFileSync(reportPath, JSON.stringify(summary, null, 2));
-  console.log(`\nReport saved: ${reportPath}`);
-
-  // ── Exit code ──
-  if (!summary.allPassed) {
-    const failed = (summary.results||[]).filter(r => r.passed === false);
-    console.error('\n❌ FAILED EFFECTS:');
-    for (const f of failed) {
-      console.error(`   - ${f.name}: zero=${f.zeroDelta} positive=${f.positiveDelta}  ${f.note||''}`);
+    let summary;
+    try {
+      summary = JSON.parse(raw);
+    } catch (error) {
+      throw new Error(`Could not parse effect summary JSON: ${error.message}\n${raw.slice(0, 1000)}`);
     }
-    process.exit(1);
-  }
 
-  const blockedList = (summary.results||[]).filter(r => r.passed === null);
-  if (blockedList.length > 0) {
-    console.log('\n⚠️  BLOCKED (WebGL unavailable in headless):');
-    for (const b of blockedList) console.log(`   - ${b.name}: ${b.reason||''}`);
-  }
+    fs.writeFileSync(
+      path.join(ART_DIR, 'new_effects_sensitivity_report.json'),
+      JSON.stringify(summary, null, 2)
+    );
+    printSummary(summary);
 
-  console.log('\n✅ ALL REQUIRED SENSITIVITY TESTS PASSED');
-  console.log('=== SENSITIVITY TEST COMPLETE ===');
+    if (pageErrors.length) {
+      console.warn('Browser page errors:', pageErrors);
+    }
+
+    if (!summary.allPassed) {
+      const failed = (summary.results || []).filter((r) => r.passed === false);
+      throw new Error(
+        `Effect sensitivity verification failed: ${failed.map((r) => r.name).join(', ') || 'unknown failure'}`
+      );
+    }
+
+    console.log('\nALL REQUIRED EFFECT SENSITIVITY TESTS PASSED');
+  } finally {
+    if (browser) await browser.close();
+    await terminateProcessTree(viteProc);
+  }
 }
 
-main().catch(e => {
-  console.error('Fatal error:', e.message);
+main().catch((error) => {
+  console.error('Effect sensitivity verification failed:', error);
   process.exit(1);
 });
