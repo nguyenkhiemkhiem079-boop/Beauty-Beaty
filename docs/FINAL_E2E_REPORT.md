@@ -3,7 +3,7 @@
 > [!NOTE]
 > **REMOTE CI STATUS: 100% GREEN ON MAIN BRANCH**
 >
-> All 5 GitHub Actions CI jobs completed successfully on `main` at commit [`32a6f14`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/commit/32a6f1488b2107a17dafd3a30596bf3df1134c23) (Workflow Run ID: [`37598300107`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37598300107)):
+> All 5 GitHub Actions CI jobs completed successfully on `main` at latest commit [`1f234f6`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/commit/1f234f6b781cb3fdfff295b400196f02f78266d3) (Workflow Run ID: [`37599113321`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37599113321)) and product release commit [`32a6f14`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/commit/32a6f1488b2107a17dafd3a30596bf3df1134c23) (Workflow Run ID: [`37598300107`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37598300107)):
 > - Static Quality & Build Gate: **SUCCESS**
 > - Server Security & Provider Contract Tests: **SUCCESS**
 > - Effects Wiring & Sensitivity Suite: **SUCCESS**
@@ -16,9 +16,9 @@
 
 | Metric | Status / Value | Verification Source |
 |---|---|---|
-| **Final Main SHA** | `32a6f1488b2107a17dafd3a30596bf3df1134c23` | `git rev-parse origin/main` & GitHub Actions |
-| **Commit URL** | [`32a6f14`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/commit/32a6f1488b2107a17dafd3a30596bf3df1134c23) | GitHub Remote Repository |
-| **GitHub Actions Run** | [`37598300107`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37598300107) | Remote Ubuntu GitHub Runners |
+| **Final Main SHA** | `1f234f6b781cb3fdfff295b400196f02f78266d3` | `git rev-parse origin/main` |
+| **Product Release Commit** | [`32a6f14`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/commit/32a6f1488b2107a17dafd3a30596bf3df1134c23) | GitHub Remote Repository |
+| **GitHub Actions Run** | [`37599113321`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37599113321) (Latest Main) / [`37598300107`](https://github.com/nguyenkhiemkhiem079-boop/Beauty-Beaty/actions/runs/37598300107) (Product Release) | Remote Ubuntu GitHub Runners |
 | **Declared Requirements** | 110 rows | `scripts/verify_feature_matrix.js` |
 | **Authoritative Ledger** | 102 IMPLEMENTED_UNVERIFIED, 8 BLOCKED_EXTERNAL, 0 PLANNED | `docs/FEATURES.md` |
 | **E2E Function Matrix** | 36 VERIFIED_E2E, 66 WORKS_TECHNICALLY, 8 BLOCKED_EXTERNAL, 0 NOT_IMPLEMENTED | `docs/E2E_FUNCTION_MATRIX.md` |
