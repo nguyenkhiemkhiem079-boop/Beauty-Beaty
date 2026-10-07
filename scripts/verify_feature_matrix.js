@@ -59,14 +59,16 @@ function countStatuses(rows) {
 }
 
 function parseSummaryCount(text, status) {
-  const escaped = status.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const patterns = [
-    new RegExp(`\\|\\s*\\*\\*\\\\`${escaped}\\\\`\\*\\*\\s*\\|\\s*\\*\\*(\\d+)\\*\\*`),
-    new RegExp(`\\|\\s*\\\\`${escaped}\\\\`\\s*\\|\\s*(\\d+)\\s*\\|`)
-  ];
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return Number(match[1]);
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith('|')) continue;
+    if (!line.includes(`\`${status}\``)) continue;
+    if (/^\|\s*\*\*[BXI]\d{3}/.test(line)) continue;
+
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+    if (cells.length < 2) continue;
+
+    const numeric = cells[1].replace(/\*/g, '').match(/\d+/);
+    if (numeric) return Number(numeric[0]);
   }
   return null;
 }
