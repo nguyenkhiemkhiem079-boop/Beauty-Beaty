@@ -172,3 +172,5 @@ jobs:
             docs/test_artifacts/progression_*.png
             docs/test_artifacts/responsive_*.png
             docs/test_artifacts/monotonic_progression_report.json
+            docs/test_artifacts/public_tools_matrix_report.json
+            docs/test_artifacts/public_tools_matrix_export.png

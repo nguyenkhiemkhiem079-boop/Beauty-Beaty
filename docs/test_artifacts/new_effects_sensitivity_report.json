@@ -9,8 +9,8 @@
     {
       "name": "B006 skin_oil",
       "zeroDelta": "0.0000",
-      "positiveDelta": "1.6275",
-      "roiMAE": "5.3549",
+      "positiveDelta": "10.3894",
+      "roiMAE": "31.4107",
       "outsideROI": "0.0000",
       "passed": true,
       "note": ""
@@ -26,16 +26,16 @@
     {
       "name": "B005 nasolabial",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.4159",
-      "roiMAE": "4.7257",
+      "positiveDelta": "0.6045",
+      "roiMAE": "6.8695",
       "outsideROI": "0.0000",
       "passed": true
     },
     {
       "name": "B011 dark_circles",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.0533",
-      "roiMAE": "0.7109",
+      "positiveDelta": "0.1044",
+      "roiMAE": "1.3924",
       "outsideROI": "0.0000",
       "passed": true
     },
@@ -49,7 +49,7 @@
     {
       "name": "B016 jaw_slim",
       "zeroDelta": "0.0000",
-      "positiveDelta": "0.3296",
+      "positiveDelta": "0.5968",
       "webGLAvailable": true,
       "passed": true
     },
@@ -178,8 +178,8 @@
   "parity": [
     {
       "resolution": "400px preview vs 800px export",
-      "mae": "0.641",
-      "psnr": "38.46",
+      "mae": "0.611",
+      "psnr": "39.50",
       "passed": true
     }
   ]

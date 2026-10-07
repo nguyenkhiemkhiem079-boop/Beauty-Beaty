@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-07T07:11:07.021Z",
+  "timestamp": "2026-10-07T09:03:20.891Z",
   "fixture": "real_portrait_front_real_photo_original.png",
   "totalToolsTested": 12,
   "allMonotonic": true,
@@ -35,9 +35,9 @@
     {
       "tool": "skin_oil",
       "mae0": 0,
-      "mae30": 0,
-      "mae60": 0.0059,
-      "mae100": 0.0625,
+      "mae30": 0.0327,
+      "mae60": 0.1514,
+      "mae100": 0.5733,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_skin_oil_000.png",
@@ -49,9 +49,9 @@
     {
       "tool": "nasolabial",
       "mae0": 0,
-      "mae30": 0.0035,
-      "mae60": 0.0098,
-      "mae100": 0.0311,
+      "mae30": 0.0047,
+      "mae60": 0.0295,
+      "mae100": 0.0904,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_nasolabial_000.png",
@@ -63,9 +63,9 @@
     {
       "tool": "dark_circles",
       "mae0": 0,
-      "mae30": 0.0013,
-      "mae60": 0.0072,
-      "mae100": 0.0249,
+      "mae30": 0.0027,
+      "mae60": 0.0175,
+      "mae100": 0.0532,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_dark_circles_000.png",
@@ -91,9 +91,9 @@
     {
       "tool": "chin_slim",
       "mae0": 0,
-      "mae30": 0.031,
-      "mae60": 0.0465,
-      "mae100": 0.0622,
+      "mae30": 0.0527,
+      "mae60": 0.0789,
+      "mae100": 0.103,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_chin_slim_000.png",
@@ -105,9 +105,9 @@
     {
       "tool": "jaw_slim",
       "mae0": 0,
-      "mae30": 0.0081,
-      "mae60": 0.0137,
-      "mae100": 0.0205,
+      "mae30": 0.0158,
+      "mae60": 0.0273,
+      "mae100": 0.0394,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_jaw_slim_000.png",
@@ -147,9 +147,9 @@
     {
       "tool": "teeth_whiten",
       "mae0": 0,
-      "mae30": 0.0017,
-      "mae60": 0.0034,
-      "mae100": 0.0057,
+      "mae30": 0.0075,
+      "mae60": 0.0151,
+      "mae100": 0.0255,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_teeth_whiten_000.png",

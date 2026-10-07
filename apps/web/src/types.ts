@@ -115,6 +115,53 @@ export interface EditState {
   crop?: CropOperation;
   healings?: HealingOperation[];
   ai_makeup?: number;
+  // Local-capable algorithmic feature parameters
+  skin_blemish_reduction?: number; // B003
+  wrinkle_reduction?: number;      // B004
+  skin_evening?: number;           // B007
+  midface_ratio?: number;          // B021
+  lower_face_ratio?: number;       // B022
+  forehead_height?: number;        // B023
+  head_scale?: number;             // B024
+  gaze_direction?: number;         // B030
+  nose_size?: number;              // B035
+  nose_tip?: number;               // B038
+  lip_position?: number;           // B040
+  lip_tilt?: number;               // B041
+  eyebrow_height?: number;         // B045
+  eyebrow_spacing?: number;        // B047
+  eyebrow_tilt?: number;           // B048
+  eyebrow_arch?: number;           // B049
+  eyebrow_color?: string;          // B050
+  eyebrow_color_intensity?: number;// B050
+  lip_finish?: 'matte' | 'gloss';  // B052
+  lip_finish_intensity?: number;   // B052
+  lip_liner?: number;              // B053
+  eyeshadow_color?: string;        // B056
+  eyeshadow_intensity?: number;    // B056
+  eyeliner?: number;               // B057
+  false_lashes?: number;           // B058
+  makeup_preset?: string;          // B061
+  makeup_preset_intensity?: number;// B061
+  hair_flyaway?: number;           // B065
+  hair_highlight?: string;         // B067
+  hair_highlight_intensity?: number;// B067
+  hairline_adjust?: number;        // B068
+  crown_volume?: number;           // B069
+  hair_fill?: number;              // B071
+  bangs_preview?: number;          // B072
+  arm_slim?: number;               // B076
+  leg_slim?: number;               // B077
+  height_stretch?: number;         // B079
+  hip_shape?: number;              // B080
+  tummy_tuck?: number;             // B081
+  forehead_width?: number;         // X001
+  eye_spacing?: number;            // X002
+  chest_volume?: number;           // X004
+  buttock_volume?: number;         // X005
+  magic_sky?: string;              // X014
+  magic_sky_intensity?: number;    // X014
+  lens_film_effects?: number;      // X023
 }
 
 export const DEFAULT_EDIT_STATE: EditState = {
@@ -164,5 +211,51 @@ export const DEFAULT_EDIT_STATE: EditState = {
     width: 1,
     height: 1
   },
-  healings: []
+  healings: [],
+  skin_blemish_reduction: 0,
+  wrinkle_reduction: 0,
+  skin_evening: 0,
+  midface_ratio: 0,
+  lower_face_ratio: 0,
+  forehead_height: 0,
+  head_scale: 0,
+  gaze_direction: 0,
+  nose_size: 0,
+  nose_tip: 0,
+  lip_position: 0,
+  lip_tilt: 0,
+  eyebrow_height: 0,
+  eyebrow_spacing: 0,
+  eyebrow_tilt: 0,
+  eyebrow_arch: 0,
+  eyebrow_color: '#3b2f2f',
+  eyebrow_color_intensity: 0,
+  lip_finish: 'gloss',
+  lip_finish_intensity: 0,
+  lip_liner: 0,
+  eyeshadow_color: '#8b4513',
+  eyeshadow_intensity: 0,
+  eyeliner: 0,
+  false_lashes: 0,
+  makeup_preset: '',
+  makeup_preset_intensity: 0,
+  hair_flyaway: 0,
+  hair_highlight: '#d4af37',
+  hair_highlight_intensity: 0,
+  hairline_adjust: 0,
+  crown_volume: 0,
+  hair_fill: 0,
+  bangs_preview: 0,
+  arm_slim: 0,
+  leg_slim: 0,
+  height_stretch: 0,
+  hip_shape: 0,
+  tummy_tuck: 0,
+  forehead_width: 0,
+  eye_spacing: 0,
+  chest_volume: 0,
+  buttock_volume: 0,
+  magic_sky: '',
+  magic_sky_intensity: 0,
+  lens_film_effects: 0
 };

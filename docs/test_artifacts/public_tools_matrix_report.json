@@ -1,0 +1,341 @@
+{
+  "timestamp": "2026-10-07T09:04:56.192Z",
+  "fixture": "real_portrait_front_real_photo_original.png",
+  "totalToolsTested": 33,
+  "allPassed": true,
+  "draftRestoreMAE": 2.1185,
+  "exportFileSize": 2891357,
+  "reopenedOutputVerified": true,
+  "results": [
+    {
+      "toolId": "skin_smooth",
+      "category": "skin",
+      "featureCode": "B001",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.7405
+    },
+    {
+      "toolId": "skin_brighten",
+      "category": "skin",
+      "featureCode": "B009",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.7847
+    },
+    {
+      "toolId": "skin_oil",
+      "category": "skin",
+      "featureCode": "B006",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.1514
+    },
+    {
+      "toolId": "skin_tone",
+      "category": "skin",
+      "featureCode": "B008",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.588
+    },
+    {
+      "toolId": "skin_detail",
+      "category": "skin",
+      "featureCode": "B010",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.9045
+    },
+    {
+      "toolId": "nasolabial",
+      "category": "skin",
+      "featureCode": "B005",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0295
+    },
+    {
+      "toolId": "dark_circles",
+      "category": "skin",
+      "featureCode": "B011",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0175
+    },
+    {
+      "toolId": "eye_bags",
+      "category": "skin",
+      "featureCode": "B012",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0383
+    },
+    {
+      "toolId": "face_slim",
+      "category": "face",
+      "featureCode": "B013",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 2.2355
+    },
+    {
+      "toolId": "face_width",
+      "category": "face",
+      "featureCode": "B014",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 1.3671
+    },
+    {
+      "toolId": "cheekbone_width",
+      "category": "face",
+      "featureCode": "B020",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.6641
+    },
+    {
+      "toolId": "jaw_angle",
+      "category": "face",
+      "featureCode": "B015",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.5215
+    },
+    {
+      "toolId": "jaw_slim",
+      "category": "face",
+      "featureCode": "B016",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0236
+    },
+    {
+      "toolId": "chin_vline",
+      "category": "face",
+      "featureCode": "B017",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0755
+    },
+    {
+      "toolId": "chin_length",
+      "category": "face",
+      "featureCode": "B018",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 2.1825
+    },
+    {
+      "toolId": "chin_slim",
+      "category": "face",
+      "featureCode": "B019",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0789
+    },
+    {
+      "toolId": "eye_enlarge",
+      "category": "eyes",
+      "featureCode": "B025",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.1936
+    },
+    {
+      "toolId": "eye_height",
+      "category": "eyes",
+      "featureCode": "B026",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.1176
+    },
+    {
+      "toolId": "eye_length",
+      "category": "eyes",
+      "featureCode": "B027",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.855
+    },
+    {
+      "toolId": "eyelid_lift",
+      "category": "eyes",
+      "featureCode": "B032",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 1.0934
+    },
+    {
+      "toolId": "double_eyelid",
+      "category": "eyes",
+      "featureCode": "B033",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0101
+    },
+    {
+      "toolId": "eye_bright",
+      "category": "eyes",
+      "featureCode": "B028",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0034
+    },
+    {
+      "toolId": "eye_catchlight",
+      "category": "eyes",
+      "featureCode": "B034",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.088
+    },
+    {
+      "toolId": "teeth_whiten",
+      "category": "mouth",
+      "featureCode": "B043",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.0151
+    },
+    {
+      "toolId": "hair_smooth",
+      "category": "hair",
+      "featureCode": "B063",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.7065
+    },
+    {
+      "toolId": "hair_shine",
+      "category": "hair",
+      "featureCode": "B064",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 1.3742
+    },
+    {
+      "toolId": "body_slim",
+      "category": "body",
+      "featureCode": "B075",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 5.0125
+    },
+    {
+      "toolId": "collarbone",
+      "category": "body",
+      "featureCode": "X006",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.4931
+    },
+    {
+      "toolId": "brightness",
+      "category": "adjust",
+      "featureCode": "X022",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 22.4759
+    },
+    {
+      "toolId": "contrast",
+      "category": "adjust",
+      "featureCode": "X022",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 13.3793
+    },
+    {
+      "toolId": "saturation",
+      "category": "adjust",
+      "featureCode": "X022",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 2.6062
+    },
+    {
+      "toolId": "temperature",
+      "category": "adjust",
+      "featureCode": "X022",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 1.5359
+    },
+    {
+      "toolId": "tint",
+      "category": "adjust",
+      "featureCode": "X022",
+      "hasDelta": true,
+      "undoWorks": true,
+      "redoWorks": true,
+      "resetWorks": true,
+      "deltaMAE": 0.8576
+    }
+  ]
+}

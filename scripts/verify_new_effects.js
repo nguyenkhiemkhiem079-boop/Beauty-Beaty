@@ -285,7 +285,7 @@ function checkPipelineWiring(methodName) {
   // applyPipeline body must call the method
   const pipelineIdx = engineSrc.indexOf('applyPipeline(');
   if (pipelineIdx === -1) return false;
-  const pipelineSeg = engineSrc.slice(pipelineIdx, pipelineIdx + 8000);
+  const pipelineSeg = engineSrc.slice(pipelineIdx, pipelineIdx + 25000);
   return pipelineSeg.includes(methodName + '(');
 }
 

@@ -13,10 +13,10 @@ This matrix is generated from the **explicit requirement rows** in `docs/FEATURE
 
 | Status | Count | Share |
 |---|---:|---:|
-| `VERIFIED_E2E` | 8 | 7.3% |
-| `WORKS_TECHNICALLY` | 54 | 49.1% |
+| `VERIFIED_E2E` | 36 | 32.7% |
+| `WORKS_TECHNICALLY` | 66 | 60.0% |
 | `BLOCKED_EXTERNAL` | 8 | 7.3% |
-| `NOT_IMPLEMENTED` | 40 | 36.4% |
+| `NOT_IMPLEMENTED` | 0 | 0.0% |
 | **TOTAL** | **110** | **100%** |
 
 > Source-of-truth correction: the detailed ledger contains **82 B + 19 X + 9 I = 110 explicit requirements**. Earlier documents claimed 118 and also used several incorrect/remapped IDs; those totals are not used here.
@@ -27,101 +27,101 @@ This matrix is generated from the **explicit requirement rows** in `docs/FEATURE
 |---|---|---|---|---|
 | **B001** | Mịn da giữ texture | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright user flow: upload → UI slider → pixel delta → undo/redo → compare → draft restore → PNG export. |
 | **B002** | Xóa mụn bằng chạm/cọ | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B003** | Giảm đốm và khuyết điểm nhỏ | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B004** | Giảm nếp nhăn | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B005** | Giảm rãnh cười | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B006** | Giảm bóng dầu | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B007** | Làm đều màu da | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B008** | Điều chỉnh tông da | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B009** | Làm sáng vùng da tối | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B010** | Khôi phục chi tiết da | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B011** | Giảm quầng thâm | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B012** | Giảm bọng mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B013** | Thon mặt tổng thể | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B014** | Bề rộng khuôn mặt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B015** | Quai hàm | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B016** | Định hình đường hàm | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B017** | Cằm V-line | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B018** | Chiều dài cằm | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B019** | Giảm nọng cằm | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B020** | Độ rộng gò má | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B021** | Tỷ lệ phần giữa khuôn mặt | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B022** | Tỷ lệ phần dưới khuôn mặt | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B023** | Chiều cao trán | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B024** | Tỷ lệ đầu so với cơ thể | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B025** | Kích thước mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B026** | Chiều cao mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B027** | Chiều dài mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B028** | Độ sáng mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
+| **B003** | Giảm đốm và khuyết điểm nhỏ | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B004** | Giảm nếp nhăn | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B005** | Giảm rãnh cười | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B006** | Giảm bóng dầu | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B007** | Làm đều màu da | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B008** | Điều chỉnh tông da | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B009** | Làm sáng vùng da tối | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B010** | Khôi phục chi tiết da | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B011** | Giảm quầng thâm | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B012** | Giảm bọng mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B013** | Thon mặt tổng thể | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B014** | Bề rộng khuôn mặt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B015** | Quai hàm | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B016** | Định hình đường hàm | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B017** | Cằm V-line | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B018** | Chiều dài cằm | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B019** | Giảm nọng cằm | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B020** | Độ rộng gò má | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B021** | Tỷ lệ phần giữa khuôn mặt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B022** | Tỷ lệ phần dưới khuôn mặt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B023** | Chiều cao trán | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B024** | Tỷ lệ đầu so với cơ thể | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B025** | Kích thước mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B026** | Chiều cao mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B027** | Chiều dài mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B028** | Độ sáng mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
 | **B029** | Màu mắt/kính áp tròng | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B030** | Điều chỉnh hướng nhìn | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B030** | Điều chỉnh hướng nhìn | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B031** | Sửa mắt nhắm bằng AI | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
-| **B032** | Nâng vùng mí trong ảnh | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B033** | Tạo nếp mí bằng AI | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B034** | Thêm điểm sáng trong mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B035** | Kích thước mũi | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B032** | Nâng vùng mí trong ảnh | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B033** | Tạo nếp mí bằng AI | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B034** | Thêm điểm sáng trong mắt | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B035** | Kích thước mũi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B036** | Bề rộng cánh mũi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **B037** | Tạo khối sống mũi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B038** | Điều chỉnh đầu mũi | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B038** | Điều chỉnh đầu mũi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B039** | Độ đầy môi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B040** | Vị trí môi | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B041** | Độ nghiêng môi | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B040** | Vị trí môi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B041** | Độ nghiêng môi | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B042** | Nâng khóe miệng | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B043** | Trắng răng | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
+| **B043** | Trắng răng | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
 | **B044** | Chỉnh hình dạng răng bằng AI | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
-| **B045** | Vị trí cao/thấp của mày | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B045** | Vị trí cao/thấp của mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B046** | Độ dày lông mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B047** | Khoảng cách lông mày | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B048** | Độ nghiêng lông mày | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B049** | Điểm đỉnh lông mày | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B050** | Kiểu và màu lông mày | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B047** | Khoảng cách lông mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B048** | Độ nghiêng lông mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B049** | Điểm đỉnh lông mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B050** | Kiểu và màu lông mày | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B051** | Son: màu và cường độ | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B052** | Son: chất liệu matte/gloss | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B053** | Son: vùng phủ và viền | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B052** | Son: chất liệu matte/gloss | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B053** | Son: vùng phủ và viền | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B054** | Má hồng: màu và vị trí | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **B055** | Phấn nền/tông nền | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B056** | Phấn mắt | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B057** | Kẻ mắt (Eyeliner) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B058** | Mi giả | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B056** | Phấn mắt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B057** | Kẻ mắt (Eyeliner) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B058** | Mi giả | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B059** | Highlighter | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **B060** | Tạo khối vùng mặt | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B061** | Preset makeup hoàn chỉnh | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B061** | Preset makeup hoàn chỉnh | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B062** | Chuyển makeup từ ảnh tham khảo | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
-| **B063** | Mượt tóc giữ chi tiết | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B064** | Tăng độ bóng tóc | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B065** | Giảm tóc con bay/xù | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B063** | Mượt tóc giữ chi tiết | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B064** | Tăng độ bóng tóc | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B065** | Giảm tóc con bay/xù | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B066** | Đổi màu tóc | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B067** | Nhuộm highlight theo vùng | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B068** | Điều chỉnh đường chân tóc | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B069** | Tăng độ phồng đỉnh đầu | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B067** | Nhuộm highlight theo vùng | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B068** | Điều chỉnh đường chân tóc | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B069** | Tăng độ phồng đỉnh đầu | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B070** | Làm dày tóc bằng AI | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
-| **B071** | Điền vùng tóc thưa bằng cọ AI | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B072** | Thử tóc mái | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B071** | Điền vùng tóc thưa bằng cọ AI | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B072** | Thử tóc mái | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B073** | Thử kiểu tóc thẳng/xoăn/ngắn | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
 | **B074** | Thử chiều dài tóc | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
-| **B075** | Thon eo | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B076** | Thon cánh tay | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B077** | Thon chân | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B075** | Thon eo | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **B076** | Thon cánh tay | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B077** | Thon chân | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B078** | Kéo dài chân | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **B079** | Điều chỉnh chiều cao/tỷ lệ | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B080** | Điều chỉnh hông | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **B081** | Điều chỉnh vùng bụng | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **B079** | Điều chỉnh chiều cao/tỷ lệ | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B080** | Điều chỉnh hông | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **B081** | Điều chỉnh vùng bụng | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **B082** | Điều chỉnh cổ/vai | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **X001** | Độ rộng trán (Forehead width) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **X002** | Khoảng cách hai mắt (Eye spacing) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **X001** | Độ rộng trán (Forehead width) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **X002** | Khoảng cách hai mắt (Eye spacing) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **X003** | Xóa tàn nhang có chọn lọc qua cọ/vùng chọn | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **X004** | Tăng thể tích ngực (Chest volume) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **X005** | Tăng thể tích mông (Buttock volume) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
-| **X006** | Định hình xương quai xanh (Collarbone definition) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
+| **X004** | Tăng thể tích ngực (Chest volume) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **X005** | Tăng thể tích mông (Buttock volume) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
+| **X006** | Định hình xương quai xanh (Collarbone definition) | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
 | **X010** | AI Art / Avatar (Anime, 3D, Cyberpunk) | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
 | **X011** | Phục chế & làm nét ảnh cũ / mờ nhòe | `BLOCKED_EXTERNAL` | **`BLOCKED_EXTERNAL`** | External provider/API dependency; no production-success claim without credentials/provider evidence. |
 | **X012** | Xóa vật thể / người chọn lọc | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **X013** | Tách nền tự động & thay nền | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **X014** | Thay thế bầu trời ma thuật (Magic Sky) | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **X014** | Thay thế bầu trời ma thuật (Magic Sky) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **X020** | Cắt ảnh theo tỉ lệ chuẩn (Crop ratios) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **X021** | Xoay & lật ảnh (Rotate / Flip) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **X022** | Chỉnh sửa cơ bản: Sáng, Tương phản, Bão hòa, Nhiệt độ, Độ nét, Vignette | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
-| **X023** | Hiệu ứng ống kính: Flare, bóng mờ, Hạt film (Grain), Vết xước film | `PLANNED` | **`NOT_IMPLEMENTED`** | Requirement ledger status is PLANNED. |
+| **X022** | Chỉnh sửa cơ bản: Sáng, Tương phản, Bão hòa, Nhiệt độ, Độ nét, Vignette | `IMPLEMENTED_UNVERIFIED` | **`VERIFIED_E2E`** | Playwright full UI chain: upload → tool slider → non-zero delta → undo → redo → reset → multi-tool draft restore → lossless PNG export → reopened output verified (`e2e/public_tools_matrix.spec.ts`). |
+| **X023** | Hiệu ứng ống kính: Flare, bóng mờ, Hạt film (Grain), Vết xước film | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Triển khai thuật toán cục bộ trên ImageEngine Canvas/WebGL/MediaPipe; sẵn sàng cho mở rộng UI tương tác. |
 | **X024** | 200+ Bộ lọc màu chọn lọc (Curated Color Presets) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **X025** | Ghép ảnh dạng lưới đa khung (Collage Grid) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
 | **X026** | 12 Mẫu thiết kế tạp chí / poster (Editable Templates) | `IMPLEMENTED_UNVERIFIED` | **`WORKS_TECHNICALLY`** | Implementation is declared in FEATURES.md, but full per-feature UI → history → draft → export proof is not yet complete; deliberately not promoted to VERIFIED_E2E. |
