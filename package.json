@@ -19,7 +19,8 @@
     "verify:effects": "node scripts/verify_new_effects.js",
     "test:e2e": "playwright test",
     "lint": "npm run lint --workspace=apps/web",
-    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit"
+    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit",
+    "verify:matrix": "node scripts/verify_feature_matrix.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
