@@ -134,6 +134,7 @@ async function main() {
         const text = document.querySelector('#result')?.textContent?.trim() || '';
         return text.startsWith('{') || text.startsWith('FATAL ERROR:');
       },
+      undefined,
       { timeout: 120000 }
     );
 
