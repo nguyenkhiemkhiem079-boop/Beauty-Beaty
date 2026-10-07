@@ -868,19 +868,19 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     <Droplets size={16} />Da
                   </button>
                   <button data-testid="tab-face" className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
-                    <UserRound size={16} />Mặt
+                    <UserRound size={16} />Khuôn mặt
                   </button>
                   <button data-testid="tab-eyes" className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
                     <Eye size={16} />Mắt
                   </button>
                   <button data-testid="tab-mouth" className={`tab ${activeCategory === 'mouth' ? 'active' : ''}`} onClick={() => { setActiveCategory('mouth'); setActiveTool('teeth_whiten'); }}>
-                    <Smile size={16} />Nụ cười
+                    <Smile size={16} />Môi & Răng
                   </button>
                   <button data-testid="tab-hair" className={`tab ${activeCategory === 'hair' ? 'active' : ''}`} onClick={() => { setActiveCategory('hair'); setActiveTool('hair_smooth'); }}>
                     <Scissors size={16} />Tóc
                   </button>
                   <button data-testid="tab-body" className={`tab ${activeCategory === 'body' ? 'active' : ''}`} onClick={() => { setActiveCategory('body'); setActiveTool('body_slim'); }}>
-                    <UserRound size={16} />Vóc dáng
+                    <UserRound size={16} />Cơ thể
                   </button>
                   <button data-testid="tab-adjust" className={`tab ${activeCategory === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveCategory('adjust'); setActiveTool('brightness'); }}>
                     <Sliders size={16} />Chỉnh màu
@@ -892,10 +892,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     <Palette size={16} />Bộ lọc
                   </button>
                   <button data-testid="tab-templates" className={`tab ${activeCategory === 'templates' ? 'active' : ''}`} onClick={() => { setActiveCategory('templates'); }}>
-                    <LayoutTemplate size={16} />Mẫu bìa
-                  </button>
-                  <button data-testid="tab-ai" className={`tab ${activeCategory === 'ai' ? 'active' : ''}`} onClick={() => { setActiveCategory('ai'); }}>
-                    <Sparkles size={16} />Cloud AI
+                    <LayoutTemplate size={16} />Mẫu
                   </button>
                 </div>
               )}
@@ -923,22 +920,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         <div className="active-tool-header">
                           <div className="active-tool-name">
                             <span>{currentToolDef.name}</span>
-                            {activeToolVal !== 0 && (
-                              <span className="tool-value-badge">
-                                {activeToolVal > 0 ? `+${activeToolVal}` : activeToolVal}
-                              </span>
-                            )}
                           </div>
-                          {activeToolVal !== 0 && (
-                            <button 
-                              data-testid="btn-reset-tool"
-                              onClick={() => handleResetTool(activeTool)}
-                              style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer' }}
-                              title="Đặt lại công cụ này"
-                            >
-                              <RotateCcw size={12} /> Đặt lại
-                            </button>
-                          )}
                         </div>
                         <div className="active-tool-desc">{currentToolDef.desc}</div>
 
@@ -971,6 +953,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                                 />
                               ))}
                             </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {editState.eye_color_intensity ?? 0}
+                              </span>
+                            </div>
                             <div className="active-tool-slider-row">
                               <span className="slider-bound-label">0</span>
                               <input 
@@ -986,6 +974,16 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                                 onKeyUp={commitHistory}
                               />
                               <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                              <button 
+                                data-testid="btn-reset-tool"
+                                onClick={() => handleResetTool(activeTool)}
+                                className="btn-reset-tool"
+                                title="Đặt lại công cụ này"
+                              >
+                                <RotateCcw size={12} /> Đặt lại
+                              </button>
                             </div>
                           </div>
                         ) : activeTool === 'skin_blemish' ? (
@@ -1006,25 +1004,53 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                             <div style={{ marginTop: '8px', fontSize: '11px', color: '#94a3b8' }}>
                               Nhấp chuột trực tiếp lên nốt mụn trên ảnh để xóa.
                             </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                              <button 
+                                data-testid="btn-reset-tool"
+                                onClick={() => handleResetTool(activeTool)}
+                                className="btn-reset-tool"
+                                title="Đặt lại công cụ này"
+                              >
+                                <RotateCcw size={12} /> Đặt lại
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="active-tool-slider-row">
-                            <span className="slider-bound-label">
-                              {currentToolDef.min === -100 ? '-100' : '0'}
-                            </span>
-                            <input 
-                              type="range"
-                              data-testid="tool-slider"
-                              className="premium-slider"
-                              min={currentToolDef.min === -100 ? '-100' : '0'}
-                              max="100"
-                              value={activeToolVal}
-                              onChange={handleSliderChange}
-                              onMouseUp={commitHistory}
-                              onTouchEnd={commitHistory}
-                              onKeyUp={commitHistory}
-                            />
-                            <span className="slider-bound-label" style={{ textAlign: 'right' }}>+100</span>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {activeToolVal > 0 ? `+${activeToolVal}` : activeToolVal}
+                              </span>
+                            </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">
+                                {currentToolDef.min === -100 ? '-100' : '0'}
+                              </span>
+                              <input 
+                                type="range"
+                                data-testid="tool-slider"
+                                className="premium-slider"
+                                min={currentToolDef.min === -100 ? '-100' : '0'}
+                                max="100"
+                                value={activeToolVal}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory}
+                                onTouchEnd={commitHistory}
+                                onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>+100</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                              <button 
+                                data-testid="btn-reset-tool"
+                                onClick={() => handleResetTool(activeTool)}
+                                className="btn-reset-tool"
+                                title="Đặt lại công cụ này"
+                              >
+                                <RotateCcw size={12} /> Đặt lại
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1034,7 +1060,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'skin' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Làn da</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Da</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
                         </div>
 
@@ -1050,7 +1076,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'face' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Định hình khuôn mặt</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Khuôn mặt</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
                         </div>
 
@@ -1066,7 +1092,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'eyes' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Đôi mắt</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Mắt</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
                         </div>
 
@@ -1082,7 +1108,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'mouth' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Nụ cười</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Môi & Răng</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'mouth').map(renderToolButton)}
@@ -1093,7 +1119,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'hair' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Chăm sóc tóc</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Tóc</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'hair').map(renderToolButton)}
@@ -1104,7 +1130,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'body' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Vóc dáng</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Cơ thể</h4>
                           <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại</button>
                         </div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'body').map(renderToolButton)}
@@ -1163,7 +1189,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'filters' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Bộ lọc màu</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Bộ lọc</h4>
                           {editState.filter_id && (
                             <button onClick={() => setEditState(prev => ({ ...prev, filter_id: '' }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Bỏ chọn</button>
                           )}
@@ -1224,7 +1250,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                     {activeCategory === 'templates' && (
                       <div className="tool-group">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <h4 className="util-label" style={{ margin: 0 }}>Mẫu bìa & Poster</h4>
+                          <h4 className="util-label" style={{ margin: 0 }}>Mẫu</h4>
                           {editState.template_id && (
                             <button onClick={() => setEditState(prev => ({ ...prev, template_id: '', template_custom_text: undefined }))} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Tắt khung</button>
                           )}
@@ -1371,22 +1397,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                       </div>
                     )}
 
-                    {/* CLOUD AI CATEGORY - CLEAN PUBLIC BETA DISABLED NOTICE */}
-                    {activeCategory === 'ai' && (
-                      <div className="cloud-ai-card">
-                        <div className="cloud-ai-badge">Sắp ra mắt</div>
-                        <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 8px 0', color: 'var(--color-text-primary)' }}>
-                          Tính năng Cloud AI
-                        </h4>
-                        <p style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, margin: '0 0 16px 0' }}>
-                          Các tính năng phục dựng phức tạp (mở mắt nhắm, chỉnh form răng, phục dựng tóc AI) đang trong quá trình thử nghiệm và sẽ có mặt trong bản cập nhật tới.
-                        </p>
-                        <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <ShieldCheck size={15} />
-                          <span>Hiện tại 100% công cụ đang dùng đều xử lý cục bộ trên máy bạn.</span>
-                        </div>
-                      </div>
-                    )}
+                    {/* End categories */}
                   </>
                 )}
               </div>

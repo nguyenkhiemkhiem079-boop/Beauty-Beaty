@@ -9,12 +9,15 @@
   background-color: var(--color-bg-primary);
 }
 
-body {
+html, body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 *, *::before, *::after {
@@ -46,7 +49,7 @@ button {
 .util-label {
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: 0.4em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 

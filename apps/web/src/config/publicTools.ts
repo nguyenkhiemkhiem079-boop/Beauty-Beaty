@@ -60,7 +60,7 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
   },
   {
     id: 'skin_oil',
-    name: 'Khử bóng dầu',
+    name: 'Giảm bóng dầu',
     desc: 'Khử vùng phản xạ bóng nhờn, mang lại bề mặt da lì mịn màng.',
     category: 'skin',
     subgroup: 'Làn da',
@@ -72,7 +72,7 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     step: 1,
     default: 0,
     availability: 'available',
-    searchTerms: ['da', 'dau', 'bong dau', 'matte', 'kiem dau', 'oil']
+    searchTerms: ['da', 'dau', 'bong dau', 'matte', 'kiem dau', 'oil', 'giam bong dau', 'khu bong dau']
   },
   {
     id: 'skin_tone',
@@ -108,7 +108,7 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
   },
   {
     id: 'skin_blemish',
-    name: 'Xóa thâm mụn',
+    name: 'Xóa khuyết điểm',
     desc: 'Chấm cọ trực tiếp lên nốt mụn để xóa sạch tự nhiên.',
     category: 'skin',
     subgroup: 'Khuyết điểm',
@@ -120,11 +120,11 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     step: 1,
     default: 16,
     availability: 'available',
-    searchTerms: ['mun', 'tham', 'khuyet diem', 'xoa mun', 'blemish', 'spot']
+    searchTerms: ['mun', 'tham', 'khuyet diem', 'xoa mun', 'xoa khuyet diem', 'blemish', 'spot']
   },
   {
     id: 'nasolabial',
-    name: 'Rãnh cười',
+    name: 'Giảm rãnh cười',
     desc: 'Làm mờ nếp gấp rãnh cười sâu giữa mũi và khóe miệng.',
     category: 'skin',
     subgroup: 'Khuyết điểm',
@@ -136,11 +136,11 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     step: 1,
     default: 0,
     availability: 'available',
-    searchTerms: ['ranh cuoi', 'nep nhan', 'khoe mieng', 'smile line', 'nasolabial']
+    searchTerms: ['ranh cuoi', 'giam ranh cuoi', 'nep nhan', 'khoe mieng', 'smile line', 'nasolabial']
   },
   {
     id: 'dark_circles',
-    name: 'Quầng thâm mắt',
+    name: 'Giảm quầng thâm',
     desc: 'Khử sắc tối và làm sáng bừng vùng da dưới mắt.',
     category: 'skin',
     subgroup: 'Khuyết điểm',
@@ -152,11 +152,11 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     step: 1,
     default: 0,
     availability: 'available',
-    searchTerms: ['tham mat', 'quang tham', 'mat', 'dark circles', 'eye']
+    searchTerms: ['tham mat', 'quang tham', 'giam quang tham', 'mat', 'dark circles', 'eye']
   },
   {
     id: 'eye_bags',
-    name: 'Bọng mắt',
+    name: 'Giảm bọng mắt',
     desc: 'Co gọn nhẹ nhàng bọng mỡ dưới mí mắt.',
     category: 'skin',
     subgroup: 'Khuyết điểm',
@@ -168,7 +168,7 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     step: 1,
     default: 0,
     availability: 'available',
-    searchTerms: ['bong mat', 'mo mat', 'eye bags', 'mat']
+    searchTerms: ['bong mat', 'giam bong mat', 'mo mat', 'eye bags', 'mat']
   },
 
   // --- FACE ---
