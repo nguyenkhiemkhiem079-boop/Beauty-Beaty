@@ -491,8 +491,166 @@ export async function runAllTests() {
   `;
   container.appendChild(reopenCard);
 
+  // ==========================================
+  // SECTION 5: EYE GROUP EFFICACY VALIDATION (eye_bright, eye_enlarge)
+  // ==========================================
+  console.log('Running Eye Group Efficacy Validation...');
+  const eyeGroupCard = document.createElement('div');
+  eyeGroupCard.className = 'test-case-card';
+  eyeGroupCard.innerHTML = '<h3>Case: Eye Group Validation (ROI Measurements for Sclera Brightening & Eye Enlargement)</h3>';
+
+  const eyeImg = await loadImage('/fixtures/real_portrait_front.jpg');
+  const eyeCanvas = document.createElement('canvas');
+  eyeCanvas.width = 600;
+  eyeCanvas.height = Math.round((600 / eyeImg.width) * eyeImg.height);
+  const eyeCtx = eyeCanvas.getContext('2d')!;
+  eyeCtx.drawImage(eyeImg, 0, 0, eyeCanvas.width, eyeCanvas.height);
+  
+  const eyeFaces = await faceLandmarkManager.detectFaces(eyeCanvas);
+  const eyeLandmarks = eyeFaces[0];
+  
+  // Left eye inner/outer corners
+  const leInner = eyeLandmarks[133];
+  const leOuter = eyeLandmarks[33];
+  const eyeCenterX = (leInner.x + leOuter.x) / 2;
+  const eyeCenterY = (leInner.y + leOuter.y) / 2;
+  const eyeCenterNorm = { x: eyeCenterX, y: eyeCenterY };
+  // Approximate eye width in pixels
+  const eyeWidthPx = Math.abs(leOuter.x - leInner.x) * eyeCanvas.width;
+  const eyeSampleRadius = Math.round(eyeWidthPx * 0.8);
+
+  // 1. Original ROI
+  const eyeEngineOrig = new ImageEngine(eyeCanvas);
+  const origEyeCanvas = eyeEngineOrig.getCanvas();
+
+  // 2. Eye Brightening
+  const eyeEngineBright = new ImageEngine(eyeCanvas);
+  eyeEngineBright.applyEyeBrightening(eyeLandmarks, 100);
+  const brightEyeCanvas = eyeEngineBright.getCanvas();
+  const brightDiff = computeDifferenceInRegion(origEyeCanvas, brightEyeCanvas, eyeCenterNorm, eyeSampleRadius);
+  const isBrightEffective = brightDiff > 0.5;
+
+  // 3. Eye Enlargement
+  const eyeEngineEnlarge = new ImageEngine(eyeCanvas);
+  eyeEngineEnlarge.applyEyeEnlargement(eyeLandmarks, 100);
+  const enlargeEyeCanvas = eyeEngineEnlarge.getCanvas();
+  const enlargeDiff = computeDifferenceInRegion(origEyeCanvas, enlargeEyeCanvas, eyeCenterNorm, eyeSampleRadius);
+  const isEnlargeEffective = enlargeDiff > 2.0;
+
+  testReport.eyeGroupTest = {
+    brightDiff: brightDiff,
+    enlargeDiff: enlargeDiff,
+    isBrightEffective,
+    isEnlargeEffective,
+    passed: isBrightEffective && isEnlargeEffective
+  };
+
+  const cropEye = (srcCanvas: HTMLCanvasElement) => {
+    const cropC = document.createElement('canvas');
+    const size = eyeSampleRadius * 2;
+    cropC.width = size;
+    cropC.height = size;
+    const ctx = cropC.getContext('2d')!;
+    const cx = Math.round(eyeCenterNorm.x * srcCanvas.width);
+    const cy = Math.round(eyeCenterNorm.y * srcCanvas.height);
+    ctx.drawImage(srcCanvas, cx - eyeSampleRadius, cy - eyeSampleRadius, size, size, 0, 0, size, size);
+    return cropC.toDataURL('image/png');
+  };
+
+  const eyeRow = document.createElement('div');
+  eyeRow.style.display = 'flex';
+  eyeRow.style.gap = '15px';
+  eyeRow.style.flexWrap = 'wrap';
+
+  const addEyeThumb = (title: string, dataUrl: string) => {
+    const col = document.createElement('div');
+    col.style.textAlign = 'center';
+    col.innerHTML = `<p style="margin: 4px 0; font-weight: bold; font-size: 12px;">${title}</p><img src="${dataUrl}" style="width: 120px; border: 1px solid #ccc; border-radius: 4px;" />`;
+    eyeRow.appendChild(col);
+  };
+
+  addEyeThumb('Original Left Eye', cropEye(origEyeCanvas));
+  addEyeThumb('Eye Brightening 100%', cropEye(brightEyeCanvas));
+  addEyeThumb('Eye Enlargement 100%', cropEye(enlargeEyeCanvas));
+  eyeGroupCard.appendChild(eyeRow);
+
+  const eyeMetrics = document.createElement('div');
+  eyeMetrics.style.marginTop = '10px';
+  eyeMetrics.style.padding = '10px 14px';
+  eyeMetrics.style.background = '#f9f9f9';
+  eyeMetrics.style.border = '1px solid #eee';
+  eyeMetrics.style.borderRadius = '4px';
+  eyeMetrics.innerHTML = `
+    <p style="margin: 4px 0;"><strong>Eye Brightening MAE (ROI):</strong> ${brightDiff.toFixed(2)} &rarr; ${isBrightEffective ? '✅ EFFECTIVE' : '❌ INEFFECTIVE'}</p>
+    <p style="margin: 4px 0;"><strong>Eye Enlargement MAE (ROI):</strong> ${enlargeDiff.toFixed(2)} &rarr; ${isEnlargeEffective ? '✅ EFFECTIVE' : '❌ INEFFECTIVE'}</p>
+  `;
+  eyeGroupCard.appendChild(eyeMetrics);
+  container.appendChild(eyeGroupCard);
+
+  // ==========================================
+  // SECTION 6: HAIR PROTECTION VALIDATION (Warp Masking)
+  // ==========================================
+  console.log('Running Hair Protection Validation...');
+  const hairCard = document.createElement('div');
+  hairCard.className = 'test-case-card';
+  hairCard.innerHTML = '<h3>Case: Hair Protection Validation (Preventing hair from warping onto face)</h3>';
+
+  // 1. Get original face skin mask and hair mask from original image
+  const origSegMask = await segmenterManager.segment(eyeCanvas);
+  
+  // 2. Warp image heavily (e.g. face_slim 100)
+  const hairEngine = new ImageEngine(eyeCanvas);
+  if (origSegMask) hairEngine.setSegmentationMask(origSegMask);
+  hairEngine.applyFaceSlimming(eyeLandmarks, 100);
+  const warpedCanvas = hairEngine.getCanvas();
+
+  // 3. Segment warped image
+  const warpedSegMask = await segmenterManager.segment(warpedCanvas);
+
+  // 4. Count hair pixels in the face region (using original face mask as ROI)
+  let hairInFaceOrig = 0;
+  let hairInFaceWarped = 0;
+  let totalFacePixels = 0;
+
+  if (origSegMask && warpedSegMask) {
+      for (let i = 0; i < origSegMask.mask.length; i++) {
+          const isFaceOrig = origSegMask.mask[i] === 3; // 3 = face
+          if (isFaceOrig) {
+              totalFacePixels++;
+              if (origSegMask.mask[i] === 1) hairInFaceOrig++; // Wait, it can't be both 3 and 1 in original mask.
+              // Wait, the original face mask defines the ROI.
+              // We want to see if the WARPED image has hair in this ROI.
+              if (warpedSegMask.mask[i] === 1) hairInFaceWarped++;
+          }
+      }
+  }
+
+  // Hair intrusion ratio
+  const hairIntrusionRatio = totalFacePixels > 0 ? (hairInFaceWarped / totalFacePixels) : 0;
+  const isHairProtected = hairIntrusionRatio < 0.05; // Less than 5% of face ROI became hair
+
+  testReport.hairProtectionTest = {
+      hairInFaceWarped,
+      totalFacePixels,
+      hairIntrusionRatio,
+      isHairProtected,
+      passed: isHairProtected
+  };
+
+  const hairMetrics = document.createElement('div');
+  hairMetrics.style.marginTop = '10px';
+  hairMetrics.style.padding = '10px 14px';
+  hairMetrics.style.background = '#f9f9f9';
+  hairMetrics.style.border = '1px solid #eee';
+  hairMetrics.style.borderRadius = '4px';
+  hairMetrics.innerHTML = `
+    <p style="margin: 4px 0;"><strong>Hair Intrusion Ratio (Warped Hair in Original Face ROI):</strong> ${(hairIntrusionRatio * 100).toFixed(2)}% (Threshold &lt; 5%) &rarr; ${isHairProtected ? '✅ PROTECTED' : '❌ HAIR BLED INTO FACE'}</p>
+  `;
+  hairCard.appendChild(hairMetrics);
+  container.appendChild(hairCard);
+
   const allPortraitsPassed = testReport.realPortraits.every((r: any) => r.passed);
-  const allPassed = allPortraitsPassed && regressionPassed && Boolean(isParityValid) && testReport.uiExportReopenTest.passed;
+  const allPassed = allPortraitsPassed && regressionPassed && Boolean(isParityValid) && testReport.uiExportReopenTest.passed && testReport.eyeGroupTest.passed && testReport.hairProtectionTest.passed;
   testReport.allPassed = allPassed;
 
   console.log('DEBUG allPassed:', allPassed, 'allPortraitsPassed:', allPortraitsPassed, 'regressionPassed:', regressionPassed, 'isParityValid:', isParityValid);

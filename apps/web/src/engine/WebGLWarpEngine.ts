@@ -12,6 +12,7 @@ export class WebGLWarpEngine {
   private positionBuffer: WebGLBuffer;
   private texCoordBuffer: WebGLBuffer;
   private texture: WebGLTexture;
+  private hairTexture: WebGLTexture;
   private width: number;
   private height: number;
 
@@ -41,6 +42,8 @@ export class WebGLWarpEngine {
       precision highp float;
       varying vec2 v_texCoord;
       uniform sampler2D u_image;
+      uniform sampler2D u_hairMask;
+      uniform int u_hasHairMask;
       
       uniform vec2 u_centers[10];
       uniform vec2 u_targets[10];
@@ -67,19 +70,32 @@ export class WebGLWarpEngine {
                 float smoothFactor = t * t * (3.0 - 2.0 * t);
                 float factor = smoothFactor * u_intensities[i];
                 
+                vec2 shift = vec2(0.0);
                 if (abs(u_modes[i]) < 0.5) {
                     // Directional shift
-                    vec2 shift = (u_targets[i] - u_centers[i]) * factor;
-                    tc -= shift;
+                    shift = (u_targets[i] - u_centers[i]) * factor;
                 } else if (u_modes[i] > 0.5) {
                     // Radial bulge: sample from closer to center (magnifies iris/feature)
                     vec2 dir = (v_texCoord - u_centers[i]);
-                    tc -= dir * factor;
+                    shift = dir * factor;
                 } else {
                     // Radial pinch: sample from further away (slims/shrinks feature)
                     vec2 dir = (v_texCoord - u_centers[i]);
-                    tc += dir * factor;
+                    shift = -dir * factor;
                 }
+                
+                if (u_hasHairMask == 1) {
+                    float targetHair = texture2D(u_hairMask, v_texCoord).r;
+                    float sampleHair = texture2D(u_hairMask, tc - shift).r;
+                    
+                    if (sampleHair > 0.5 && targetHair < 0.2) {
+                        shift *= 0.0;
+                    } else if (sampleHair > targetHair) {
+                        shift *= (1.0 - (sampleHair - targetHair));
+                    }
+                }
+                
+                tc -= shift;
             }
         }
 
@@ -106,6 +122,7 @@ export class WebGLWarpEngine {
     ]), this.gl.STATIC_DRAW);
 
     this.texture = this.gl.createTexture()!;
+    this.hairTexture = this.gl.createTexture()!;
   }
 
   private createShader(type: number, source: string) {
@@ -130,7 +147,7 @@ export class WebGLWarpEngine {
     return prog;
   }
 
-  public applyWarp(image: HTMLCanvasElement, points: WarpPoint[]): HTMLCanvasElement {
+  public applyWarp(image: HTMLCanvasElement, points: WarpPoint[], hairMask?: HTMLCanvasElement): HTMLCanvasElement {
     if (this.width !== image.width || this.height !== image.height) {
       this.width = image.width;
       this.height = image.height;
@@ -140,11 +157,28 @@ export class WebGLWarpEngine {
     }
 
     this.gl.useProgram(this.program);
+    
+    this.gl.activeTexture(this.gl.TEXTURE0);
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+    this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_image"), 0);
+
+    const hasHairMaskLoc = this.gl.getUniformLocation(this.program, "u_hasHairMask");
+    if (hairMask) {
+        this.gl.activeTexture(this.gl.TEXTURE1);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.hairTexture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, hairMask);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_hairMask"), 1);
+        this.gl.uniform1i(hasHairMaskLoc, 1);
+    } else {
+        this.gl.uniform1i(hasHairMaskLoc, 0);
+    }
 
     const posLoc = this.gl.getAttribLocation(this.program, "a_position");
     this.gl.enableVertexAttribArray(posLoc);

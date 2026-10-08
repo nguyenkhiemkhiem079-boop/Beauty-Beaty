@@ -2,6 +2,7 @@
 
 Báo cáo kiểm toán chuyên sâu trải nghiệm người dùng (UX Audit) thực hiện bởi **`agency-ux-researcher`** và **`agency-ui-designer`**.  
 Đối tượng kiểm toán: Ứng dụng web chỉnh sửa chân dung **D'Beaty** (phiên bản Public Beta UI).
+Ngày chạy audit: 2026-10-08
 
 ---
 

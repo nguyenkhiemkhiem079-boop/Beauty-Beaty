@@ -188,6 +188,8 @@ export class ImageEngine {
     return this.workCanvas;
   }
 
+  private _hairMaskCache?: HTMLCanvasElement;
+  
   reset() {
     this.currentCropNorm = { x: 0, y: 0, w: 1, h: 1 };
     this.workCanvas.width = this.originalCanvas.width;
@@ -195,6 +197,21 @@ export class ImageEngine {
     const ctxWork = this.workCanvas.getContext('2d')!;
     ctxWork.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctxWork.drawImage(this.originalCanvas, 0, 0);
+    this._hairMaskCache = undefined;
+  }
+
+  private applyWarpWithMask(points: any[]): HTMLCanvasElement {
+      if (!this._hairMaskCache && this.segmentationMask) {
+          const w = this.workCanvas.width;
+          const h = this.workCanvas.height;
+          this._hairMaskCache = document.createElement('canvas');
+          this._hairMaskCache.width = w;
+          this._hairMaskCache.height = h;
+          const ctx = this._hairMaskCache.getContext('2d')!;
+          this.drawScaledSegmentationMask(ctx, w, h, 1); // category 1 is hair
+      }
+      if (!this.webGLWarp) return this.workCanvas;
+      return this.webGLWarp.applyWarp(this.workCanvas, points, this._hairMaskCache);
   }
 
   private drawScaledSegmentationMask(targetCtx: CanvasRenderingContext2D, targetW: number, targetH: number, categoryId: number) {
@@ -209,10 +226,11 @@ export class ImageEngine {
     
     for (let i = 0; i < mask.length; i++) {
         const isMatch = mask[i] === categoryId;
-        mData.data[i * 4] = 255;
-        mData.data[i * 4 + 1] = 255;
-        mData.data[i * 4 + 2] = 255;
-        mData.data[i * 4 + 3] = isMatch ? 255 : 0;
+        const val = isMatch ? 255 : 0;
+        mData.data[i * 4] = val;
+        mData.data[i * 4 + 1] = val;
+        mData.data[i * 4 + 2] = val;
+        mData.data[i * 4 + 3] = val;
     }
     smallCtx.putImageData(mData, 0, 0);
 
@@ -665,7 +683,7 @@ export class ImageEngine {
         y: rightBagCenter.y - rightEyeW * 0.26 * warpIntensity
       };
 
-      const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      const glCanvas = this.applyWarpWithMask([
         { center: leftBagCenter, target: leftBagTarget, radius: leftEyeW * 0.55, intensity: 0.9, mode: 0 },
         { center: rightBagCenter, target: rightBagTarget, radius: rightEyeW * 0.55, intensity: 0.9, mode: 0 }
       ]);
@@ -817,7 +835,7 @@ export class ImageEngine {
         const radius = faceW * 0.6;
         const mappedIntensity = (intensity / 100.0) * 0.3;
 
-        const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+        const glCanvas = this.applyWarpWithMask([
           { center: leftCheek, target: nose, radius, intensity: mappedIntensity, mode: 0 },
           { center: rightCheek, target: nose, radius, intensity: mappedIntensity, mode: 0 }
         ]);
@@ -846,7 +864,7 @@ export class ImageEngine {
     const leftTarget = { x: leftTemple.x + factor, y: leftTemple.y };
     const rightTarget = { x: rightTemple.x - factor, y: rightTemple.y };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTemple, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightTemple, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -874,7 +892,7 @@ export class ImageEngine {
     const leftTarget = { x: leftAngle.x + mapped, y: leftAngle.y - mapped * 0.25 };
     const rightTarget = { x: rightAngle.x - mapped, y: rightAngle.y - mapped * 0.25 };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftAngle, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightAngle, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -902,7 +920,7 @@ export class ImageEngine {
     const leftTarget = { x: leftCheekbone.x + mapped, y: leftCheekbone.y };
     const rightTarget = { x: rightCheekbone.x - mapped, y: rightCheekbone.y };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCheekbone, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightCheekbone, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -943,7 +961,7 @@ export class ImageEngine {
     const rightWidth = Math.hypot((rightOuter.x - rightInner.x) * aspect, rightOuter.y - rightInner.y);
 
     const warpIntensity = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCenter, target: leftCenter, radius: leftWidth * 1.15, intensity: warpIntensity, mode: 1.0 },
       { center: rightCenter, target: rightCenter, radius: rightWidth * 1.15, intensity: warpIntensity, mode: 1.0 }
     ]);
@@ -971,7 +989,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftH * 1.8, 0.045);
     const radiusRight = Math.max(rightH * 1.8, 0.045);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTop, target: { x: leftTop.x, y: leftTop.y - shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
       { center: leftBottom, target: { x: leftBottom.x, y: leftBottom.y + shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
       { center: rightTop, target: { x: rightTop.x, y: rightTop.y - shiftRight }, radius: radiusRight, intensity: 0.85, mode: 0 },
@@ -1009,7 +1027,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
     const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftOuter, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
       { center: rightOuter, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
     ]);
@@ -1039,7 +1057,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
     const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTop, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
       { center: rightTop, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
     ]);
@@ -1260,7 +1278,7 @@ export class ImageEngine {
     const mappedIntensity = (intensity / 100.0) * 0.32;
 
     const centerX = (leftJaw.x + rightJaw.x) / 2;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftJaw, target: { x: leftJaw.x + (centerX - leftJaw.x) * mappedIntensity * 2.8, y: leftJaw.y - (chin.y - leftJaw.y) * mappedIntensity * 0.35 }, radius, intensity: 0.95, mode: 0 },
       { center: rightJaw, target: { x: rightJaw.x + (centerX - rightJaw.x) * mappedIntensity * 2.8, y: rightJaw.y - (chin.y - rightJaw.y) * mappedIntensity * 0.35 }, radius, intensity: 0.95, mode: 0 }
     ]);
@@ -1287,7 +1305,7 @@ export class ImageEngine {
     // Increased to 0.40 with multiplier 2.5 for measurable pixel displacement
     const mappedIntensity = (intensity / 100.0) * 0.40;
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.5, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
       { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.5, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
     ]);
@@ -1322,7 +1340,7 @@ export class ImageEngine {
     };
     const radius = Math.max(len * 1.5, 0.22);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: chin, target, radius, intensity: 1.0, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -1336,7 +1354,7 @@ export class ImageEngine {
     if (!params || !this.webGLWarp) return;
 
     const ctx = this.workCanvas.getContext('2d')!;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, params.warpPoints);
+    const glCanvas = this.applyWarpWithMask(params.warpPoints);
     ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctx.drawImage(glCanvas, 0, 0);
   }
@@ -1833,7 +1851,7 @@ export class ImageEngine {
     ];
 
     const ctx = this.workCanvas.getContext('2d')!;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, warpPoints);
+    const glCanvas = this.applyWarpWithMask(warpPoints);
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(glCanvas, 0, 0);
   }
@@ -2011,7 +2029,7 @@ export class ImageEngine {
     const nose = landmarks[1], noseBase = landmarks[2];
     if (!nose || !noseBase) return;
     const shiftY = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: { x: nose.x, y: nose.y + shiftY }, radius: 0.18, intensity: 0.9, mode: 0 },
       { center: noseBase, target: { x: noseBase.x, y: noseBase.y + shiftY * 0.8 }, radius: 0.15, intensity: 0.85, mode: 0 }
     ]);
@@ -2026,7 +2044,7 @@ export class ImageEngine {
     const chin = landmarks[152], lowerLip = landmarks[17];
     if (!chin || !lowerLip) return;
     const shiftY = (intensity / 100.0) * 0.028;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: chin, target: { x: chin.x, y: chin.y + shiftY }, radius: 0.20, intensity: 0.95, mode: 0 },
       { center: lowerLip, target: { x: lowerLip.x, y: lowerLip.y + shiftY * 0.5 }, radius: 0.14, intensity: 0.8, mode: 0 }
     ]);
@@ -2041,7 +2059,7 @@ export class ImageEngine {
     const forehead = landmarks[10], leftT = landmarks[67], rightT = landmarks[297];
     if (!forehead) return;
     const shiftY = (intensity / 100.0) * -0.030;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: forehead, target: { x: forehead.x, y: forehead.y + shiftY }, radius: 0.28, intensity: 0.95, mode: 0 },
       ...(leftT ? [{ center: leftT, target: { x: leftT.x, y: leftT.y + shiftY * 0.6 }, radius: 0.20, intensity: 0.8, mode: 0 }] : []),
       ...(rightT ? [{ center: rightT, target: { x: rightT.x, y: rightT.y + shiftY * 0.6 }, radius: 0.20, intensity: 0.8, mode: 0 }] : [])
@@ -2057,7 +2075,7 @@ export class ImageEngine {
     const nose = landmarks[1];
     if (!nose) return;
     const mode = intensity > 0 ? -1.0 : 1.0;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: nose, radius: 0.45, intensity: (Math.abs(intensity) / 100.0) * 0.35, mode }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2071,7 +2089,7 @@ export class ImageEngine {
     const leftIris = landmarks[468], rightIris = landmarks[473];
     if (!leftIris || !rightIris) return;
     const shiftX = (intensity / 100.0) * 0.012;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftIris, target: { x: leftIris.x + shiftX, y: leftIris.y }, radius: 0.06, intensity: 0.9, mode: 0 },
       { center: rightIris, target: { x: rightIris.x + shiftX, y: rightIris.y }, radius: 0.06, intensity: 0.9, mode: 0 }
     ]);
@@ -2086,7 +2104,7 @@ export class ImageEngine {
     const nose = landmarks[1];
     if (!nose) return;
     const mode = intensity > 0 ? -1.0 : 1.0;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: nose, radius: 0.16, intensity: (Math.abs(intensity) / 100.0) * 0.30, mode }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2100,7 +2118,7 @@ export class ImageEngine {
     const tip = landmarks[4] || landmarks[1];
     if (!tip) return;
     const shiftY = (intensity / 100.0) * -0.018;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: tip, target: { x: tip.x, y: tip.y + shiftY }, radius: 0.08, intensity: 0.95, mode: 0 },
       { center: tip, target: tip, radius: 0.09, intensity: (intensity / 100.0) * 0.25, mode: -1.0 }
     ]);
@@ -2116,7 +2134,7 @@ export class ImageEngine {
     if (!upperLip || !lowerLip) return;
     const shiftY = (intensity / 100.0) * 0.022;
     const mouthCenter = { x: (upperLip.x + lowerLip.x) / 2, y: (upperLip.y + lowerLip.y) / 2 };
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: mouthCenter, target: { x: mouthCenter.x, y: mouthCenter.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2130,7 +2148,7 @@ export class ImageEngine {
     const leftCorner = landmarks[61], rightCorner = landmarks[291];
     if (!leftCorner || !rightCorner) return;
     const shiftY = (intensity / 100.0) * 0.016;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCorner, target: { x: leftCorner.x, y: leftCorner.y + shiftY }, radius: 0.12, intensity: 0.9, mode: 0 },
       { center: rightCorner, target: { x: rightCorner.x, y: rightCorner.y - shiftY }, radius: 0.12, intensity: 0.9, mode: 0 }
     ]);
@@ -2145,7 +2163,7 @@ export class ImageEngine {
     const leftArch = landmarks[105], rightArch = landmarks[334];
     if (!leftArch || !rightArch) return;
     const shiftY = (intensity / 100.0) * -0.024;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftArch, target: { x: leftArch.x, y: leftArch.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 },
       { center: rightArch, target: { x: rightArch.x, y: rightArch.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 }
     ]);
@@ -2160,7 +2178,7 @@ export class ImageEngine {
     const leftHead = landmarks[107], rightHead = landmarks[336];
     if (!leftHead || !rightHead) return;
     const shiftX = (intensity / 100.0) * 0.018;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftHead, target: { x: leftHead.x - shiftX, y: leftHead.y }, radius: 0.12, intensity: 0.9, mode: 0 },
       { center: rightHead, target: { x: rightHead.x + shiftX, y: rightHead.y }, radius: 0.12, intensity: 0.9, mode: 0 }
     ]);
@@ -2175,7 +2193,7 @@ export class ImageEngine {
     const leftTail = landmarks[70], rightTail = landmarks[300];
     if (!leftTail || !rightTail) return;
     const shiftY = (intensity / 100.0) * -0.020;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTail, target: { x: leftTail.x, y: leftTail.y + shiftY }, radius: 0.14, intensity: 0.9, mode: 0 },
       { center: rightTail, target: { x: rightTail.x, y: rightTail.y + shiftY }, radius: 0.14, intensity: 0.9, mode: 0 }
     ]);
@@ -2190,7 +2208,7 @@ export class ImageEngine {
     const leftPeak = landmarks[105], rightPeak = landmarks[334];
     if (!leftPeak || !rightPeak) return;
     const shiftY = (intensity / 100.0) * -0.022;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftPeak, target: { x: leftPeak.x, y: leftPeak.y + shiftY }, radius: 0.12, intensity: 0.95, mode: 0 },
       { center: rightPeak, target: { x: rightPeak.x, y: rightPeak.y + shiftY }, radius: 0.12, intensity: 0.95, mode: 0 }
     ]);
@@ -2585,7 +2603,7 @@ export class ImageEngine {
     const forehead = landmarks[10];
     if (!forehead) return;
     const shiftY = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: forehead, target: { x: forehead.x, y: forehead.y + shiftY }, radius: 0.25, intensity: 0.9, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2600,7 +2618,7 @@ export class ImageEngine {
     if (!forehead) return;
     const crownCenter = { x: forehead.x, y: Math.max(0.02, forehead.y - 0.12) };
     const targetCenter = { x: crownCenter.x, y: crownCenter.y - (intensity / 100.0) * 0.035 };
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: crownCenter, target: targetCenter, radius: 0.32, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2661,7 +2679,7 @@ export class ImageEngine {
   applyArmSlim(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.18, y: 0.52 }, target: { x: 0.18 + factor, y: 0.52 }, radius: 0.22, intensity: 0.9, mode: 0 },
       { center: { x: 0.82, y: 0.52 }, target: { x: 0.82 - factor, y: 0.52 }, radius: 0.22, intensity: 0.9, mode: 0 }
     ]);
@@ -2674,7 +2692,7 @@ export class ImageEngine {
   applyLegSlim(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.38, y: 0.85 }, target: { x: 0.38 + factor, y: 0.85 }, radius: 0.18, intensity: 0.9, mode: 0 },
       { center: { x: 0.62, y: 0.85 }, target: { x: 0.62 - factor, y: 0.85 }, radius: 0.18, intensity: 0.9, mode: 0 }
     ]);
@@ -2687,7 +2705,7 @@ export class ImageEngine {
   applyHeightStretch(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.045;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.5, y: 0.85 }, target: { x: 0.5, y: 0.85 + factor }, radius: 0.35, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2699,7 +2717,7 @@ export class ImageEngine {
   applyHipShape(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.040;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.30, y: 0.72 }, target: { x: 0.30 - factor, y: 0.72 }, radius: 0.22, intensity: 0.95, mode: 0 },
       { center: { x: 0.70, y: 0.72 }, target: { x: 0.70 + factor, y: 0.72 }, radius: 0.22, intensity: 0.95, mode: 0 }
     ]);
@@ -2712,7 +2730,7 @@ export class ImageEngine {
   applyTummyTuck(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.038;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.5, y: 0.68 }, target: { x: 0.5, y: 0.68 - factor * 0.5 }, radius: 0.25, intensity: 0.95, mode: -1.0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2726,7 +2744,7 @@ export class ImageEngine {
     const leftTemple = landmarks[67], rightTemple = landmarks[297];
     if (!leftTemple || !rightTemple) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTemple, target: { x: leftTemple.x - factor, y: leftTemple.y }, radius: 0.24, intensity: 0.9, mode: 0 },
       { center: rightTemple, target: { x: rightTemple.x + factor, y: rightTemple.y }, radius: 0.24, intensity: 0.9, mode: 0 }
     ]);
@@ -2741,7 +2759,7 @@ export class ImageEngine {
     const leftInner = landmarks[133], rightInner = landmarks[362];
     if (!leftInner || !rightInner) return;
     const factor = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftInner, target: { x: leftInner.x - factor, y: leftInner.y }, radius: 0.16, intensity: 0.95, mode: 0 },
       { center: rightInner, target: { x: rightInner.x + factor, y: rightInner.y }, radius: 0.16, intensity: 0.95, mode: 0 }
     ]);
@@ -2754,7 +2772,7 @@ export class ImageEngine {
   applyChestVolume(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.40, y: 0.58 }, target: { x: 0.40, y: 0.58 }, radius: 0.18, intensity: factor, mode: 1.0 },
       { center: { x: 0.60, y: 0.58 }, target: { x: 0.60, y: 0.58 }, radius: 0.18, intensity: factor, mode: 1.0 }
     ]);
@@ -2767,7 +2785,7 @@ export class ImageEngine {
   applyButtockVolume(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.38, y: 0.76 }, target: { x: 0.38, y: 0.76 }, radius: 0.22, intensity: factor, mode: 1.0 },
       { center: { x: 0.62, y: 0.76 }, target: { x: 0.62, y: 0.76 }, radius: 0.22, intensity: factor, mode: 1.0 }
     ]);

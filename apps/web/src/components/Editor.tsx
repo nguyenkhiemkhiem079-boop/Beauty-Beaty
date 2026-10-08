@@ -476,7 +476,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           } catch (err: any) {
             if (currentToken === uploadTokenRef.current) {
               console.error("AI Model Error:", err);
-              setErrorMsg("Khởi tạo mô hình AI thất bại. Hãy thử lại.");
+              setErrorMsg("Khởi tạo mô hình AI thất bại. Đảm bảo kết nối mạng hoặc thử lại.");
             }
           } finally {
             if (currentToken === uploadTokenRef.current) {
@@ -491,6 +491,36 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         }
       };
       img.src = url;
+    }
+  };
+
+  const handleRetryInit = async () => {
+    setErrorMsg(null);
+    setIsDetecting(true);
+    try {
+      await Promise.all([
+        faceLandmarkManager.initialize(),
+        segmenterManager.initialize()
+      ]);
+      if (canvasRef.current) {
+        const [detectedLandmarks, segResult] = await Promise.all([
+          faceLandmarkManager.detectFaces(canvasRef.current),
+          segmenterManager.segment(canvasRef.current)
+        ]);
+        setLandmarks(detectedLandmarks);
+        setSegmentationMask(segResult || null);
+        if (engineRef.current && segResult) {
+          engineRef.current.setSegmentationMask(segResult);
+        }
+        if (detectedLandmarks.length === 0) {
+          setErrorMsg("Không tìm thấy khuôn mặt trong ảnh. Bạn vẫn có thể sử dụng các công cụ chỉnh màu, bộ lọc và ghép poster.");
+        }
+      }
+    } catch (err) {
+      console.error("AI Model Retry Error:", err);
+      setErrorMsg("Khởi tạo mô hình AI thất bại. Đảm bảo kết nối mạng hoặc thử lại.");
+    } finally {
+      setIsDetecting(false);
     }
   };
 
@@ -789,8 +819,16 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 </div>
               )}
               {errorMsg && (
-                <div style={{ position: 'absolute', top: 10, background: 'rgba(220, 38, 38, 0.9)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 30 }}>
+                <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: 'rgba(220, 38, 38, 0.9)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 30, display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {errorMsg}
+                  {errorMsg.includes('thất bại') && (
+                    <button 
+                      onClick={handleRetryInit} 
+                      style={{ padding: '4px 8px', background: 'white', color: 'red', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      Thử lại
+                    </button>
+                  )}
                 </div>
               )}
               <canvas 
@@ -828,6 +866,19 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 data-testid={`tool-item-${tool.id}`}
                 className={`tool-btn-compact ${activeTool === tool.id ? 'active' : ''}`}
                 onClick={() => {
+                  if (tool.id === 'teeth_whiten' && landmarks && landmarks.length > 0) {
+                    const face = landmarks[0];
+                    const topLip = face[13];
+                    const bottomLip = face[14];
+                    if (topLip && bottomLip) {
+                      const dist = Math.hypot(topLip.x - bottomLip.x, topLip.y - bottomLip.y);
+                      if (dist < 0.015) {
+                        setErrorMsg('Không tìm thấy môi/răng hở, tính năng tạm ẩn');
+                        setTimeout(() => setErrorMsg(null), 3000);
+                        return;
+                      }
+                    }
+                  }
                   setActiveTool(tool.id);
                   if (activeCategory !== tool.category) {
                     setActiveCategory(tool.category);

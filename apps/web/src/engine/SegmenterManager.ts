@@ -19,7 +19,7 @@ export class SegmenterManager {
       let filesetResolver;
     try {
       filesetResolver = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
+        "/wasm"
       );
       
       this.segmenter = await ImageSegmenter.createFromOptions(filesetResolver, {

@@ -54,6 +54,7 @@ Tài liệu kiểm toán bản quyền và giấy phép mã nguồn mở của t
 | `real_portrait_tilted.jpg` | 1000x1500 px | Unsplash Community Photographer | Unsplash Free License | Ảnh chân dung nghiêng góc $21.7^\circ$ phục vụ kiểm thử hướng trục mặt |
 | `real_portrait_beard.jpg` | 1000x1500 px | Unsplash Community Photographer | Unsplash Free License | Ảnh chân dung có râu và cổ áo phức tạp phục vụ kiểm thử bảo vệ viền |
 | `highres_synthetic_grid.png` | 4000x3000 px | Tự động sinh bởi script test | Public Domain / CC0 | Ảnh lưới độ phân giải cao phục vụ kiểm thử tỷ lệ và sai số MAE/PSNR |
+| `smile.jpg` | 600x400 px | Unsplash (Photo by Michael Dam) | Unsplash Free License | Ảnh nụ cười sử dụng để kiểm thử làm trắng răng |
 
 ---
 
