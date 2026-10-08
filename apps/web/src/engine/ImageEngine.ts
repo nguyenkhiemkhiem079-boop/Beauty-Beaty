@@ -1,6 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine, type WarpPoint } from './WebGLWarpEngine';
-import { segmenterManager, type SegmentationResult, SEGMENT_FACE, SEGMENT_HAIR, SEGMENT_BODY } from './SegmenterManager';
+import { type SegmentationResult, SEGMENT_FACE, SEGMENT_HAIR } from './SegmenterManager';
 import type { CropOperation, HealingOperation, LocalBrushOperation, LocalWarpOperation } from '../types';
 import { COLOR_FILTERS } from '../presets/filters';
 
