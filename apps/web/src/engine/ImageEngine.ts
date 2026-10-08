@@ -1,6 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine, type WarpPoint } from './WebGLWarpEngine';
-import type { SegmentationResult } from './SegmenterManager';
+import { segmenterManager, type SegmentationResult, SEGMENT_FACE, SEGMENT_HAIR, SEGMENT_BODY } from './SegmenterManager';
 import type { CropOperation, HealingOperation } from '../types';
 import { COLOR_FILTERS } from '../presets/filters';
 
@@ -210,7 +210,7 @@ export class ImageEngine {
           this._hairMaskCache.width = w;
           this._hairMaskCache.height = h;
           const ctx = this._hairMaskCache.getContext('2d')!;
-          this.drawScaledSegmentationMask(ctx, w, h, 1); // category 1 is hair
+          this.drawScaledSegmentationMask(ctx, w, h, SEGMENT_HAIR);
       }
       if (!this.webGLWarp) return this.workCanvas;
       return this.webGLWarp.applyWarp(this.workCanvas, points, this._hairMaskCache);
@@ -245,7 +245,7 @@ export class ImageEngine {
     targetCtx.drawImage(smallCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
   }
 
-  // Effect 1: Skin Smoothing (Mịn da - B001)
+  // Effect 1: Skin Smoothing (Mịn da - B001) - Edge-preserving
   applySkinSmoothing(landmarks: NormalizedLandmark[], intensity: number) {
     if (intensity === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
@@ -254,24 +254,57 @@ export class ImageEngine {
     
     const scale = Math.max(w, h) / 800; // Relative to 800px preview
 
-    const blurCanvas = document.createElement('canvas');
-    blurCanvas.width = w;
-    blurCanvas.height = h;
-    const bCtx = blurCanvas.getContext('2d')!;
-    bCtx.filter = `blur(${intensity * 0.15 * scale}px)`;
-    bCtx.drawImage(this.workCanvas, 0, 0);
+    // 1. High-frequency detail extraction (pores, fine lines)
+    const blur1Canvas = document.createElement('canvas');
+    blur1Canvas.width = w; blur1Canvas.height = h;
+    const b1Ctx = blur1Canvas.getContext('2d')!;
+    b1Ctx.filter = `blur(${2 * scale}px)`;
+    b1Ctx.drawImage(this.workCanvas, 0, 0);
 
+    const hpCanvas = document.createElement('canvas');
+    hpCanvas.width = w; hpCanvas.height = h;
+    const hpCtx = hpCanvas.getContext('2d')!;
+    hpCtx.globalAlpha = 0.5;
+    hpCtx.drawImage(this.workCanvas, 0, 0);
+    hpCtx.globalCompositeOperation = 'lighter';
+    hpCtx.filter = 'invert(100%)';
+    hpCtx.drawImage(blur1Canvas, 0, 0);
+    hpCtx.filter = 'none';
+
+    // 2. Low-frequency smooth base
+    const smoothCanvas = document.createElement('canvas');
+    smoothCanvas.width = w; smoothCanvas.height = h;
+    const sCtx = smoothCanvas.getContext('2d')!;
+    // Adjust smoothing strength based on intensity, max 12px radius
+    const blurRadius = Math.max(2, (intensity / 100) * 12) * scale;
+    sCtx.filter = `blur(${blurRadius}px)`;
+    sCtx.drawImage(this.workCanvas, 0, 0);
+    sCtx.filter = 'none';
+
+    // 3. Reinject texture (High Frequency) into Smooth Base
+    sCtx.globalCompositeOperation = 'hard-light';
+    sCtx.globalAlpha = 1.0;
+    sCtx.drawImage(hpCanvas, 0, 0);
+
+    // 4. Create precise skin mask
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = w;
-    maskCanvas.height = h;
+    maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    
-    // Transparent background, so alpha is 0 outside the face
     mCtx.clearRect(0, 0, w, h);
 
     if (landmarks && landmarks.length > 0) {
+      // Start with Face Segment if available
+      if (this.segmentationMask) {
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
+      } else {
+        // Fallback: full canvas if no segmenter
+        mCtx.fillStyle = '#fff';
+        mCtx.fillRect(0, 0, w, h);
+      }
+
+      // Intersect with Face Oval (limits to face boundaries, ignoring neck/ears if desired)
+      mCtx.globalCompositeOperation = 'destination-in';
       const faceOval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-      
       mCtx.beginPath();
       faceOval.forEach((idx, i) => {
         const pt = landmarks[idx];
@@ -280,15 +313,13 @@ export class ImageEngine {
         else mCtx.lineTo(pt.x * w, pt.y * h);
       });
       mCtx.closePath();
-      mCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-      
-      mCtx.filter = `blur(${10 * scale}px)`;
+      mCtx.fillStyle = '#fff';
       mCtx.fill();
-      mCtx.filter = 'none';
 
+      // Exclude delicate features (destination-out)
       mCtx.globalCompositeOperation = 'destination-out';
       
-      const drawFeature = (pts: number[]) => {
+      const drawFeature = (pts: number[], blur = 0) => {
         mCtx.beginPath();
         pts.forEach((idx, i) => {
           const pt = landmarks[idx];
@@ -297,35 +328,43 @@ export class ImageEngine {
           else mCtx.lineTo(pt.x * w, pt.y * h);
         });
         mCtx.closePath();
-        mCtx.filter = `blur(${8 * scale}px)`; 
+        if (blur > 0) mCtx.filter = `blur(${blur}px)`;
         mCtx.fill();
         mCtx.filter = 'none';
       };
 
-      drawFeature([33, 160, 158, 133, 153, 144]); // Left eye
-      drawFeature([362, 385, 387, 263, 373, 380]); // Right eye
-      drawFeature([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]); // Lips
-      drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46]); // Left Brow
-      drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276]); // Right Brow
-      
-      // Exclude hair using segmentation mask (Hair category = 1)
+      drawFeature([33, 160, 158, 133, 153, 144], 4 * scale); // Left eye
+      drawFeature([362, 385, 387, 263, 373, 380], 4 * scale); // Right eye
+      drawFeature([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95], 3 * scale); // Lips
+      drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46], 2 * scale); // Left Brow
+      drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276], 2 * scale); // Right Brow
+      drawFeature([2, 97, 248, 236, 3, 196, 237, 440, 278, 327, 326], 3 * scale); // Nostrils / Strong nose edges approx
+
+      // Exclude hair segment to prevent halo/blur bleeding into hair
       if (this.segmentationMask) {
-        mCtx.filter = `blur(${5 * scale}px)`;
-        this.drawScaledSegmentationMask(mCtx, w, h, 1);
+        mCtx.filter = `blur(${3 * scale}px)`;
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
         mCtx.filter = 'none';
       }
     }
-    
-    mCtx.globalCompositeOperation = 'source-over';
 
-    // Apply alpha mask to the blurred canvas
-    bCtx.globalCompositeOperation = 'destination-in';
-    bCtx.drawImage(maskCanvas, 0, 0); 
+    // Apply soft feathering to the final mask
+    const finalMaskCanvas = document.createElement('canvas');
+    finalMaskCanvas.width = w; finalMaskCanvas.height = h;
+    const fmCtx = finalMaskCanvas.getContext('2d')!;
+    fmCtx.filter = `blur(${6 * scale}px)`;
+    fmCtx.drawImage(maskCanvas, 0, 0);
 
-    // Overlay the blurred masked regions onto current workCanvas
+    // Apply alpha mask to the smoothed canvas
+    sCtx.globalCompositeOperation = 'destination-in';
+    sCtx.drawImage(finalMaskCanvas, 0, 0); 
+
+    // Composite back to original
     ctx.save();
+    // Intensity is already handled partly by the blur radius, but we can also modulate opacity
+    // For intensity=100, we want maximum effect. For intensity=30, subtle effect.
     ctx.globalAlpha = intensity / 100.0;
-    ctx.drawImage(blurCanvas, 0, 0);
+    ctx.drawImage(smoothCanvas, 0, 0);
     ctx.restore();
   }
 
@@ -391,7 +430,7 @@ export class ImageEngine {
       
       if (this.segmentationMask) {
         mCtx.filter = `blur(${6 * scale}px)`;
-        this.drawScaledSegmentationMask(mCtx, w, h, 1);
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
         mCtx.filter = 'none';
       }
     }
@@ -758,7 +797,7 @@ export class ImageEngine {
     maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
     
-    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = Hair
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     const blurredMaskCanvas = document.createElement('canvas');
     blurredMaskCanvas.width = w;
@@ -788,7 +827,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = hair
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     // Shine strip: radial gradient on top portion of image
     const shineCanvas = document.createElement('canvas');
@@ -2559,7 +2598,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 2); // Category 2: face skin
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
     
     const baseCanvas = document.createElement('canvas');
     baseCanvas.width = w; baseCanvas.height = h;
@@ -2623,7 +2662,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1);
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     const smoothMask = document.createElement('canvas');
     smoothMask.width = w; smoothMask.height = h;
@@ -2661,7 +2700,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1);
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     sCtx.globalCompositeOperation = 'destination-in';
     sCtx.drawImage(maskCanvas, 0, 0);

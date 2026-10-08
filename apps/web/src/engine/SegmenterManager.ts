@@ -6,6 +6,13 @@ export interface SegmentationResult {
   height: number;
 }
 
+export const SEGMENT_BACKGROUND = 0;
+export const SEGMENT_HAIR = 1;
+export const SEGMENT_BODY = 2;
+export const SEGMENT_FACE = 3;
+export const SEGMENT_CLOTHES = 4;
+export const SEGMENT_OTHERS = 5;
+
 export class SegmenterManager {
   private segmenter: ImageSegmenter | null = null;
   private isInitialized = false;
