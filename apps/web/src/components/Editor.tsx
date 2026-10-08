@@ -173,6 +173,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const applyEffects = () => {
     if (!engineRef.current || !canvasRef.current || !originalImage) return;
     
+    const t0 = performance.now();
     const faceLandmarks = landmarks?.[0];
     engineRef.current.applyPipeline(editState, faceLandmarks);
     
@@ -201,6 +202,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           );
         }
       }
+    }
+    
+    const t1 = performance.now();
+    if (typeof window !== 'undefined') {
+      (window as any).__perfMeasurements = (window as any).__perfMeasurements || [];
+      (window as any).__perfMeasurements.push(t1 - t0);
     }
   };
 
@@ -870,6 +877,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   <button data-testid="tab-face" className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
                     <UserRound size={16} />Khuôn mặt
                   </button>
+                  <button data-testid="tab-makeup" className={`tab ${activeCategory === 'makeup' ? 'active' : ''}`} onClick={() => { setActiveCategory('makeup'); setActiveTool('makeup_preset'); }}>
+                    <Sparkles size={16} />Trang điểm
+                  </button>
                   <button data-testid="tab-eyes" className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
                     <Eye size={16} />Mắt
                   </button>
@@ -975,13 +985,112 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                               />
                               <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
                             </div>
+                          </div>
+                        ) : activeTool === 'makeup_preset' ? (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                              {[
+                                { id: 'natural', name: 'Tự nhiên' },
+                                { id: 'korean', name: 'Hàn Quốc' },
+                                { id: 'douyin', name: 'Douyin' },
+                                { id: 'western', name: 'Tây Âu' }
+                              ].map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => {
+                                    setEditState(prev => ({ ...prev, makeup_preset: c.id, makeup_preset_intensity: prev.makeup_preset_intensity || 60 }));
+                                    setTimeout(commitHistory, 50);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '16px',
+                                    border: (editState.makeup_preset || 'natural') === c.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                                    background: (editState.makeup_preset || 'natural') === c.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {c.name}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {editState.makeup_preset_intensity ?? 0}
+                              </span>
+                            </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">0</span>
+                              <input 
+                                type="range"
+                                data-testid="tool-slider"
+                                className="premium-slider"
+                                min="0"
+                                max="100"
+                                value={editState.makeup_preset_intensity ?? 0}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory}
+                                onTouchEnd={commitHistory}
+                                onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                              <button 
-                                data-testid="btn-reset-tool"
-                                onClick={() => handleResetTool(activeTool)}
-                                className="btn-reset-tool"
-                                title="Đặt lại công cụ này"
-                              >
+                              <button onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
+                                <RotateCcw size={12} /> Đặt lại
+                              </button>
+                            </div>
+                          </div>
+                        ) : activeTool === 'makeup_lipstick' || activeTool === 'makeup_blush' || activeTool === 'makeup_eyeshadow' ? (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                              {[
+                                { id: '#ff4d4d', name: 'Đỏ tươi' },
+                                { id: '#ff80df', name: 'Hồng phấn' },
+                                { id: '#ff9966', name: 'Cam san hô' },
+                                { id: '#cc3300', name: 'Đỏ đất' },
+                                { id: '#993333', name: 'Nâu đỏ' }
+                              ].map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => {
+                                    setEditState(prev => ({ 
+                                      ...prev, 
+                                      [`${activeTool}_color`]: c.id, 
+                                      [activeTool]: (prev as any)[activeTool] || 50 
+                                    }));
+                                    setTimeout(commitHistory, 50);
+                                  }}
+                                  title={c.name}
+                                  style={{
+                                    width: '26px', height: '26px', borderRadius: '50%',
+                                    backgroundColor: c.id,
+                                    border: (editState as any)[`${activeTool}_color`] === c.id ? '2px solid var(--color-accent)' : '2px solid #ffffff',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)', cursor: 'pointer'
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {(editState as any)[activeTool] ?? 0}
+                              </span>
+                            </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">0</span>
+                              <input 
+                                type="range" data-testid="tool-slider" className="premium-slider" min="0" max="100"
+                                value={(editState as any)[activeTool] ?? 0}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory} onTouchEnd={commitHistory} onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                              <button onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
                                 <RotateCcw size={12} /> Đặt lại
                               </button>
                             </div>
@@ -1101,6 +1210,28 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
                         <div className="tool-subgroup-title">Trang điểm mắt</div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Trang điểm mắt').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* MAKEUP CATEGORY */}
+                    {activeCategory === 'makeup' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Trang điểm</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+
+                        <div className="tool-subgroup-title">Tổng thể</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Tổng thể').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Môi</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Môi').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Má & khối</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Má & khối').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Mắt</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Mắt').map(renderToolButton)}
                       </div>
                     )}
 

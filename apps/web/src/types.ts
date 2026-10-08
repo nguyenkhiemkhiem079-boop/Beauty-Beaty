@@ -1,4 +1,4 @@
-export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'body' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai';
+export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'body' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai' | 'makeup';
 
 export type ToolType = 
   | 'skin_smooth' 
@@ -37,6 +37,12 @@ export type ToolType =
   | 'temperature'
   | 'tint'
   | 'crop'
+  | 'makeup_preset'
+  | 'makeup_lipstick'
+  | 'makeup_blush'
+  | 'makeup_eyeshadow'
+  | 'makeup_eyeliner'
+  | 'makeup_contour'
   | 'ai_makeup';
 
 export interface TemplateCustomText {
@@ -143,6 +149,14 @@ export interface EditState {
   false_lashes?: number;           // B058
   makeup_preset?: string;          // B061
   makeup_preset_intensity?: number;// B061
+  makeup_lipstick?: number;
+  makeup_lipstick_color?: string;
+  makeup_blush?: number;
+  makeup_blush_color?: string;
+  makeup_contour?: number;
+  makeup_eyeshadow?: number;
+  makeup_eyeshadow_color?: string;
+  makeup_eyeliner?: number;
   hair_flyaway?: number;           // B065
   hair_highlight?: string;         // B067
   hair_highlight_intensity?: number;// B067

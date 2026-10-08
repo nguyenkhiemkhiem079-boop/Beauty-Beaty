@@ -65,6 +65,14 @@ export interface PipelineParams {
   false_lashes?: number;           // B058
   makeup_preset?: string;          // B061
   makeup_preset_intensity?: number;// B061
+  makeup_lipstick?: number;
+  makeup_lipstick_color?: string;
+  makeup_blush?: number;
+  makeup_blush_color?: string;
+  makeup_contour?: number;
+  makeup_eyeshadow?: number;
+  makeup_eyeshadow_color?: string;
+  makeup_eyeliner?: number;
   hair_flyaway?: number;           // B065
   hair_highlight?: string;         // B067
   hair_highlight_intensity?: number;// B067
@@ -2372,13 +2380,142 @@ export class ImageEngine {
     });
   }
 
+  applyLipstick(landmarks: NormalizedLandmark[], colorHex: string, intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = colorHex;
+    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    
+    const lipUpperIds = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291];
+    const lipLowerIds = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
+    
+    ctx.beginPath();
+    for (let i = 0; i < lipUpperIds.length; i++) {
+      const pt = landmarks[lipUpperIds[i]];
+      if (!pt) continue;
+      if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
+      else ctx.lineTo(pt.x * w, pt.y * h);
+    }
+    for (let i = lipLowerIds.length - 1; i >= 0; i--) {
+      const pt = landmarks[lipLowerIds[i]];
+      if (!pt) continue;
+      ctx.lineTo(pt.x * w, pt.y * h);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  applyBlush(landmarks: NormalizedLandmark[], colorHex: string, intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    
+    const drawBlush = (centerId: number) => {
+      const pt = landmarks[centerId];
+      if (!pt) return;
+      const cx = pt.x * w;
+      const cy = pt.y * h;
+      const rx = w * 0.08;
+      const ry = h * 0.05;
+      
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+      grad.addColorStop(0, colorHex);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    drawBlush(116); // Left cheek center approx
+    drawBlush(345); // Right cheek center approx
+    ctx.restore();
+  }
+
+  applyContour(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalAlpha = (intensity / 100.0) * 0.3;
+    
+    // Highlight on nose tip
+    const noseTip = landmarks[4];
+    if (noseTip) {
+      ctx.globalCompositeOperation = 'screen';
+      const cx = noseTip.x * w;
+      const cy = noseTip.y * h;
+      const r = w * 0.04;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Contour on jawline
+    ctx.globalCompositeOperation = 'multiply';
+    const jawIds = [132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361];
+    ctx.beginPath();
+    for (let i = 0; i < jawIds.length; i++) {
+      const pt = landmarks[jawIds[i]];
+      if (!pt) continue;
+      const px = pt.x * w;
+      const py = pt.y * h;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.lineWidth = w * 0.03;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5a4033';
+    ctx.filter = 'blur(10px)';
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
   // B061: Full Makeup Preset (Preset makeup hoàn chỉnh)
   applyMakeupPreset(landmarks: NormalizedLandmark[], _preset = 'natural', intensity = 60) {
-    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
-    this.applyEyeBrightening(landmarks, intensity * 0.6);
-    this.applyEyeCatchlight(landmarks, intensity * 0.5);
-    this.applyEyeliner(landmarks, intensity * 0.65);
-    this.applyLipFinish(landmarks, 'gloss', intensity * 0.6);
+    if (intensity === 0 || !landmarks || landmarks.length === 0 || !_preset) return;
+    
+    let eyeBrighten = 0.6;
+    let eyeCatchlight = 0.5;
+    let eyeliner = 0.65;
+    let lip = 0.6;
+    
+    if (_preset === 'korean') {
+      eyeBrighten = 0.8; eyeCatchlight = 0.7; eyeliner = 0.4; lip = 0.8;
+      this.applyBlush(landmarks, '#ff9966', intensity * 0.5);
+    } else if (_preset === 'douyin') {
+      eyeBrighten = 0.9; eyeCatchlight = 0.9; eyeliner = 0.8; lip = 0.9;
+      this.applyBlush(landmarks, '#ff80df', intensity * 0.6);
+      this.applyContour(landmarks, intensity * 0.5);
+    } else if (_preset === 'western') {
+      eyeBrighten = 0.5; eyeCatchlight = 0.4; eyeliner = 0.9; lip = 0.7;
+      this.applyContour(landmarks, intensity * 0.8);
+      this.applyEyeShadow(landmarks, '#8b4513', intensity * 0.7);
+    }
+
+    this.applyEyeBrightening(landmarks, intensity * eyeBrighten);
+    this.applyEyeCatchlight(landmarks, intensity * eyeCatchlight);
+    this.applyEyeliner(landmarks, intensity * eyeliner);
+    this.applyLipFinish(landmarks, _preset === 'western' ? 'matte' : 'gloss', intensity * lip);
   }
 
   // B065: Tame Flyaway Hair (Giảm tóc con bay/xù)
@@ -2944,6 +3081,23 @@ export class ImageEngine {
     if (params.lip_liner && params.lip_liner > 0 && mappedLandmarks) {
       this.applyLipLiner(mappedLandmarks, '#c43a53', params.lip_liner);
     }
+    
+    if (params.makeup_lipstick && params.makeup_lipstick > 0 && mappedLandmarks) {
+      this.applyLipstick(mappedLandmarks, params.makeup_lipstick_color || '#ff4d4d', params.makeup_lipstick);
+    }
+    if (params.makeup_blush && params.makeup_blush > 0 && mappedLandmarks) {
+      this.applyBlush(mappedLandmarks, params.makeup_blush_color || '#ff80df', params.makeup_blush);
+    }
+    if (params.makeup_contour && params.makeup_contour > 0 && mappedLandmarks) {
+      this.applyContour(mappedLandmarks, params.makeup_contour);
+    }
+    if (params.makeup_eyeshadow && params.makeup_eyeshadow > 0 && mappedLandmarks) {
+      this.applyEyeShadow(mappedLandmarks, params.makeup_eyeshadow_color || '#8b4513', params.makeup_eyeshadow);
+    }
+    if (params.makeup_eyeliner && params.makeup_eyeliner > 0 && mappedLandmarks) {
+      this.applyEyeliner(mappedLandmarks, params.makeup_eyeliner);
+    }
+
     if (params.makeup_preset_intensity && params.makeup_preset_intensity > 0 && mappedLandmarks) {
       this.applyMakeupPreset(mappedLandmarks, params.makeup_preset, params.makeup_preset_intensity);
     }
