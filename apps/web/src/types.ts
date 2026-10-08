@@ -60,9 +60,31 @@ export interface TemplateCustomText {
 
 export interface HealingOperation {
   id?: string;
-  x: number;          // normalized x (0..1) relative to canvas
-  y: number;          // normalized y (0..1) relative to canvas
-  radiusNorm: number; // normalized radius relative to canvas height
+  x: number;          // normalized x (0..1) relative to source image
+  y: number;          // normalized y (0..1) relative to source image
+  radiusNorm: number; // normalized radius relative to source image height
+}
+
+export type DirectRetouchTool = 'skin_smooth' | 'face_slim' | 'chin_slim' | 'body_slim';
+
+export interface LocalBrushOperation {
+  id?: string;
+  tool: 'skin_smooth';
+  x: number;          // normalized source-image coordinate
+  y: number;
+  radiusNorm: number;
+  intensity: number;  // 0..100
+}
+
+export interface LocalWarpOperation {
+  id?: string;
+  tool: 'face_slim' | 'chin_slim' | 'body_slim';
+  x: number;          // normalized source-image start point
+  y: number;
+  dx: number;         // normalized drag vector in source-image space
+  dy: number;
+  radiusNorm: number;
+  intensity: number;  // 0..1 scalar applied to the drag vector
 }
 
 export interface CropOperation {
@@ -125,6 +147,8 @@ export interface EditState {
   template_placement?: 'top' | 'center' | 'bottom';
   crop?: CropOperation;
   healings?: HealingOperation[];
+  localBrushes?: LocalBrushOperation[];
+  localWarps?: LocalWarpOperation[];
   ai_makeup?: number;
   // Local-capable algorithmic feature parameters
   skin_blemish_reduction?: number; // B003
@@ -233,6 +257,8 @@ export const DEFAULT_EDIT_STATE: EditState = {
     height: 1
   },
   healings: [],
+  localBrushes: [],
+  localWarps: [],
   skin_blemish_reduction: 0,
   wrinkle_reduction: 0,
   skin_evening: 0,
