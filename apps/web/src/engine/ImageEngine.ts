@@ -1,7 +1,7 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine, type WarpPoint } from './WebGLWarpEngine';
 import { segmenterManager, type SegmentationResult, SEGMENT_FACE, SEGMENT_HAIR, SEGMENT_BODY } from './SegmenterManager';
-import type { CropOperation, HealingOperation } from '../types';
+import type { CropOperation, HealingOperation, LocalBrushOperation, LocalWarpOperation } from '../types';
 import { COLOR_FILTERS } from '../presets/filters';
 
 export interface PipelineParams {
@@ -104,6 +104,8 @@ export interface PipelineParams {
   filter_intensity?: number;  // X024
   crop?: CropOperation;       // X020
   healings?: HealingOperation[]; // B002
+  localBrushes?: LocalBrushOperation[];
+  localWarps?: LocalWarpOperation[];
 }
 
 export interface ChinSlimParams {
@@ -1865,6 +1867,127 @@ export class ImageEngine {
     ctx.restore();
   }
 
+
+  // Direct local skin retouch: edge-preserving smoothing constrained to a user-selected circular region.
+  applyLocalSkinSmoothing(
+    centerNorm: { x: number; y: number },
+    radiusNorm: number,
+    intensity: number,
+    landmarks?: NormalizedLandmark[]
+  ) {
+    if (intensity <= 0 || radiusNorm <= 0) return;
+
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+    const radiusPx = Math.max(8, radiusNorm * h);
+    const cx = centerNorm.x * w;
+    const cy = centerNorm.y * h;
+
+    // Frequency-separation approximation: smooth low-frequency color while retaining fine texture.
+    const fineBlur = document.createElement('canvas');
+    fineBlur.width = w; fineBlur.height = h;
+    const fineCtx = fineBlur.getContext('2d')!;
+    fineCtx.filter = `blur(${Math.max(1, 1.5 * scale)}px)`;
+    fineCtx.drawImage(this.workCanvas, 0, 0);
+
+    const smooth = document.createElement('canvas');
+    smooth.width = w; smooth.height = h;
+    const smoothCtx = smooth.getContext('2d')!;
+    const blurRadius = Math.max(2, (intensity / 100) * 8) * scale;
+    smoothCtx.filter = `blur(${blurRadius}px)`;
+    smoothCtx.drawImage(this.workCanvas, 0, 0);
+    smoothCtx.filter = 'none';
+
+    // Reintroduce a controlled amount of high-frequency detail.
+    smoothCtx.save();
+    smoothCtx.globalCompositeOperation = 'soft-light';
+    smoothCtx.globalAlpha = 0.22;
+    smoothCtx.drawImage(this.workCanvas, 0, 0);
+    smoothCtx.globalAlpha = 0.10;
+    smoothCtx.drawImage(fineBlur, 0, 0);
+    smoothCtx.restore();
+
+    const mask = document.createElement('canvas');
+    mask.width = w; mask.height = h;
+    const mCtx = mask.getContext('2d')!;
+
+    const radial = mCtx.createRadialGradient(cx, cy, radiusPx * 0.45, cx, cy, radiusPx);
+    radial.addColorStop(0, 'rgba(255,255,255,1)');
+    radial.addColorStop(0.72, 'rgba(255,255,255,0.9)');
+    radial.addColorStop(1, 'rgba(255,255,255,0)');
+    mCtx.fillStyle = radial;
+    mCtx.beginPath();
+    mCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+    mCtx.fill();
+
+    // Intersect with actual face segmentation when available.
+    if (this.segmentationMask) {
+      mCtx.globalCompositeOperation = 'destination-in';
+      this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
+    }
+
+    // Never smooth hair.
+    if (this.segmentationMask) {
+      mCtx.globalCompositeOperation = 'destination-out';
+      this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
+    }
+
+    // Protect eyes / brows / lips if landmarks are available.
+    if (landmarks && landmarks.length > 0) {
+      mCtx.globalCompositeOperation = 'destination-out';
+      const protect = (ids: number[], featherPx: number) => {
+        mCtx.beginPath();
+        ids.forEach((idx, i) => {
+          const p = landmarks[idx];
+          if (!p) return;
+          if (i === 0) mCtx.moveTo(p.x * w, p.y * h);
+          else mCtx.lineTo(p.x * w, p.y * h);
+        });
+        mCtx.closePath();
+        mCtx.filter = `blur(${featherPx}px)`;
+        mCtx.fillStyle = '#fff';
+        mCtx.fill();
+        mCtx.filter = 'none';
+      };
+      protect([33, 160, 158, 133, 153, 144], 2.5 * scale);
+      protect([362, 385, 387, 263, 373, 380], 2.5 * scale);
+      protect([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95], 2 * scale);
+      protect([70, 63, 105, 66, 107, 55, 65, 52, 53, 46], 2 * scale);
+      protect([300, 293, 334, 296, 336, 285, 295, 282, 283, 276], 2 * scale);
+    }
+
+    smoothCtx.globalCompositeOperation = 'destination-in';
+    smoothCtx.drawImage(mask, 0, 0);
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.82, 0.18 + (intensity / 100) * 0.62);
+    ctx.drawImage(smooth, 0, 0);
+    ctx.restore();
+  }
+
+  // Direct manipulation warp replayed from normalized source-image coordinates.
+  applyLocalWarpOperation(op: LocalWarpOperation) {
+    if (!this.webGLWarp || op.radiusNorm <= 0) return;
+    const target = {
+      x: op.x + op.dx * op.intensity,
+      y: op.y + op.dy * op.intensity
+    };
+    const glCanvas = this.applyWarpWithMask([
+      {
+        center: { x: op.x, y: op.y },
+        target,
+        radius: Math.max(0.025, op.radiusNorm),
+        intensity: 1.0,
+        mode: 0.0
+      }
+    ]);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
   // Effect 10: Body Slim / Waist Reshape (B070)
   applyBodySlim(intensity: number, centerYNorm = 0.65) {
     if (intensity === 0 || !this.webGLWarp) return;
@@ -3097,6 +3220,23 @@ export class ImageEngine {
       this.applySkinEvening(mappedLandmarks, params.skin_evening);
     }
 
+    // User-painted local smoothing strokes. Coordinates are stored in source-image space
+    // and remapped through the current crop so preview/export remain identical.
+    if (params.localBrushes && params.localBrushes.length > 0) {
+      for (const op of params.localBrushes) {
+        if (op.tool !== 'skin_smooth') continue;
+        const u = (op.x - x_n) / w_n;
+        const v = (op.y - y_n) / h_n;
+        if (u < -0.2 || u > 1.2 || v < -0.2 || v > 1.2) continue;
+        this.applyLocalSkinSmoothing(
+          { x: u, y: v },
+          op.radiusNorm / h_n,
+          op.intensity,
+          mappedLandmarks
+        );
+      }
+    }
+
     // Stage 2: Geometric Feature Shaping (WebGL Warp)
     if (params.face_slim > 0 && mappedLandmarks) {
       this.applyFaceSlimming(mappedLandmarks, params.face_slim);
@@ -3178,6 +3318,22 @@ export class ImageEngine {
     }
     if (params.lip_tilt && params.lip_tilt !== 0 && mappedLandmarks) {
       this.applyLipTilt(mappedLandmarks, params.lip_tilt);
+    }
+
+    // User-directed local warp gestures. Map source coordinates/vectors through crop.
+    if (params.localWarps && params.localWarps.length > 0) {
+      for (const op of params.localWarps) {
+        const mappedOp: LocalWarpOperation = {
+          ...op,
+          x: (op.x - x_n) / w_n,
+          y: (op.y - y_n) / h_n,
+          dx: op.dx / w_n,
+          dy: op.dy / h_n,
+          radiusNorm: op.radiusNorm / h_n
+        };
+        if (mappedOp.x < -0.25 || mappedOp.x > 1.25 || mappedOp.y < -0.25 || mappedOp.y > 1.25) continue;
+        this.applyLocalWarpOperation(mappedOp);
+      }
     }
 
     // Stage 3: Facial Details, Makeup & Hair (2D Canvas & Shaders)
