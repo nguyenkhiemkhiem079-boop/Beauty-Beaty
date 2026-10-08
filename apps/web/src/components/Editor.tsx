@@ -3,13 +3,14 @@ import {
   Undo2, Redo2, Download, ArrowLeft, Upload, Loader2, Sparkles, 
   UserRound, Droplets, Scissors, Eye, Smile, 
   Sliders, Palette, LayoutTemplate, SplitSquareVertical, Crop,
-  LayoutGrid, Save, Bookmark, Search, X, RotateCcw, ShieldCheck
+  LayoutGrid, Save, Bookmark, Search, X, RotateCcw, ShieldCheck,
+  ZoomIn, ZoomOut, Move, MousePointer2
 } from 'lucide-react';
 import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
 import { ImageEngine } from '../engine/ImageEngine';
 import { useAppContext, DEFAULT_EDIT_STATE } from '../context';
-import type { ToolCategory, ToolType, TemplateCustomText, CropOperation, HealingOperation, EditState } from '../context';
+import type { ToolCategory, ToolType, TemplateCustomText, CropOperation, HealingOperation, EditState, LocalBrushOperation, LocalWarpOperation } from '../context';
 import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
 import { CollageMaker } from './CollageMaker';
@@ -49,11 +50,41 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const [draftAvailable, setDraftAvailable] = useState<AppDraft | null>(null);
   const [draftToast, setDraftToast] = useState<string | null>(null);
   const [blemishRadius, setBlemishRadius] = useState(16);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [interactionMode, setInteractionMode] = useState<'retouch' | 'pan'>('retouch');
+  const [directRadius, setDirectRadius] = useState(64);
+  const [directStrength, setDirectStrength] = useState(55);
+  const [pointerPreview, setPointerPreview] = useState<{ u: number; v: number } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ImageEngine | null>(null);
   const uploadTokenRef = useRef(0);
   const originalDataUrlRef = useRef<string | null>(null);
+  const gestureRef = useRef<{
+    kind: 'brush' | 'heal' | 'warp' | 'pan' | null;
+    pointerId: number | null;
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    startSource?: { x: number; y: number };
+    lastClientX: number;
+    lastClientY: number;
+  }>({
+    kind: null,
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    startPanX: 0,
+    startPanY: 0,
+    lastClientX: 0,
+    lastClientY: 0
+  });
+  const gestureStateRef = useRef<EditState | null>(null);
+
+  const directRetouchTools: ToolType[] = ['skin_smooth', 'skin_blemish', 'face_slim', 'chin_slim', 'body_slim'];
+  const supportsDirectRetouch = directRetouchTools.includes(activeTool);
 
   // Filter list by category
   const filteredFilters = useMemo(() => {
@@ -594,37 +625,180 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     setHistoryIndex(newHistory.length - 1);
   };
 
-  // Spot Blemish Healing on Canvas Click (B002) - Declarative Graph Operation
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== 'skin_blemish' || !canvasRef.current || !engineRef.current) return;
+  const getCanvasSourcePoint = (clientX: number, clientY: number) => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const u = (e.clientX - rect.left) / rect.width;
-    const v = (e.clientY - rect.top) / rect.height;
-
-    // Coordinate mapping: from current canvas space into uncropped original image normalized space
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const u = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const v = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
     const cropX = editState.crop?.x ?? 0;
     const cropY = editState.crop?.y ?? 0;
     const cropW = editState.crop?.width ?? 1;
     const cropH = editState.crop?.height ?? 1;
+    return {
+      u,
+      v,
+      x: cropX + u * cropW,
+      y: cropY + v * cropH,
+      radiusNorm: (directRadius / rect.height) * cropH
+    };
+  };
 
-    const origX = cropX + u * cropW;
-    const origY = cropY + v * cropH;
-    const radiusNorm = (blemishRadius / canvasRef.current.height) * cropH;
+  const appendDirectBrushPoint = (clientX: number, clientY: number) => {
+    const p = getCanvasSourcePoint(clientX, clientY);
+    if (!p) return;
 
-    const newOp: HealingOperation = {
-      id: 'heal_' + Date.now(),
-      x: origX,
-      y: origY,
-      radiusNorm
+    if (activeTool === 'skin_blemish') {
+      const op: HealingOperation = {
+        id: `heal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        x: p.x,
+        y: p.y,
+        radiusNorm: Math.max(0.002, p.radiusNorm * 0.45)
+      };
+      setEditState(prev => {
+        const next = { ...prev, healings: [...(prev.healings || []), op] };
+        gestureStateRef.current = next;
+        return next;
+      });
+      return;
+    }
+
+    if (activeTool === 'skin_smooth') {
+      const op: LocalBrushOperation = {
+        id: `smooth_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        tool: 'skin_smooth',
+        x: p.x,
+        y: p.y,
+        radiusNorm: Math.max(0.006, p.radiusNorm),
+        intensity: directStrength
+      };
+      setEditState(prev => {
+        const next = { ...prev, localBrushes: [...(prev.localBrushes || []), op] };
+        gestureStateRef.current = next;
+        return next;
+      });
+    }
+  };
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    canvasRef.current.setPointerCapture(e.pointerId);
+
+    const shouldPan = interactionMode === 'pan' || e.button === 1;
+    if (shouldPan) {
+      gestureRef.current = {
+        kind: 'pan',
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: pan.x,
+        startPanY: pan.y,
+        lastClientX: e.clientX,
+        lastClientY: e.clientY
+      };
+      return;
+    }
+
+    if (!supportsDirectRetouch) return;
+    const p = getCanvasSourcePoint(e.clientX, e.clientY);
+    if (!p) return;
+
+    const kind = activeTool === 'skin_smooth' ? 'brush' : activeTool === 'skin_blemish' ? 'heal' : 'warp';
+    gestureRef.current = {
+      kind,
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+      startSource: { x: p.x, y: p.y },
+      lastClientX: e.clientX,
+      lastClientY: e.clientY
     };
 
-    const nextState: EditState = {
-      ...editState,
-      healings: [...(editState.healings || []), newOp]
-    };
+    if (kind === 'brush' || kind === 'heal') {
+      appendDirectBrushPoint(e.clientX, e.clientY);
+    }
+  };
 
-    setEditState(nextState);
-    commitHistory(nextState);
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = getCanvasSourcePoint(e.clientX, e.clientY);
+    if (p) setPointerPreview({ u: p.u, v: p.v });
+
+    const gesture = gestureRef.current;
+    if (gesture.pointerId !== e.pointerId || !gesture.kind) return;
+
+    if (gesture.kind === 'pan') {
+      setPan({
+        x: gesture.startPanX + (e.clientX - gesture.startClientX),
+        y: gesture.startPanY + (e.clientY - gesture.startClientY)
+      });
+      return;
+    }
+
+    if (gesture.kind === 'brush' || gesture.kind === 'heal') {
+      const minDistance = Math.max(10, directRadius * 0.32);
+      const distance = Math.hypot(e.clientX - gesture.lastClientX, e.clientY - gesture.lastClientY);
+      if (distance >= minDistance) {
+        gesture.lastClientX = e.clientX;
+        gesture.lastClientY = e.clientY;
+        appendDirectBrushPoint(e.clientX, e.clientY);
+      }
+    }
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const gesture = gestureRef.current;
+    if (gesture.pointerId !== e.pointerId || !gesture.kind) return;
+
+    if (gesture.kind === 'warp' && gesture.startSource) {
+      const end = getCanvasSourcePoint(e.clientX, e.clientY);
+      if (end) {
+        const dx = end.x - gesture.startSource.x;
+        const dy = end.y - gesture.startSource.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > 0.0015 && (activeTool === 'face_slim' || activeTool === 'chin_slim' || activeTool === 'body_slim')) {
+          const op: LocalWarpOperation = {
+            id: `warp_${Date.now()}`,
+            tool: activeTool,
+            x: gesture.startSource.x,
+            y: gesture.startSource.y,
+            dx,
+            dy,
+            radiusNorm: Math.max(0.01, end.radiusNorm),
+            intensity: Math.max(0.15, Math.min(1, directStrength / 100))
+          };
+          const nextState: EditState = {
+            ...editState,
+            localWarps: [...(editState.localWarps || []), op]
+          };
+          setEditState(nextState);
+          gestureStateRef.current = nextState;
+        }
+      }
+    }
+
+    if (gesture.kind !== 'pan') {
+      const stateToCommit = gestureStateRef.current;
+      if (stateToCommit) commitHistory(stateToCommit);
+    }
+
+    gestureRef.current.kind = null;
+    gestureRef.current.pointerId = null;
+    gestureStateRef.current = null;
+  };
+
+  const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    setZoom(prev => Math.min(5, Math.max(1, prev * factor)));
+  };
+
+  const resetCanvasView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setInteractionMode('retouch');
   };
 
   // Direct Aspect Ratio Crop (B090 / X020) - Declarative Graph Operation
@@ -683,13 +857,37 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   };
 
   const handleResetTool = (toolId: ToolType) => {
-    setEditState(prev => resetToolValue(prev, toolId));
-    setTimeout(commitHistory, 50);
+    let committed: EditState | null = null;
+    setEditState(prev => {
+      let next = resetToolValue(prev, toolId);
+      if (toolId === 'skin_smooth') {
+        next = { ...next, localBrushes: (next.localBrushes || []).filter(op => op.tool !== 'skin_smooth') };
+      } else if (toolId === 'skin_blemish') {
+        next = { ...next, healings: [] };
+      } else if (toolId === 'face_slim' || toolId === 'chin_slim' || toolId === 'body_slim') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool !== toolId) };
+      }
+      committed = next;
+      return next;
+    });
+    setTimeout(() => committed && commitHistory(committed), 0);
   };
 
   const resetCurrentCategory = () => {
-    setEditState(prev => resetCategoryValues(prev, activeCategory));
-    setTimeout(commitHistory, 50);
+    let committed: EditState | null = null;
+    setEditState(prev => {
+      let next = resetCategoryValues(prev, activeCategory);
+      if (activeCategory === 'skin') {
+        next = { ...next, localBrushes: [], healings: [] };
+      } else if (activeCategory === 'face') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool === 'body_slim') };
+      } else if (activeCategory === 'body') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool !== 'body_slim') };
+      }
+      committed = next;
+      return next;
+    });
+    setTimeout(() => committed && commitHistory(committed), 0);
   };
 
   // If collage maker is open, render collage workspace
@@ -831,13 +1029,158 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   )}
                 </div>
               )}
-              <canvas 
-                ref={canvasRef} 
-                data-testid="main-canvas"
-                className="main-canvas" 
-                onClick={handleCanvasClick}
-                style={{ cursor: activeTool === 'skin_blemish' ? 'crosshair' : 'default' }}
-              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 12,
+                  zIndex: 25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.92)',
+                  boxShadow: '0 4px 16px rgba(15,23,42,0.12)',
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Thu nhỏ ảnh"
+                  onClick={() => setZoom(v => Math.max(1, v / 1.2))}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 5 }}
+                ><ZoomOut size={16} /></button>
+                <button
+                  type="button"
+                  aria-label="Đặt lại mức thu phóng"
+                  onClick={resetCanvasView}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', minWidth: 52, fontSize: 12, fontWeight: 700 }}
+                >{Math.round(zoom * 100)}%</button>
+                <button
+                  type="button"
+                  aria-label="Phóng to ảnh"
+                  onClick={() => setZoom(v => Math.min(5, v * 1.2))}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 5 }}
+                ><ZoomIn size={16} /></button>
+                {supportsDirectRetouch && (
+                  <button
+                    type="button"
+                    data-testid="btn-direct-interaction-mode"
+                    aria-label={interactionMode === 'retouch' ? 'Chuyển sang di chuyển ảnh' : 'Chuyển sang chỉnh trực tiếp'}
+                    onClick={() => setInteractionMode(m => m === 'retouch' ? 'pan' : 'retouch')}
+                    style={{
+                      border: '1px solid rgba(148,163,184,0.35)',
+                      background: interactionMode === 'retouch' ? 'rgba(228,164,189,0.22)' : 'white',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      padding: '5px 8px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      fontSize: 11,
+                      fontWeight: 700
+                    }}
+                  >
+                    {interactionMode === 'retouch' ? <MousePointer2 size={14} /> : <Move size={14} />}
+                    {interactionMode === 'retouch' ? 'Chỉnh vùng' : 'Di chuyển'}
+                  </button>
+                )}
+              </div>
+
+              {supportsDirectRetouch && interactionMode === 'retouch' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 12,
+                    right: 12,
+                    zIndex: 25,
+                    width: 190,
+                    padding: '9px 11px',
+                    borderRadius: 12,
+                    background: 'rgba(38,38,38,0.82)',
+                    color: '#fff',
+                    fontSize: 11,
+                    backdropFilter: 'blur(8px)'
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 5 }}>
+                    Vuốt trực tiếp trên vùng cần chỉnh
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span>Vùng</span>
+                    <input
+                      aria-label="Kích thước vùng chỉnh trực tiếp"
+                      type="range"
+                      min="24"
+                      max="120"
+                      value={directRadius}
+                      onChange={e => setDirectRadius(Number(e.target.value))}
+                    />
+                    <span>{directRadius}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: 6 }}>
+                    <span>Cường độ</span>
+                    <input
+                      aria-label="Cường độ chỉnh trực tiếp"
+                      type="range"
+                      min="15"
+                      max="100"
+                      value={directStrength}
+                      onChange={e => setDirectStrength(Number(e.target.value))}
+                    />
+                    <span>{directStrength}</span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                data-testid="canvas-transform-stage"
+                style={{
+                  position: 'relative',
+                  display: 'inline-flex',
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center center',
+                  willChange: 'transform'
+                }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  data-testid="main-canvas"
+                  className="main-canvas"
+                  onPointerDown={handleCanvasPointerDown}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  onPointerCancel={handleCanvasPointerUp}
+                  onPointerLeave={() => setPointerPreview(null)}
+                  onWheel={handleCanvasWheel}
+                  style={{
+                    touchAction: 'none',
+                    cursor: interactionMode === 'pan'
+                      ? 'grab'
+                      : supportsDirectRetouch
+                        ? (activeTool === 'skin_blemish' || activeTool === 'skin_smooth' ? 'crosshair' : 'cell')
+                        : 'default'
+                  }}
+                />
+                {supportsDirectRetouch && interactionMode === 'retouch' && pointerPreview && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      pointerEvents: 'none',
+                      position: 'absolute',
+                      left: `${pointerPreview.u * 100}%`,
+                      top: `${pointerPreview.v * 100}%`,
+                      width: `${(directRadius * 2) / zoom}px`,
+                      height: `${(directRadius * 2) / zoom}px`,
+                      transform: 'translate(-50%, -50%)',
+                      borderRadius: '50%',
+                      border: `${1.5 / zoom}px solid rgba(255,255,255,0.95)`,
+                      boxShadow: `0 0 0 ${1 / zoom}px rgba(228,164,189,0.9), 0 0 ${8 / zoom}px rgba(0,0,0,0.2)`
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
