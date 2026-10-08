@@ -1089,7 +1089,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                               <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                              <button onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
+                              <button data-testid="btn-reset-tool" onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
                                 <RotateCcw size={12} /> Đặt lại
                               </button>
                             </div>
@@ -1097,13 +1097,40 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                         ) : activeTool === 'makeup_lipstick' || activeTool === 'makeup_blush' || activeTool === 'makeup_eyeshadow' ? (
                           <div>
                             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                              {[
-                                { id: '#ff4d4d', name: 'Đỏ tươi' },
-                                { id: '#ff80df', name: 'Hồng phấn' },
-                                { id: '#ff9966', name: 'Cam san hô' },
-                                { id: '#cc3300', name: 'Đỏ đất' },
-                                { id: '#993333', name: 'Nâu đỏ' }
-                              ].map(c => (
+                              {(
+                                activeTool === 'makeup_lipstick' ? [
+                                  { id: '#ff0000', name: 'Đỏ thuần' },
+                                  { id: '#ff4d4d', name: 'Đỏ tươi' },
+                                  { id: '#b30000', name: 'Đỏ rượu' },
+                                  { id: '#cc3300', name: 'Đỏ đất' },
+                                  { id: '#993333', name: 'Nâu đỏ' },
+                                  { id: '#ff9966', name: 'Cam san hô' },
+                                  { id: '#ff6600', name: 'Cam cháy' },
+                                  { id: '#ff80df', name: 'Hồng phấn' },
+                                  { id: '#ff3399', name: 'Hồng cánh sen' },
+                                  { id: '#cc6699', name: 'Hồng đất' }
+                                ] : activeTool === 'makeup_blush' ? [
+                                  { id: '#ffb3b3', name: 'Hồng đào' },
+                                  { id: '#ff80df', name: 'Hồng phấn' },
+                                  { id: '#ff66b3', name: 'Hồng sen' },
+                                  { id: '#ff9966', name: 'Cam san hô' },
+                                  { id: '#ff8c66', name: 'Cam đất' },
+                                  { id: '#e67300', name: 'Cam gạch' },
+                                  { id: '#cc6699', name: 'Mận chín' },
+                                  { id: '#d98cb3', name: 'Tím nhạt' }
+                                ] : [
+                                  { id: '#ffe6cc', name: 'Trắng ngà' },
+                                  { id: '#ffcc99', name: 'Be nhạt' },
+                                  { id: '#d9b38c', name: 'Nâu nhạt' },
+                                  { id: '#bf8040', name: 'Nâu đồng' },
+                                  { id: '#8b4513', name: 'Nâu đậm' },
+                                  { id: '#ffb3b3', name: 'Hồng phấn' },
+                                  { id: '#ff9966', name: 'Cam đào' },
+                                  { id: '#cc3300', name: 'Đỏ gạch' },
+                                  { id: '#4d4d4d', name: 'Xám khói' },
+                                  { id: '#000000', name: 'Đen tuyền' }
+                                ]
+                              ).map(c => (
                                 <button
                                   key={c.id}
                                   onClick={() => {
@@ -1141,7 +1168,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                               <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                              <button onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
+                              <button data-testid="btn-reset-tool" onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
                                 <RotateCcw size={12} /> Đặt lại
                               </button>
                             </div>
@@ -1274,6 +1301,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
                         <div className="tool-subgroup-title">Tổng thể</div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Tổng thể').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Mặt</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Mặt').map(renderToolButton)}
 
                         <div className="tool-subgroup-title">Môi</div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Môi').map(renderToolButton)}

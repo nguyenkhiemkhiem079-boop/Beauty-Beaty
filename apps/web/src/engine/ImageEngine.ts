@@ -69,6 +69,8 @@ export interface PipelineParams {
   makeup_lipstick_color?: string;
   makeup_blush?: number;
   makeup_blush_color?: string;
+  makeup_foundation?: number;      // B055
+  makeup_highlighter?: number;     // B059
   makeup_contour?: number;
   makeup_eyeshadow?: number;
   makeup_eyeshadow_color?: string;
@@ -2398,16 +2400,19 @@ export class ImageEngine {
     });
   }
 
-  applyLipstick(landmarks: NormalizedLandmark[], colorHex: string, intensity: number) {
+  applyLipstick(landmarks: NormalizedLandmark[], colorHex: string, intensity: number, finish: number = 50, liner: number = 100) {
     if (intensity === 0 || !landmarks || landmarks.length === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
 
     ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
+    // Finish: 0 = matte (multiply), 100 = gloss (overlay/soft-light)
+    ctx.globalCompositeOperation = finish > 50 ? 'soft-light' : 'multiply';
     ctx.fillStyle = colorHex;
-    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    const alphaBase = intensity / 100.0;
+    const linerScale = 0.5 + liner / 200.0; // 0 = 0.5 (ombre), 100 = 1.0 (full)
+    ctx.globalAlpha = alphaBase * (finish > 50 ? 0.6 : 0.4) * linerScale;
     
     const lipUpperIds = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291];
     const lipLowerIds = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
@@ -2425,6 +2430,14 @@ export class ImageEngine {
       ctx.lineTo(pt.x * w, pt.y * h);
     }
     ctx.fill();
+    
+    // Gloss specular highlight if finish > 50
+    if (finish > 50) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.globalAlpha = ((finish - 50) / 50.0) * (intensity / 100.0);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -2510,7 +2523,8 @@ export class ImageEngine {
 
   // B061: Full Makeup Preset (Preset makeup hoàn chỉnh)
   applyMakeupPreset(landmarks: NormalizedLandmark[], _preset = 'natural', intensity = 60) {
-    if (intensity === 0 || !landmarks || landmarks.length === 0 || !_preset) return;
+    if (!_preset) _preset = 'natural';
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
     
     let eyeBrighten = 0.6;
     let eyeCatchlight = 0.5;
@@ -2533,8 +2547,70 @@ export class ImageEngine {
     this.applyEyeBrightening(landmarks, intensity * eyeBrighten);
     this.applyEyeCatchlight(landmarks, intensity * eyeCatchlight);
     this.applyEyeliner(landmarks, intensity * eyeliner);
-    this.applyLipFinish(landmarks, _preset === 'western' ? 'matte' : 'gloss', intensity * lip);
+    this.applyLipstick(landmarks, _preset === 'western' ? '#993333' : '#ff4d4d', intensity * lip, _preset === 'western' ? 0 : 100, 100);
   }
+
+  applyFoundation(intensity: number) {
+    if (intensity === 0 || !this.segmentationMask) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w; maskCanvas.height = h;
+    const mCtx = maskCanvas.getContext('2d')!;
+    this.drawScaledSegmentationMask(mCtx, w, h, 2); // Category 2: face skin
+    
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = w; baseCanvas.height = h;
+    const bCtx = baseCanvas.getContext('2d')!;
+    bCtx.fillStyle = '#ffeedd'; // Foundation color
+    bCtx.fillRect(0, 0, w, h);
+    
+    bCtx.globalCompositeOperation = 'destination-in';
+    bCtx.drawImage(maskCanvas, 0, 0);
+    
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = (intensity / 100.0) * 0.5;
+    ctx.drawImage(baseCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  applyHighlighter(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    ctx.globalCompositeOperation = 'screen';
+    
+    const highlightSpots = [
+      { id: 4, r: 0.03 }, // Nose tip
+      { id: 164, r: 0.02 }, // Philtrum
+      { id: 116, r: 0.05 }, // Left cheekbone
+      { id: 345, r: 0.05 }  // Right cheekbone
+    ];
+    
+    for (const spot of highlightSpots) {
+      const pt = landmarks[spot.id];
+      if (!pt) continue;
+      const cx = pt.x * w;
+      const cy = pt.y * h;
+      const r = w * spot.r;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, 'rgba(255,255,255,0.8)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
 
   // B065: Tame Flyaway Hair (Giảm tóc con bay/xù)
   applyFlyawayReduction(intensity: number) {
@@ -3093,15 +3169,10 @@ export class ImageEngine {
     if (params.teeth_whiten && params.teeth_whiten > 0 && mappedLandmarks) {
       this.applyTeethWhitening(mappedLandmarks, params.teeth_whiten);
     }
-    if (params.lip_finish_intensity && params.lip_finish_intensity > 0 && mappedLandmarks) {
-      this.applyLipFinish(mappedLandmarks, params.lip_finish, params.lip_finish_intensity);
-    }
-    if (params.lip_liner && params.lip_liner > 0 && mappedLandmarks) {
-      this.applyLipLiner(mappedLandmarks, '#c43a53', params.lip_liner);
-    }
+    
     
     if (params.makeup_lipstick && params.makeup_lipstick > 0 && mappedLandmarks) {
-      this.applyLipstick(mappedLandmarks, params.makeup_lipstick_color || '#ff4d4d', params.makeup_lipstick);
+      this.applyLipstick(mappedLandmarks, params.makeup_lipstick_color || '#ff4d4d', params.makeup_lipstick, params.lip_finish_intensity ?? 50, params.lip_liner ?? 100);
     }
     if (params.makeup_blush && params.makeup_blush > 0 && mappedLandmarks) {
       this.applyBlush(mappedLandmarks, params.makeup_blush_color || '#ff80df', params.makeup_blush);
@@ -3114,6 +3185,15 @@ export class ImageEngine {
     }
     if (params.makeup_eyeliner && params.makeup_eyeliner > 0 && mappedLandmarks) {
       this.applyEyeliner(mappedLandmarks, params.makeup_eyeliner);
+    }
+    if (params.makeup_foundation && params.makeup_foundation > 0) {
+      this.applyFoundation(params.makeup_foundation);
+    }
+    if (params.makeup_highlighter && params.makeup_highlighter > 0 && mappedLandmarks) {
+      this.applyHighlighter(mappedLandmarks, params.makeup_highlighter);
+    }
+    if (params.false_lashes && params.false_lashes > 0 && mappedLandmarks) {
+      this.applyFalseLashes(mappedLandmarks, params.false_lashes);
     }
 
     if (params.makeup_preset_intensity && params.makeup_preset_intensity > 0 && mappedLandmarks) {

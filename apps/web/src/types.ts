@@ -39,9 +39,14 @@ export type ToolType =
   | 'crop'
   | 'makeup_preset'
   | 'makeup_lipstick'
+  | 'lip_finish'
+  | 'lip_liner'
   | 'makeup_blush'
+  | 'makeup_foundation'
   | 'makeup_eyeshadow'
   | 'makeup_eyeliner'
+  | 'false_lashes'
+  | 'makeup_highlighter'
   | 'makeup_contour'
   | 'ai_makeup';
 
@@ -153,10 +158,12 @@ export interface EditState {
   makeup_lipstick_color?: string;
   makeup_blush?: number;
   makeup_blush_color?: string;
+  makeup_foundation?: number;      // B055
   makeup_contour?: number;
   makeup_eyeshadow?: number;
   makeup_eyeshadow_color?: string;
   makeup_eyeliner?: number;
+  makeup_highlighter?: number;     // B059
   hair_flyaway?: number;           // B065
   hair_highlight?: string;         // B067
   hair_highlight_intensity?: number;// B067
