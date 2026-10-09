@@ -54,6 +54,7 @@ test.describe('Direct touch retouch interaction', () => {
     expect(redone).toBe(smoothed);
 
     // Direct face warp: drag inward from one cheek.
+    await page.locator('[data-testid="tab-face"]').click();
     await page.locator('[data-testid="tool-item-face_slim"]').click();
     const beforeWarp = await canvasDataUrl(page);
     const box2 = await canvas.boundingBox();

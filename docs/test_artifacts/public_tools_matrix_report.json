@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-10-08T09:56:51.900Z",
+  "timestamp": "2026-10-08T10:39:14.010Z",
   "fixture": "real_portrait_front_real_photo_original.png",
   "totalToolsTested": 44,
   "allPassed": true,
-  "draftRestoreMAE": 1.8171,
+  "draftRestoreMAE": 1.7501,
   "exportFileSize": 2891357,
   "reopenedOutputVerified": true,
   "results": [
@@ -15,7 +15,7 @@
       "undoWorks": true,
       "redoWorks": true,
       "resetWorks": true,
-      "deltaMAE": 0.7405
+      "deltaMAE": 0.5202
     },
     {
       "toolId": "skin_brighten",
@@ -395,7 +395,7 @@
       "undoWorks": true,
       "redoWorks": true,
       "resetWorks": true,
-      "deltaMAE": 0.8399
+      "deltaMAE": 1.0812
     },
     {
       "toolId": "makeup_highlighter",

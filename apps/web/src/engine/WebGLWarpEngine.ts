@@ -12,7 +12,7 @@ export class WebGLWarpEngine {
   private positionBuffer: WebGLBuffer;
   private texCoordBuffer: WebGLBuffer;
   private texture: WebGLTexture;
-  private hairTexture: WebGLTexture;
+  private protectionTexture: WebGLTexture;
   private width: number;
   private height: number;
 
@@ -42,8 +42,8 @@ export class WebGLWarpEngine {
       precision highp float;
       varying vec2 v_texCoord;
       uniform sampler2D u_image;
-      uniform sampler2D u_hairMask;
-      uniform int u_hasHairMask;
+      uniform sampler2D u_protectionMask;
+      uniform int u_hasProtectionMask;
       
       uniform vec2 u_centers[10];
       uniform vec2 u_targets[10];
@@ -84,14 +84,14 @@ export class WebGLWarpEngine {
                     shift = -dir * factor;
                 }
                 
-                if (u_hasHairMask == 1) {
-                    float targetHair = texture2D(u_hairMask, v_texCoord).r;
-                    float sampleHair = texture2D(u_hairMask, tc - shift).r;
+                if (u_hasProtectionMask == 1) {
+                    float targetProt = texture2D(u_protectionMask, v_texCoord).r;
+                    float sampleProt = texture2D(u_protectionMask, tc - shift).r;
                     
-                    if (sampleHair > 0.5 && targetHair < 0.2) {
+                    if (sampleProt > 0.5 && targetProt < 0.2) {
                         shift *= 0.0;
-                    } else if (sampleHair > targetHair) {
-                        shift *= (1.0 - (sampleHair - targetHair));
+                    } else if (sampleProt > targetProt) {
+                        shift *= (1.0 - (sampleProt - targetProt));
                     }
                 }
                 
@@ -122,7 +122,7 @@ export class WebGLWarpEngine {
     ]), this.gl.STATIC_DRAW);
 
     this.texture = this.gl.createTexture()!;
-    this.hairTexture = this.gl.createTexture()!;
+    this.protectionTexture = this.gl.createTexture()!;
   }
 
   private createShader(type: number, source: string) {
@@ -147,7 +147,7 @@ export class WebGLWarpEngine {
     return prog;
   }
 
-  public applyWarp(image: HTMLCanvasElement, points: WarpPoint[], hairMask?: HTMLCanvasElement): HTMLCanvasElement {
+  public applyWarp(image: HTMLCanvasElement, points: WarpPoint[], protectionMask?: HTMLCanvasElement): HTMLCanvasElement {
     if (this.width !== image.width || this.height !== image.height) {
       this.width = image.width;
       this.height = image.height;
@@ -166,18 +166,18 @@ export class WebGLWarpEngine {
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
     this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_image"), 0);
 
-    const hasHairMaskLoc = this.gl.getUniformLocation(this.program, "u_hasHairMask");
-    if (hairMask) {
+    const hasProtectionMaskLoc = this.gl.getUniformLocation(this.program, "u_hasProtectionMask");
+    if (protectionMask) {
         this.gl.activeTexture(this.gl.TEXTURE1);
-        this.gl.bindTexture(this.gl.TEXTURE_2D, this.hairTexture);
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, hairMask);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.protectionTexture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, protectionMask);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-        this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_hairMask"), 1);
-        this.gl.uniform1i(hasHairMaskLoc, 1);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, "u_protectionMask"), 1);
+        this.gl.uniform1i(hasProtectionMaskLoc, 1);
     } else {
-        this.gl.uniform1i(hasHairMaskLoc, 0);
+        this.gl.uniform1i(hasProtectionMaskLoc, 0);
     }
 
     const posLoc = this.gl.getAttribLocation(this.program, "a_position");
@@ -229,6 +229,7 @@ export class WebGLWarpEngine {
   public dispose() {
     if (this.gl) {
       if (this.texture) this.gl.deleteTexture(this.texture);
+      if (this.protectionTexture) this.gl.deleteTexture(this.protectionTexture);
       if (this.positionBuffer) this.gl.deleteBuffer(this.positionBuffer);
       if (this.texCoordBuffer) this.gl.deleteBuffer(this.texCoordBuffer);
       if (this.program) this.gl.deleteProgram(this.program);

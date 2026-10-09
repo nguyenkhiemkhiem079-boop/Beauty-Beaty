@@ -193,6 +193,7 @@ export class ImageEngine {
   }
 
   private _hairMaskCache?: HTMLCanvasElement;
+  private _backgroundMaskCache?: HTMLCanvasElement;
   
   reset() {
     this.currentCropNorm = { x: 0, y: 0, w: 1, h: 1 };
@@ -202,20 +203,45 @@ export class ImageEngine {
     ctxWork.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctxWork.drawImage(this.originalCanvas, 0, 0);
     this._hairMaskCache = undefined;
+    this._backgroundMaskCache = undefined;
   }
 
-  private applyWarpWithMask(points: any[]): HTMLCanvasElement {
-      if (!this._hairMaskCache && this.segmentationMask) {
+  private applyWarpWithMask(points: any[], protectHair = true, protectBackground = false): HTMLCanvasElement {
+      if (!this.webGLWarp) return this.workCanvas;
+
+      let protectionMask: HTMLCanvasElement | undefined = undefined;
+      if (this.segmentationMask && (protectHair || protectBackground)) {
           const w = this.workCanvas.width;
           const h = this.workCanvas.height;
-          this._hairMaskCache = document.createElement('canvas');
-          this._hairMaskCache.width = w;
-          this._hairMaskCache.height = h;
-          const ctx = this._hairMaskCache.getContext('2d')!;
-          this.drawScaledSegmentationMask(ctx, w, h, SEGMENT_HAIR);
+          protectionMask = document.createElement('canvas');
+          protectionMask.width = w;
+          protectionMask.height = h;
+          const ctx = protectionMask.getContext('2d')!;
+
+          if (protectHair) {
+              if (!this._hairMaskCache) {
+                  this._hairMaskCache = document.createElement('canvas');
+                  this._hairMaskCache.width = w;
+                  this._hairMaskCache.height = h;
+                  this.drawScaledSegmentationMask(this._hairMaskCache.getContext('2d')!, w, h, SEGMENT_HAIR);
+              }
+              ctx.globalCompositeOperation = 'source-over';
+              ctx.drawImage(this._hairMaskCache, 0, 0);
+          }
+
+          if (protectBackground) {
+              if (!this._backgroundMaskCache) {
+                  this._backgroundMaskCache = document.createElement('canvas');
+                  this._backgroundMaskCache.width = w;
+                  this._backgroundMaskCache.height = h;
+                  this.drawScaledSegmentationMask(this._backgroundMaskCache.getContext('2d')!, w, h, SEGMENT_BACKGROUND);
+              }
+              ctx.globalCompositeOperation = 'source-over';
+              ctx.drawImage(this._backgroundMaskCache, 0, 0);
+          }
       }
-      if (!this.webGLWarp) return this.workCanvas;
-      return this.webGLWarp.applyWarp(this.workCanvas, points, this._hairMaskCache);
+
+      return this.webGLWarp.applyWarp(this.workCanvas, points, protectionMask);
   }
 
   private drawScaledSegmentationMask(targetCtx: CanvasRenderingContext2D, targetW: number, targetH: number, categoryId: number) {
@@ -1552,48 +1578,73 @@ export class ImageEngine {
     const cy = Math.round(centerNorm.y * h);
 
     const r = Math.max(4, Math.round(radiusPx));
-    const x0 = Math.max(0, cx - r);
-    const y0 = Math.max(0, cy - r);
-    const x1 = Math.min(w, cx + r);
-    const y1 = Math.min(h, cy + r);
+    
+    // Define a bounding box that includes the target blemish and a source patch for texture cloning
+    // We'll search for a clean texture patch offset by ~1.8r
+    const shiftX = (cx + r * 2.5 < w) ? Math.round(r * 1.8) : Math.round(-r * 1.8);
+    const shiftY = (cy + r * 2.5 < h) ? Math.round(r * 1.8) : Math.round(-r * 1.8);
+
+    const x0 = Math.max(0, cx - r - Math.abs(shiftX));
+    const y0 = Math.max(0, cy - r - Math.abs(shiftY));
+    const x1 = Math.min(w, cx + r + Math.abs(shiftX));
+    const y1 = Math.min(h, cy + r + Math.abs(shiftY));
     const pw = x1 - x0;
     const ph = y1 - y0;
     if (pw <= 0 || ph <= 0) return;
 
+    // 1. Get original pixels
     const imgData = ctx.getImageData(x0, y0, pw, ph);
     const data = imgData.data;
 
-    // Collect surrounding ring samples (from r*0.7 to r)
-    let sumR = 0, sumG = 0, sumB = 0, ringCount = 0;
+    // 2. Create a blurred version for low-frequency color base
+    const patchCanvas = document.createElement('canvas');
+    patchCanvas.width = pw; patchCanvas.height = ph;
+    const pCtx = patchCanvas.getContext('2d')!;
+    pCtx.putImageData(imgData, 0, 0);
+
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = pw; blurCanvas.height = ph;
+    const bCtx = blurCanvas.getContext('2d', { willReadFrequently: true })!;
+    bCtx.filter = `blur(${Math.max(2, r * 0.4)}px)`;
+    bCtx.drawImage(patchCanvas, 0, 0);
+    const blurData = bCtx.getImageData(0, 0, pw, ph).data;
+
+    // 3. Frequency separation blend
+    // For each pixel in the target blemish radius:
+    // Result = Target_LowFreq (blur) + (Source_Original - Source_LowFreq)
     for (let y = 0; y < ph; y++) {
       for (let x = 0; x < pw; x++) {
         const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
-        if (dist >= r * 0.65 && dist <= r) {
-          const idx = (y * pw + x) * 4;
-          sumR += data[idx];
-          sumG += data[idx + 1];
-          sumB += data[idx + 2];
-          ringCount++;
-        }
-      }
-    }
+        if (dist <= r) {
+          // Soft radial mask for blending
+          const t = Math.cos((dist / r) * (Math.PI / 2));
+          const weight = Math.min(1.0, Math.max(0.0, t));
+          
+          // Target pixel index
+          const tIdx = (y * pw + x) * 4;
+          
+          // Source pixel index (shifted)
+          let sx = x + shiftX;
+          let sy = y + shiftY;
+          // clamp to patch bounds just in case
+          sx = Math.max(0, Math.min(pw - 1, sx));
+          sy = Math.max(0, Math.min(ph - 1, sy));
+          const sIdx = (sy * pw + sx) * 4;
 
-    if (ringCount === 0) return;
-    const avgR = sumR / ringCount;
-    const avgG = sumG / ringCount;
-    const avgB = sumB / ringCount;
+          // Compute Source High Frequency (Detail)
+          const detailR = data[sIdx] - blurData[sIdx];
+          const detailG = data[sIdx + 1] - blurData[sIdx + 1];
+          const detailB = data[sIdx + 2] - blurData[sIdx + 2];
 
-    // Radial blend inward
-    for (let y = 0; y < ph; y++) {
-      for (let x = 0; x < pw; x++) {
-        const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
-        if (dist < r) {
-          const t = Math.cos((dist / r) * (Math.PI / 2)); // 1.0 at center, 0.0 at radius
-          const weight = Math.min(1.0, Math.max(0.0, t * 0.85));
-          const idx = (y * pw + x) * 4;
-          data[idx] = Math.round(data[idx] * (1 - weight) + avgR * weight);
-          data[idx + 1] = Math.round(data[idx + 1] * (1 - weight) + avgG * weight);
-          data[idx + 2] = Math.round(data[idx + 2] * (1 - weight) + avgB * weight);
+          // Reconstruct: Target Base (blur) + Source Detail
+          const outR = blurData[tIdx] + detailR;
+          const outG = blurData[tIdx + 1] + detailG;
+          const outB = blurData[tIdx + 2] + detailB;
+
+          // Blend into original data using radial weight
+          data[tIdx] = Math.round(data[tIdx] * (1 - weight) + Math.min(255, Math.max(0, outR)) * weight);
+          data[tIdx + 1] = Math.round(data[tIdx + 1] * (1 - weight) + Math.min(255, Math.max(0, outG)) * weight);
+          data[tIdx + 2] = Math.round(data[tIdx + 2] * (1 - weight) + Math.min(255, Math.max(0, outB)) * weight);
         }
       }
     }
@@ -1868,22 +1919,28 @@ export class ImageEngine {
   }
 
 
-  // Direct local skin retouch: edge-preserving smoothing constrained to a user-selected circular region.
-  applyLocalSkinSmoothing(
-    centerNorm: { x: number; y: number },
-    radiusNorm: number,
-    intensity: number,
+  // Direct local skin retouch: edge-preserving smoothing batched for all strokes.
+  applyBatchedLocalSkinSmoothing(
+    strokes: LocalBrushOperation[],
+    w_n: number,
+    h_n: number,
+    x_n: number,
+    y_n: number,
     landmarks?: NormalizedLandmark[]
   ) {
-    if (intensity <= 0 || radiusNorm <= 0) return;
+    if (!strokes || strokes.length === 0) return;
 
     const ctx = this.workCanvas.getContext('2d')!;
     const w = this.workCanvas.width;
     const h = this.workCanvas.height;
     const scale = Math.max(w, h) / 800;
-    const radiusPx = Math.max(8, radiusNorm * h);
-    const cx = centerNorm.x * w;
-    const cy = centerNorm.y * h;
+    
+    // Find max intensity for the global filter
+    let maxIntensity = 0;
+    for (const op of strokes) {
+      if (op.intensity > maxIntensity) maxIntensity = op.intensity;
+    }
+    if (maxIntensity <= 0) return;
 
     // Frequency-separation approximation: smooth low-frequency color while retaining fine texture.
     const fineBlur = document.createElement('canvas');
@@ -1895,7 +1952,7 @@ export class ImageEngine {
     const smooth = document.createElement('canvas');
     smooth.width = w; smooth.height = h;
     const smoothCtx = smooth.getContext('2d')!;
-    const blurRadius = Math.max(2, (intensity / 100) * 8) * scale;
+    const blurRadius = Math.max(2, (maxIntensity / 100) * 8) * scale;
     smoothCtx.filter = `blur(${blurRadius}px)`;
     smoothCtx.drawImage(this.workCanvas, 0, 0);
     smoothCtx.filter = 'none';
@@ -1913,14 +1970,28 @@ export class ImageEngine {
     mask.width = w; mask.height = h;
     const mCtx = mask.getContext('2d')!;
 
-    const radial = mCtx.createRadialGradient(cx, cy, radiusPx * 0.45, cx, cy, radiusPx);
-    radial.addColorStop(0, 'rgba(255,255,255,1)');
-    radial.addColorStop(0.72, 'rgba(255,255,255,0.9)');
-    radial.addColorStop(1, 'rgba(255,255,255,0)');
-    mCtx.fillStyle = radial;
-    mCtx.beginPath();
-    mCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
-    mCtx.fill();
+    for (const op of strokes) {
+      const u = (op.x - x_n) / w_n;
+      const v = (op.y - y_n) / h_n;
+      if (u < -0.2 || u > 1.2 || v < -0.2 || v > 1.2) continue;
+
+      const cx = u * w;
+      const cy = v * h;
+      const radiusPx = Math.max(8, (op.radiusNorm / h_n) * h);
+      
+      const strokeAlpha = op.intensity / maxIntensity;
+      
+      const radial = mCtx.createRadialGradient(cx, cy, radiusPx * 0.45, cx, cy, radiusPx);
+      radial.addColorStop(0, `rgba(255,255,255,${1 * strokeAlpha})`);
+      radial.addColorStop(0.72, `rgba(255,255,255,${0.9 * strokeAlpha})`);
+      radial.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      mCtx.globalCompositeOperation = 'source-over';
+      mCtx.fillStyle = radial;
+      mCtx.beginPath();
+      mCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+      mCtx.fill();
+    }
 
     // Intersect with actual face segmentation when available.
     if (this.segmentationMask) {
@@ -1962,7 +2033,7 @@ export class ImageEngine {
     smoothCtx.drawImage(mask, 0, 0);
 
     ctx.save();
-    ctx.globalAlpha = Math.min(0.82, 0.18 + (intensity / 100) * 0.62);
+    ctx.globalAlpha = Math.min(0.82, 0.18 + (maxIntensity / 100) * 0.62);
     ctx.drawImage(smooth, 0, 0);
     ctx.restore();
   }
@@ -1974,6 +2045,10 @@ export class ImageEngine {
       x: op.x + op.dx * op.intensity,
       y: op.y + op.dy * op.intensity
     };
+    
+    const protectHair = op.tool === 'face_slim' || op.tool === 'chin_slim';
+    const protectBackground = op.tool === 'face_slim' || op.tool === 'chin_slim' || op.tool === 'body_slim';
+    
     const glCanvas = this.applyWarpWithMask([
       {
         center: { x: op.x, y: op.y },
@@ -1982,7 +2057,7 @@ export class ImageEngine {
         intensity: 1.0,
         mode: 0.0
       }
-    ]);
+    ], protectHair, protectBackground);
     const ctx = this.workCanvas.getContext('2d')!;
     ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctx.drawImage(glCanvas, 0, 0);
@@ -3223,17 +3298,9 @@ export class ImageEngine {
     // User-painted local smoothing strokes. Coordinates are stored in source-image space
     // and remapped through the current crop so preview/export remain identical.
     if (params.localBrushes && params.localBrushes.length > 0) {
-      for (const op of params.localBrushes) {
-        if (op.tool !== 'skin_smooth') continue;
-        const u = (op.x - x_n) / w_n;
-        const v = (op.y - y_n) / h_n;
-        if (u < -0.2 || u > 1.2 || v < -0.2 || v > 1.2) continue;
-        this.applyLocalSkinSmoothing(
-          { x: u, y: v },
-          op.radiusNorm / h_n,
-          op.intensity,
-          mappedLandmarks
-        );
+      const skinSmoothStrokes = params.localBrushes.filter(op => op.tool === 'skin_smooth');
+      if (skinSmoothStrokes.length > 0) {
+        this.applyBatchedLocalSkinSmoothing(skinSmoothStrokes, w_n, h_n, x_n, y_n, mappedLandmarks);
       }
     }
 
