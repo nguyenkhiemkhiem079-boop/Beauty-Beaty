@@ -1,0 +1,2 @@
+  applyPipeline(params: PipelineParams, landmarks?: NormalizedLandmark[]) {  
+    const t0 = performance.now(); 

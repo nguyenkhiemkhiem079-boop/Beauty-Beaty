@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head><title>Bench</title></head>
+<body>
+  <canvas id="c"></canvas>
+  <script type="module">
+    import { ImageEngine } from './src/engine/ImageEngine.ts';
+    
+    async function run() {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      
+      const doBench = async (size, strokesCount) => {
+        const c = document.getElementById('c');
+        c.width = size.w;
+        c.height = size.h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffccaa';
+        ctx.fillRect(0,0,size.w,size.h);
+        
+        const engine = new ImageEngine(c);
+        
+        const strokes = [];
+        for (let i=0; i<strokesCount; i++) {
+          strokes.push({
+            id: 's'+i, tool: 'skin_smooth',
+            x: Math.random()*size.w, y: Math.random()*size.h,
+            radiusNorm: 0.1, intensity: 50
+          });
+        }
+        
+        // Warmup
+        engine.applyPipeline({ localBrushes: strokes });
+        await wait(100);
+        
+        const times = [];
+        for (let i=0; i<15; i++) {
+          const t0 = performance.now();
+          engine.applyPipeline({ localBrushes: strokes });
+          const t1 = performance.now();
+          times.push(t1-t0);
+          await wait(16);
+        }
+        
+        times.sort((a,b)=>a-b);
+        const avg = times.reduce((a,b)=>a+b, 0) / times.length;
+        const p95 = times[Math.floor(times.length * 0.95)];
+        
+        console.log(`BENCH: ${size.w}x${size.h} - ${strokesCount} strokes -> Avg: ${avg.toFixed(2)}ms, P95: ${p95.toFixed(2)}ms`);
+        engine.dispose();
+      };
+
+      await doBench({w: 800, h: 600}, 1);
+      await doBench({w: 800, h: 600}, 10);
+      await doBench({w: 800, h: 600}, 25);
+      await doBench({w: 800, h: 600}, 50);
+      
+      await doBench({w: 4000, h: 3000}, 10);
+      await doBench({w: 4000, h: 3000}, 25);
+      await doBench({w: 4000, h: 3000}, 50);
+      
+      console.log('DONE');
+    }
+    
+    run();
+  </script>
+</body>
+</html>

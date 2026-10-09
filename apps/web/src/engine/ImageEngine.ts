@@ -1935,13 +1935,6 @@ export class ImageEngine {
     const h = this.workCanvas.height;
     const scale = Math.max(w, h) / 800;
     
-    // Find max intensity for the global filter
-    let maxIntensity = 0;
-    for (const op of strokes) {
-      if (op.intensity > maxIntensity) maxIntensity = op.intensity;
-    }
-    if (maxIntensity <= 0) return;
-
     // Frequency-separation approximation: smooth low-frequency color while retaining fine texture.
     const fineBlur = document.createElement('canvas');
     fineBlur.width = w; fineBlur.height = h;
@@ -1952,7 +1945,7 @@ export class ImageEngine {
     const smooth = document.createElement('canvas');
     smooth.width = w; smooth.height = h;
     const smoothCtx = smooth.getContext('2d')!;
-    const blurRadius = Math.max(2, (maxIntensity / 100) * 8) * scale;
+    const blurRadius = 8 * scale; // Fixed radius; strength controlled by mask alpha
     smoothCtx.filter = `blur(${blurRadius}px)`;
     smoothCtx.drawImage(this.workCanvas, 0, 0);
     smoothCtx.filter = 'none';
@@ -1979,7 +1972,8 @@ export class ImageEngine {
       const cy = v * h;
       const radiusPx = Math.max(8, (op.radiusNorm / h_n) * h);
       
-      const strokeAlpha = op.intensity / maxIntensity;
+      // Calculate final absolute stroke alpha based on op.intensity directly.
+      const strokeAlpha = Math.min(0.82, 0.18 + (op.intensity / 100) * 0.62);
       
       const radial = mCtx.createRadialGradient(cx, cy, radiusPx * 0.45, cx, cy, radiusPx);
       radial.addColorStop(0, `rgba(255,255,255,${1 * strokeAlpha})`);
@@ -2033,7 +2027,7 @@ export class ImageEngine {
     smoothCtx.drawImage(mask, 0, 0);
 
     ctx.save();
-    ctx.globalAlpha = Math.min(0.82, 0.18 + (maxIntensity / 100) * 0.62);
+    ctx.globalAlpha = 1.0; // Intensity mapped directly into the mask alpha
     ctx.drawImage(smooth, 0, 0);
     ctx.restore();
   }

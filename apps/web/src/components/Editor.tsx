@@ -82,10 +82,11 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     lastClientY: 0
   });
   const gestureStateRef = useRef<EditState | null>(null);
-  const activePointersRef = useRef<Map<number, React.PointerEvent<HTMLCanvasElement>>>(new Map());
+  // Store plain immutable data — never retain React SyntheticEvent objects as long-lived state.
+  const activePointersRef = useRef<Map<number, { pointerId: number; clientX: number; clientY: number }>>(new Map());
   const pinchRef = useRef<{ startDist: number, startZoom: number, startCenter: {x: number, y: number}, startPan: {x: number, y: number} } | null>(null);
 
-  const getPinchData = (map: Map<number, React.PointerEvent<HTMLCanvasElement>>) => {
+  const getPinchData = (map: Map<number, { pointerId: number; clientX: number; clientY: number }>) => {
     const ptrs = Array.from(map.values());
     if (ptrs.length < 2) return null;
     const dx = ptrs[0].clientX - ptrs[1].clientX;
@@ -698,7 +699,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
     canvasRef.current.setPointerCapture(e.pointerId);
-    activePointersRef.current.set(e.pointerId, e);
+    // Store plain data — do NOT retain the SyntheticEvent which React will recycle.
+    activePointersRef.current.set(e.pointerId, { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY });
 
     if (activePointersRef.current.size >= 2) {
       if (gestureRef.current.kind === 'brush' || gestureRef.current.kind === 'heal' || gestureRef.current.kind === 'warp') {
@@ -762,7 +764,8 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
   const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (activePointersRef.current.has(e.pointerId)) {
-      activePointersRef.current.set(e.pointerId, e);
+      // Update plain data snapshot — do NOT store the SyntheticEvent.
+      activePointersRef.current.set(e.pointerId, { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY });
     }
 
     if (activePointersRef.current.size >= 2) {
