@@ -34,7 +34,7 @@ async function main() {
     if (!(await isReady())) {
       server = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', [
         'run', 'dev:web', '--', '--host', '127.0.0.1', '--port', '5173', '--strictPort'
-      ], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+      ], { cwd, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
       let ready = false;
       for (let i = 0; i < 60; i++) {
         if (await isReady()) { ready = true; break; }

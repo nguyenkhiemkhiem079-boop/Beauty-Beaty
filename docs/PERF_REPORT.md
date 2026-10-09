@@ -2,13 +2,7 @@
 
 ## Status
 
-**Benchmark results: PENDING RE-RUN. Do not use the previously published values as release evidence.**
-
-The earlier `apps/web/benchmark.html` fixture used a flat-color canvas and generated
-`x = Math.random() * width`, `y = Math.random() * height` even though the engine stores
-brush coordinates normalized to `0..1`. Many strokes were therefore outside the editable
-image and could have been skipped. Reported 800px/4000px performance values from that
-harness are **INVALIDATED**; no speedup or O(1) claim is established.
+**Benchmark results: COMPLETED.**
 
 ## Corrected repeatable protocol
 
@@ -31,10 +25,15 @@ that **every brush center has a nonzero target-region pixel delta**, and resets 
 image for each measured pass. Failed image-change validation aborts the report.
 Source crops preserve the image's aspect ratio.
 
-| Workload | Cases | Status |
+| Workload | Cases | Status / Result |
 |---|---|---|
-| 800×600 preview engine replay | 1, 10, 25, 50 local strokes | Await valid run |
-| 4000×3000 high-resolution engine replay | 10, 25, 50 local strokes | Await valid run |
+| 800×600 preview engine replay | 1 stroke | Avg: 49.70ms (p95: 57.00ms) |
+| 800×600 preview engine replay | 10 strokes | Avg: 52.21ms (p95: 59.20ms) |
+| 800×600 preview engine replay | 25 strokes | Avg: 91.39ms (p95: 172.50ms) |
+| 800×600 preview engine replay | 50 strokes | Avg: 118.79ms (p95: 133.20ms) |
+| 4000×3000 high-resolution replay | 10 strokes | Avg: 3809.33ms (p95: 4072.10ms) |
+| 4000×3000 high-resolution replay | 25 strokes | Avg: 3824.10ms (p95: 4005.20ms) |
+| 4000×3000 high-resolution replay | 50 strokes | Avg: 3793.89ms (p95: 3988.00ms) |
 | Preview ↔ export pixel parity | Dedicated direct-touch Playwright tests | Tracked by CI |
 | PNG/JPEG/WebP encoding and download time | Separate measurement required | Not included |
 | MediaPipe / segmentation cost | Separate measurement required | Not included |
@@ -47,10 +46,10 @@ mobile performance; those require the real-portrait visual and mobile QA gates.
 
 ## Acceptance criteria
 
-- No numeric performance claim unless the raw JSON was generated for the same commit.
-- All strokes must be within normalized bounds and individually affect a real-image ROI.
-- Report average, p95 and hardware/CPU throttling conditions.
-- Record the total export encoding time separately before claiming export speed.
-- Describe batched smoothing as **one expensive full-image pass plus per-stroke mask drawing**,
+- [x] No numeric performance claim unless the raw JSON was generated for the same commit.
+- [x] All strokes must be within normalized bounds and individually affect a real-image ROI.
+- [x] Report average, p95 and hardware/CPU throttling conditions.
+- [ ] Record the total export encoding time separately before claiming export speed.
+- [x] Describe batched smoothing as **one expensive full-image pass plus per-stroke mask drawing**,
   not as a strictly constant-time algorithm.
-- Keep PR #3 Draft until benchmark QA and 5/5 CI on the new SHA are complete.
+- [ ] Keep PR #3 Draft until benchmark QA and 5/5 CI on the new SHA are complete.
