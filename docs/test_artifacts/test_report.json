@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-10-08T03:06:55.258Z",
+  "timestamp": "2026-10-08T08:22:20.023Z",
   "status": "PASSED",
-  "artifactsCount": 15,
+  "artifactsCount": 18,
   "details": {
     "realPortraits": [
       {
@@ -78,8 +78,8 @@
       "previewResolution": "600x899",
       "exportResolution": "2000x2997",
       "aspectRatio": "0.6674",
-      "mae": 0.7381355827464504,
-      "psnr": 47.44483405272454,
+      "mae": 0.7552206154988931,
+      "psnr": 44.809898123932186,
       "isParityValid": true
     },
     "uiExportReopenTest": {
@@ -91,7 +91,21 @@
       "isLosslessPng": true,
       "passed": true
     },
-    "allPassed": true
+    "allPassed": true,
+    "eyeGroupTest": {
+      "brightDiff": 0.8171029668411867,
+      "enlargeDiff": 17.153996509598603,
+      "isBrightEffective": true,
+      "isEnlargeEffective": true,
+      "passed": true
+    },
+    "hairProtectionTest": {
+      "hairInFaceWarped": 1583,
+      "totalFacePixels": 53337,
+      "hairIntrusionRatio": 0.02967920955434314,
+      "isHairProtected": true,
+      "passed": true
+    }
   },
   "pageErrors": []
 }

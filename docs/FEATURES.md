@@ -24,8 +24,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 1. Da (Skin: B001 – B012)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B001** (P0) | Mịn da giữ texture | Làm mịn vùng da bằng Alpha Mask, đục lỗ bảo vệ mắt/môi/mày/tóc, hòa trộn với ảnh gốc theo intensity. Bán kính blur scale theo độ phân giải. | Slider "Mịn da tự nhiên" (Nhóm Da) | Canvas 2D + MediaPipe Face Mesh & Segmenter | MediaPipe FaceLandmarker, Segmenter | Ảnh JPEG/PNG có khuôn mặt | Vùng da mịn, bảo vệ texture mắt, môi, lông mày, tóc; không blur toàn ảnh. | `scripts/run_visual_verification.js`, artifacts tại `docs/test_artifacts/` | `IMPLEMENTED_UNVERIFIED` | Tích hợp thêm fine-tuning tần số cao (frequency separation) nếu cần |
 | **B002** | Xóa mụn bằng chạm/cọ | Chấm/vẽ cọ lên nốt mụn, nội suy điểm ảnh từ viền ngoài (Poisson / patch inpainting cục bộ) | Cọ chấm xóa mụn (Nhóm Da) | Canvas 2D Patch Inpainting | Người dùng tương tác cọ | Tọa độ click/brush trong vùng da | Vùng mụn biến mất, biên hòa trộn mượt, không để lại vết quầng thâm | Unit test inpainting patch + Canvas test | `IMPLEMENTED_UNVERIFIED` | Mở rộng cọ thủ công trên UI Editor |
 | **B003** | Giảm đốm và khuyết điểm nhỏ | Tự động phát hiện đốm sắc tố có độ tương phản cao trên nền da và làm mềm cục bộ | Slider "Giảm đốm thâm" | Local bilateral filter trên mask da | FaceLandmarker | Vùng da mặt | Giảm vết thâm nhỏ mà không xóa nốt ruồi duyên (beauty mark) | Visual test trên ảnh có tàn nhang nhẹ | `IMPLEMENTED_UNVERIFIED` | Triển khai bộ lọc Laplacian of Gaussian (LoG) phát hiện đốm |
@@ -43,8 +43,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 2. Khuôn mặt (Face: B013 – B024)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B013** (P0) | Thon mặt tổng thể | Bóp gọn hai bên má hướng về trục trung tâm mũi bằng WebGL GLSL Inverse Mapping Pinch | Slider "Thon mặt (V-Line)" | WebGLWarpEngine | Landmarks má [234, 454] và mũi [1] | Ảnh có mặt chính diện/nghiêng | Má thon vào tâm, nền ngoài biên hàm không gãy, biên độ co giãn mượt $C^1$ | `test_runner.ts`, test artifacts | `IMPLEMENTED_UNVERIFIED` | Duy trì và mở rộng thêm điểm hàm |
 | **B014** | Bề rộng khuôn mặt | Co giãn tỉ lệ ngang toàn bộ hai bên thái dương và xương gò má | Slider "Bề rộng mặt" | WebGL Bilateral Pinch Warp | Landmarks [127, 356] | Toàn bộ chiều ngang mặt | Mặt hẹp lại hoặc mở rộng cân đối | applyFaceWidth — bidirectional inward/outward warp PASS | `IMPLEMENTED_UNVERIFIED` | Tinh chỉnh bán kính thái dương |
 | **B015** | Quai hàm | Tinh chỉnh góc xương quai hàm (mandibular angle) | Slider "Góc quai hàm" | WebGL Bilateral Warp | Landmarks [172, 397] | Góc hàm hai bên | Đường quai hàm sắc nét hoặc mềm mại theo ý muốn | applyJawAngle — mandibular angle warp PASS | `IMPLEMENTED_UNVERIFIED` | Tinh chỉnh góc bo hàm |
@@ -62,8 +62,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 3. Mắt (Eyes: B025 – B034)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B025** | Kích thước mắt | Phóng to hai mắt bằng WebGL Radial Bulge Warp tại tâm con ngươi | Slider "Mắt to tròn" | WebGL Radial Bulge Warp | Tâm mắt [468, 473], khóe mắt [33, 133, 362, 263] | Hốc mắt hai bên | Mắt to tròn tự nhiên, bán kính $R \le 0.85 W_{\text{eye}}$ bảo vệ chân mày và sống mũi | Radial expansion test | `IMPLEMENTED_UNVERIFIED` | Tích hợp vào UI |
 | **B026** | Chiều cao mắt | Kéo rộng mí trên và mí dưới theo phương thẳng đứng | Slider "Chiều cao mắt" | WebGL Vertical Eye Stretch | Landmarks mi trên & mi dưới [159, 145, 386, 374] | Mí mắt | Mắt mở to theo chiều dọc, lòng đen lộ rõ | applyEyeHeight — vertical eye stretch PASS | `IMPLEMENTED_UNVERIFIED` | Tinh chỉnh độ giãn mí |
 | **B027** | Chiều dài mắt | Kéo dài đuôi mắt về phía thái dương | Slider "Độ dài mắt" | WebGL Lateral Eye Warp | Khóe mắt ngoài [33, 263] | Đuôi mắt | Đuôi mắt dài sắc sảo | applyEyeLength — lateral canthus warp PASS | `IMPLEMENTED_UNVERIFIED` | Tinh chỉnh đuôi mắt |
@@ -79,8 +79,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 4. Mũi, Môi & Răng (Nose, Lips & Teeth: B035 – B044)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B035** | Kích thước mũi | Thu nhỏ hoặc phóng to toàn bộ khối mũi | Slider "Kích thước mũi" | WebGL Radial Contraction | Tâm mũi [1], chóp [4], cánh [48, 278] | Toàn bộ mũi | Mũi nhỏ nhắn hài hòa | Nose area reduction test | `IMPLEMENTED_UNVERIFIED` | Radial contraction mũi |
 | **B036** | Bề rộng cánh mũi | Bóp hẹp hai bên cánh mũi hướng vào vách ngăn giữa | Slider "Thu gọn cánh mũi" | WebGL Bilateral Pinch Warp | Cánh mũi [48, 278], vách ngăn [2] | Cánh mũi | Cánh mũi gọn gàng, lỗ mũi không bị biến dạng méo | Alar base width test | `IMPLEMENTED_UNVERIFIED` | Tích hợp vào UI Editor |
 | **B037** | Tạo khối sống mũi | Kẻ highlight sống mũi và đổ bóng hai bên sống mũi | Slider "Sống mũi cao" | Canvas 2D Nose Bridge Shading | Sống mũi [6, 197, 195, 5] | Dọc sống mũi | Sống mũi thẳng tắp và thanh thoát | Shading luminance test | `IMPLEMENTED_UNVERIFIED` | Tích hợp vào makeup pass |
@@ -96,8 +96,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 5. Lông mày (Brows: B045 – B050)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B045** | Vị trí cao/thấp của mày | Nâng hoặc hạ toàn bộ cung mày so với hốc mắt | Slider "Vị trí mày" | WebGL Directional Warp | Lông mày [70, 300...] | Cung lông mày | Chân mày cao thanh thoát hoặc thấp nam tính | Brow elevation test | `IMPLEMENTED_UNVERIFIED` | Warp nâng cung mày |
 | **B046** | Độ dày lông mày | Làm lông mày đậm hơn hoặc thanh mảnh hơn | Slider "Độ đậm mày" | Canvas 2D Stroke Density | Mask lông mày | Lông mày | Mày đậm nét rõ từng sợi | Alpha density test | `IMPLEMENTED_UNVERIFIED` | Tinh chỉnh mask chân mày |
 | **B047** | Khoảng cách lông mày | Kéo gần hoặc tách xa hai đầu lông mày | Slider "Khoảng cách mày" | WebGL Bilateral Shift | Đầu mày [55, 285] | Đầu lông mày | Cân đối ấn đường, không bị giao nhau | Inter-brow distance test | `IMPLEMENTED_UNVERIFIED` | Warp khoảng cách mày |
@@ -109,8 +109,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 6. Trang điểm (Makeup: B051 – B062)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B051** | Son: màu và cường độ | Phủ màu son lên viền môi theo bảng màu son thời thượng và cường độ 0-100% | Picker & Slider "Màu son" | Canvas 2D Soft-Light / Multiply | Outer lip mask [61, 291...] | Toàn bộ môi | Son lên đều màu, giữ vân môi thật | Color accuracy test | `IMPLEMENTED_UNVERIFIED` | Tích hợp bảng màu son |
 | **B052** | Son: chất liệu matte/gloss | Điều chỉnh độ bóng bóng mượt (gloss) hoặc lì mịn (matte) của môi | Toggle "Son lì / Son bóng" | Specular Highlights / Contrast curve | Môi dưới | Môi | Son bóng có đốm sáng bóng ướt; son lì mịn màng | Highlight intensity test | `IMPLEMENTED_UNVERIFIED` | Shader gloss texture |
 | **B053** | Son: vùng phủ và viền | Tô son lòng môi (ombre/gradient) hoặc full môi có viền sắc nét | Selector "Kiểu son" | Radial Gradient Mask | Lòng môi vs viền môi | Đôi môi | Chuyển tiếp màu từ đậm trong lòng môi ra nhạt dần ở viền | Gradient profile test | `IMPLEMENTED_UNVERIFIED` | Ombre mask |
@@ -128,8 +128,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 7. Tóc (Hair: B063 – B074)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B063** (P0) | Mượt tóc giữ chi tiết | Làm mượt tóc theo mask phân đoạn MediaPipe Segmenter (Category 1), bảo vệ viền và phông nền | Slider "Mượt tóc" | Canvas 2D + MediaPipe Segmenter | MediaPipe Segmenter | Vùng tóc | Tóc vào nếp mượt mà, không bị bết dính thành mảng, nền xung quanh nguyên vẹn | `test_runner.ts`, visual artifacts | `IMPLEMENTED_UNVERIFIED` | Duy trì và benchmark |
 | **B064** | Tăng độ bóng tóc | Thêm dải ánh sáng bóng mượt (Hair Shine) trên đỉnh đầu và thân tóc | Slider "Bóng tóc" | Canvas 2D Screen Blend trên mask tóc | Segmenter Hair Mask | Vùng tóc | Tóc có độ óng ả khỏe mạnh của salon | applyHairShine — linear gradient screen-blended to hair mask | `IMPLEMENTED_UNVERIFIED` | Tích hợp vào Hair pass |
 | **B065** | Giảm tóc con bay/xù | Làm sạch các sợi tóc con lởm chởm ngoài đường viền tóc | Slider "Gọn tóc con" | Morphological Hair Mask Erosion | Segmenter Hair Mask | Viền ngoài của tóc | Viền tóc gọn gàng, không còn sợi xù | Edge roughness test | `IMPLEMENTED_UNVERIFIED` | Mask erosion filter |
@@ -147,8 +147,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 8. Vóc dáng (Body: B075 – B082)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **B075** | Thon eo | Bóp gọn hai bên eo hướng vào rốn bằng WebGL Bilateral Warp có vùng bảo vệ phông nền | Slider "Thon eo" | WebGL Bilateral Warp | Vùng chọn eo người dùng | Thân người | Vòng eo thon nhỏ hình đồng hồ cát, nền ngoài không cong vẹo | Grid background preservation test | `IMPLEMENTED_UNVERIFIED` | Tích hợp vào UI |
 | **B076** | Thon cánh tay | Thu hẹp bắp tay to | Slider "Thon bắp tay" | WebGL Pinch Warp | Vùng chọn cánh tay | Bắp tay | Bắp tay thon thả, không làm méo thân người cạnh tay | Arm diameter test | `IMPLEMENTED_UNVERIFIED` | Warp bắp tay |
 | **B077** | Thon chân | Thu gọn đùi và bắp chân | Slider "Thon chân" | WebGL Bilateral Warp | Vùng chọn đùi/bắp chân | Đôi chân | Chân thon nuột nà, thẳng tắp | Leg width test | `IMPLEMENTED_UNVERIFIED` | Warp bắp chân |
@@ -162,8 +162,8 @@ Bảng đối chiếu chuẩn hóa theo Master Plan A2 (`Beauty_App_Antigravity_
 
 ## 9. Yêu cầu Bổ sung Đặc tả (X-Prefixed IDs)
 
-| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Next Action |
-|---|---|---|---|---|---|---|---|---|---|---|
+| ID | Nguyên văn yêu cầu | Distinct Behavior | UI Entry | Engine / Provider | Dependency | Supported Inputs | Acceptance Criteria | Tests & Evidence | Status | Công khai trên UI | Next Action |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | **X001** | Độ rộng trán (Forehead width) | Thu hẹp hoặc mở rộng hai bên thái dương trán | Slider "Độ rộng trán" | WebGL Bilateral Warp | Landmarks [67, 297] | Vùng trán | Trán cân xứng với gò má và cằm | Forehead width test | `IMPLEMENTED_UNVERIFIED` | Warp hai bên thái dương |
 | **X002** | Khoảng cách hai mắt (Eye spacing) | Dịch chuyển vị trí hai hốc mắt ra xa hoặc lại gần sống mũi | Slider "Khoảng cách mắt" | WebGL Eye Separation Warp | Khóe mắt hai bên | Hốc mắt | Khoảng cách mắt đạt chuẩn tỉ lệ 1 con mắt ở giữa | Inter-canthal distance test | `IMPLEMENTED_UNVERIFIED` | Bilateral eye translation |
 | **X003** | Xóa tàn nhang có chọn lọc qua cọ/vùng chọn | Cho phép người dùng chủ động chọn vết tàn nhang để xóa, không tự ý xóa hết nốt ruồi | Cọ "Xóa tàn nhang" | Canvas 2D Patch Inpainting | Tương tác cọ | Vùng chọn tàn nhang | Chỉ xóa đúng đốm được chọn, giữ nguyên nét duyên khác | Brush selective test | `IMPLEMENTED_UNVERIFIED` | Tích hợp cọ vào UI Editor |

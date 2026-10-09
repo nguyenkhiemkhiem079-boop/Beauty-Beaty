@@ -1,7 +1,7 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { WebGLWarpEngine, type WarpPoint } from './WebGLWarpEngine';
-import type { SegmentationResult } from './SegmenterManager';
-import type { CropOperation, HealingOperation } from '../types';
+import { type SegmentationResult, SEGMENT_FACE, SEGMENT_HAIR, SEGMENT_BACKGROUND } from './SegmenterManager';
+import type { CropOperation, HealingOperation, LocalBrushOperation, LocalWarpOperation } from '../types';
 import { COLOR_FILTERS } from '../presets/filters';
 
 export interface PipelineParams {
@@ -65,6 +65,16 @@ export interface PipelineParams {
   false_lashes?: number;           // B058
   makeup_preset?: string;          // B061
   makeup_preset_intensity?: number;// B061
+  makeup_lipstick?: number;
+  makeup_lipstick_color?: string;
+  makeup_blush?: number;
+  makeup_blush_color?: string;
+  makeup_foundation?: number;      // B055
+  makeup_highlighter?: number;     // B059
+  makeup_contour?: number;
+  makeup_eyeshadow?: number;
+  makeup_eyeshadow_color?: string;
+  makeup_eyeliner?: number;
   hair_flyaway?: number;           // B065
   hair_highlight?: string;         // B067
   hair_highlight_intensity?: number;// B067
@@ -94,6 +104,8 @@ export interface PipelineParams {
   filter_intensity?: number;  // X024
   crop?: CropOperation;       // X020
   healings?: HealingOperation[]; // B002
+  localBrushes?: LocalBrushOperation[];
+  localWarps?: LocalWarpOperation[];
 }
 
 export interface ChinSlimParams {
@@ -180,6 +192,9 @@ export class ImageEngine {
     return this.workCanvas;
   }
 
+  private _hairMaskCache?: HTMLCanvasElement;
+  private _backgroundMaskCache?: HTMLCanvasElement;
+  
   reset() {
     this.currentCropNorm = { x: 0, y: 0, w: 1, h: 1 };
     this.workCanvas.width = this.originalCanvas.width;
@@ -187,6 +202,46 @@ export class ImageEngine {
     const ctxWork = this.workCanvas.getContext('2d')!;
     ctxWork.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctxWork.drawImage(this.originalCanvas, 0, 0);
+    this._hairMaskCache = undefined;
+    this._backgroundMaskCache = undefined;
+  }
+
+  private applyWarpWithMask(points: any[], protectHair = true, protectBackground = false): HTMLCanvasElement {
+      if (!this.webGLWarp) return this.workCanvas;
+
+      let protectionMask: HTMLCanvasElement | undefined = undefined;
+      if (this.segmentationMask && (protectHair || protectBackground)) {
+          const w = this.workCanvas.width;
+          const h = this.workCanvas.height;
+          protectionMask = document.createElement('canvas');
+          protectionMask.width = w;
+          protectionMask.height = h;
+          const ctx = protectionMask.getContext('2d')!;
+
+          if (protectHair) {
+              if (!this._hairMaskCache) {
+                  this._hairMaskCache = document.createElement('canvas');
+                  this._hairMaskCache.width = w;
+                  this._hairMaskCache.height = h;
+                  this.drawScaledSegmentationMask(this._hairMaskCache.getContext('2d')!, w, h, SEGMENT_HAIR);
+              }
+              ctx.globalCompositeOperation = 'source-over';
+              ctx.drawImage(this._hairMaskCache, 0, 0);
+          }
+
+          if (protectBackground) {
+              if (!this._backgroundMaskCache) {
+                  this._backgroundMaskCache = document.createElement('canvas');
+                  this._backgroundMaskCache.width = w;
+                  this._backgroundMaskCache.height = h;
+                  this.drawScaledSegmentationMask(this._backgroundMaskCache.getContext('2d')!, w, h, SEGMENT_BACKGROUND);
+              }
+              ctx.globalCompositeOperation = 'source-over';
+              ctx.drawImage(this._backgroundMaskCache, 0, 0);
+          }
+      }
+
+      return this.webGLWarp.applyWarp(this.workCanvas, points, protectionMask);
   }
 
   private drawScaledSegmentationMask(targetCtx: CanvasRenderingContext2D, targetW: number, targetH: number, categoryId: number) {
@@ -201,10 +256,11 @@ export class ImageEngine {
     
     for (let i = 0; i < mask.length; i++) {
         const isMatch = mask[i] === categoryId;
-        mData.data[i * 4] = 255;
-        mData.data[i * 4 + 1] = 255;
-        mData.data[i * 4 + 2] = 255;
-        mData.data[i * 4 + 3] = isMatch ? 255 : 0;
+        const val = isMatch ? 255 : 0;
+        mData.data[i * 4] = val;
+        mData.data[i * 4 + 1] = val;
+        mData.data[i * 4 + 2] = val;
+        mData.data[i * 4 + 3] = val;
     }
     smallCtx.putImageData(mData, 0, 0);
 
@@ -217,7 +273,7 @@ export class ImageEngine {
     targetCtx.drawImage(smallCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
   }
 
-  // Effect 1: Skin Smoothing (Mịn da - B001)
+  // Effect 1: Skin Smoothing (Mịn da - B001) - Edge-preserving
   applySkinSmoothing(landmarks: NormalizedLandmark[], intensity: number) {
     if (intensity === 0) return;
     const ctx = this.workCanvas.getContext('2d')!;
@@ -226,24 +282,57 @@ export class ImageEngine {
     
     const scale = Math.max(w, h) / 800; // Relative to 800px preview
 
-    const blurCanvas = document.createElement('canvas');
-    blurCanvas.width = w;
-    blurCanvas.height = h;
-    const bCtx = blurCanvas.getContext('2d')!;
-    bCtx.filter = `blur(${intensity * 0.15 * scale}px)`;
-    bCtx.drawImage(this.workCanvas, 0, 0);
+    // 1. High-frequency detail extraction (pores, fine lines)
+    const blur1Canvas = document.createElement('canvas');
+    blur1Canvas.width = w; blur1Canvas.height = h;
+    const b1Ctx = blur1Canvas.getContext('2d')!;
+    b1Ctx.filter = `blur(${2 * scale}px)`;
+    b1Ctx.drawImage(this.workCanvas, 0, 0);
 
+    const hpCanvas = document.createElement('canvas');
+    hpCanvas.width = w; hpCanvas.height = h;
+    const hpCtx = hpCanvas.getContext('2d')!;
+    hpCtx.globalAlpha = 0.5;
+    hpCtx.drawImage(this.workCanvas, 0, 0);
+    hpCtx.globalCompositeOperation = 'lighter';
+    hpCtx.filter = 'invert(100%)';
+    hpCtx.drawImage(blur1Canvas, 0, 0);
+    hpCtx.filter = 'none';
+
+    // 2. Low-frequency smooth base
+    const smoothCanvas = document.createElement('canvas');
+    smoothCanvas.width = w; smoothCanvas.height = h;
+    const sCtx = smoothCanvas.getContext('2d')!;
+    // Adjust smoothing strength based on intensity, max 12px radius
+    const blurRadius = Math.max(2, (intensity / 100) * 12) * scale;
+    sCtx.filter = `blur(${blurRadius}px)`;
+    sCtx.drawImage(this.workCanvas, 0, 0);
+    sCtx.filter = 'none';
+
+    // 3. Reinject texture (High Frequency) into Smooth Base
+    sCtx.globalCompositeOperation = 'hard-light';
+    sCtx.globalAlpha = 1.0;
+    sCtx.drawImage(hpCanvas, 0, 0);
+
+    // 4. Create precise skin mask
     const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = w;
-    maskCanvas.height = h;
+    maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    
-    // Transparent background, so alpha is 0 outside the face
     mCtx.clearRect(0, 0, w, h);
 
     if (landmarks && landmarks.length > 0) {
+      // Start with Face Segment if available
+      if (this.segmentationMask) {
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
+      } else {
+        // Fallback: full canvas if no segmenter
+        mCtx.fillStyle = '#fff';
+        mCtx.fillRect(0, 0, w, h);
+      }
+
+      // Intersect with Face Oval (limits to face boundaries, ignoring neck/ears if desired)
+      mCtx.globalCompositeOperation = 'destination-in';
       const faceOval = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-      
       mCtx.beginPath();
       faceOval.forEach((idx, i) => {
         const pt = landmarks[idx];
@@ -252,15 +341,13 @@ export class ImageEngine {
         else mCtx.lineTo(pt.x * w, pt.y * h);
       });
       mCtx.closePath();
-      mCtx.fillStyle = 'rgba(255, 255, 255, 1)';
-      
-      mCtx.filter = `blur(${10 * scale}px)`;
+      mCtx.fillStyle = '#fff';
       mCtx.fill();
-      mCtx.filter = 'none';
 
+      // Exclude delicate features (destination-out)
       mCtx.globalCompositeOperation = 'destination-out';
       
-      const drawFeature = (pts: number[]) => {
+      const drawFeature = (pts: number[], blur = 0) => {
         mCtx.beginPath();
         pts.forEach((idx, i) => {
           const pt = landmarks[idx];
@@ -269,35 +356,43 @@ export class ImageEngine {
           else mCtx.lineTo(pt.x * w, pt.y * h);
         });
         mCtx.closePath();
-        mCtx.filter = `blur(${8 * scale}px)`; 
+        if (blur > 0) mCtx.filter = `blur(${blur}px)`;
         mCtx.fill();
         mCtx.filter = 'none';
       };
 
-      drawFeature([33, 160, 158, 133, 153, 144]); // Left eye
-      drawFeature([362, 385, 387, 263, 373, 380]); // Right eye
-      drawFeature([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]); // Lips
-      drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46]); // Left Brow
-      drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276]); // Right Brow
-      
-      // Exclude hair using segmentation mask (Hair category = 1)
+      drawFeature([33, 160, 158, 133, 153, 144], 4 * scale); // Left eye
+      drawFeature([362, 385, 387, 263, 373, 380], 4 * scale); // Right eye
+      drawFeature([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95], 3 * scale); // Lips
+      drawFeature([70, 63, 105, 66, 107, 55, 65, 52, 53, 46], 2 * scale); // Left Brow
+      drawFeature([300, 293, 334, 296, 336, 285, 295, 282, 283, 276], 2 * scale); // Right Brow
+      drawFeature([2, 97, 248, 236, 3, 196, 237, 440, 278, 327, 326], 3 * scale); // Nostrils / Strong nose edges approx
+
+      // Exclude hair segment to prevent halo/blur bleeding into hair
       if (this.segmentationMask) {
-        mCtx.filter = `blur(${5 * scale}px)`;
-        this.drawScaledSegmentationMask(mCtx, w, h, 1);
+        mCtx.filter = `blur(${3 * scale}px)`;
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
         mCtx.filter = 'none';
       }
     }
-    
-    mCtx.globalCompositeOperation = 'source-over';
 
-    // Apply alpha mask to the blurred canvas
-    bCtx.globalCompositeOperation = 'destination-in';
-    bCtx.drawImage(maskCanvas, 0, 0); 
+    // Apply soft feathering to the final mask
+    const finalMaskCanvas = document.createElement('canvas');
+    finalMaskCanvas.width = w; finalMaskCanvas.height = h;
+    const fmCtx = finalMaskCanvas.getContext('2d')!;
+    fmCtx.filter = `blur(${6 * scale}px)`;
+    fmCtx.drawImage(maskCanvas, 0, 0);
 
-    // Overlay the blurred masked regions onto current workCanvas
+    // Apply alpha mask to the smoothed canvas
+    sCtx.globalCompositeOperation = 'destination-in';
+    sCtx.drawImage(finalMaskCanvas, 0, 0); 
+
+    // Composite back to original
     ctx.save();
+    // Intensity is already handled partly by the blur radius, but we can also modulate opacity
+    // For intensity=100, we want maximum effect. For intensity=30, subtle effect.
     ctx.globalAlpha = intensity / 100.0;
-    ctx.drawImage(blurCanvas, 0, 0);
+    ctx.drawImage(smoothCanvas, 0, 0);
     ctx.restore();
   }
 
@@ -363,7 +458,7 @@ export class ImageEngine {
       
       if (this.segmentationMask) {
         mCtx.filter = `blur(${6 * scale}px)`;
-        this.drawScaledSegmentationMask(mCtx, w, h, 1);
+        this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
         mCtx.filter = 'none';
       }
     }
@@ -657,7 +752,7 @@ export class ImageEngine {
         y: rightBagCenter.y - rightEyeW * 0.26 * warpIntensity
       };
 
-      const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+      const glCanvas = this.applyWarpWithMask([
         { center: leftBagCenter, target: leftBagTarget, radius: leftEyeW * 0.55, intensity: 0.9, mode: 0 },
         { center: rightBagCenter, target: rightBagTarget, radius: rightEyeW * 0.55, intensity: 0.9, mode: 0 }
       ]);
@@ -730,7 +825,7 @@ export class ImageEngine {
     maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
     
-    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = Hair
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     const blurredMaskCanvas = document.createElement('canvas');
     blurredMaskCanvas.width = w;
@@ -760,7 +855,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1); // 1 = hair
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     // Shine strip: radial gradient on top portion of image
     const shineCanvas = document.createElement('canvas');
@@ -809,7 +904,7 @@ export class ImageEngine {
         const radius = faceW * 0.6;
         const mappedIntensity = (intensity / 100.0) * 0.3;
 
-        const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+        const glCanvas = this.applyWarpWithMask([
           { center: leftCheek, target: nose, radius, intensity: mappedIntensity, mode: 0 },
           { center: rightCheek, target: nose, radius, intensity: mappedIntensity, mode: 0 }
         ]);
@@ -838,7 +933,7 @@ export class ImageEngine {
     const leftTarget = { x: leftTemple.x + factor, y: leftTemple.y };
     const rightTarget = { x: rightTemple.x - factor, y: rightTemple.y };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTemple, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightTemple, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -866,7 +961,7 @@ export class ImageEngine {
     const leftTarget = { x: leftAngle.x + mapped, y: leftAngle.y - mapped * 0.25 };
     const rightTarget = { x: rightAngle.x - mapped, y: rightAngle.y - mapped * 0.25 };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftAngle, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightAngle, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -894,7 +989,7 @@ export class ImageEngine {
     const leftTarget = { x: leftCheekbone.x + mapped, y: leftCheekbone.y };
     const rightTarget = { x: rightCheekbone.x - mapped, y: rightCheekbone.y };
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCheekbone, target: leftTarget, radius, intensity: 0.9, mode: 0 },
       { center: rightCheekbone, target: rightTarget, radius, intensity: 0.9, mode: 0 }
     ]);
@@ -935,7 +1030,7 @@ export class ImageEngine {
     const rightWidth = Math.hypot((rightOuter.x - rightInner.x) * aspect, rightOuter.y - rightInner.y);
 
     const warpIntensity = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCenter, target: leftCenter, radius: leftWidth * 1.15, intensity: warpIntensity, mode: 1.0 },
       { center: rightCenter, target: rightCenter, radius: rightWidth * 1.15, intensity: warpIntensity, mode: 1.0 }
     ]);
@@ -963,7 +1058,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftH * 1.8, 0.045);
     const radiusRight = Math.max(rightH * 1.8, 0.045);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTop, target: { x: leftTop.x, y: leftTop.y - shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
       { center: leftBottom, target: { x: leftBottom.x, y: leftBottom.y + shiftLeft }, radius: radiusLeft, intensity: 0.85, mode: 0 },
       { center: rightTop, target: { x: rightTop.x, y: rightTop.y - shiftRight }, radius: radiusRight, intensity: 0.85, mode: 0 },
@@ -1001,7 +1096,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
     const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftOuter, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
       { center: rightOuter, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
     ]);
@@ -1031,7 +1126,7 @@ export class ImageEngine {
     const radiusLeft = Math.max(leftEyeW * 0.95, 0.10);
     const radiusRight = Math.max(rightEyeW * 0.95, 0.10);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTop, target: leftTarget, radius: radiusLeft, intensity: 1.0, mode: 0 },
       { center: rightTop, target: rightTarget, radius: radiusRight, intensity: 1.0, mode: 0 }
     ]);
@@ -1252,7 +1347,7 @@ export class ImageEngine {
     const mappedIntensity = (intensity / 100.0) * 0.32;
 
     const centerX = (leftJaw.x + rightJaw.x) / 2;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftJaw, target: { x: leftJaw.x + (centerX - leftJaw.x) * mappedIntensity * 2.8, y: leftJaw.y - (chin.y - leftJaw.y) * mappedIntensity * 0.35 }, radius, intensity: 0.95, mode: 0 },
       { center: rightJaw, target: { x: rightJaw.x + (centerX - rightJaw.x) * mappedIntensity * 2.8, y: rightJaw.y - (chin.y - rightJaw.y) * mappedIntensity * 0.35 }, radius, intensity: 0.95, mode: 0 }
     ]);
@@ -1279,7 +1374,7 @@ export class ImageEngine {
     // Increased to 0.40 with multiplier 2.5 for measurable pixel displacement
     const mappedIntensity = (intensity / 100.0) * 0.40;
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftChinSide, target: { x: leftChinSide.x + (chin.x - leftChinSide.x) * mappedIntensity * 2.5, y: leftChinSide.y }, radius, intensity: 0.85, mode: 0 },
       { center: rightChinSide, target: { x: rightChinSide.x + (chin.x - rightChinSide.x) * mappedIntensity * 2.5, y: rightChinSide.y }, radius, intensity: 0.85, mode: 0 }
     ]);
@@ -1314,7 +1409,7 @@ export class ImageEngine {
     };
     const radius = Math.max(len * 1.5, 0.22);
 
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: chin, target, radius, intensity: 1.0, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -1328,7 +1423,7 @@ export class ImageEngine {
     if (!params || !this.webGLWarp) return;
 
     const ctx = this.workCanvas.getContext('2d')!;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, params.warpPoints);
+    const glCanvas = this.applyWarpWithMask(params.warpPoints);
     ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
     ctx.drawImage(glCanvas, 0, 0);
   }
@@ -1483,48 +1578,73 @@ export class ImageEngine {
     const cy = Math.round(centerNorm.y * h);
 
     const r = Math.max(4, Math.round(radiusPx));
-    const x0 = Math.max(0, cx - r);
-    const y0 = Math.max(0, cy - r);
-    const x1 = Math.min(w, cx + r);
-    const y1 = Math.min(h, cy + r);
+    
+    // Define a bounding box that includes the target blemish and a source patch for texture cloning
+    // We'll search for a clean texture patch offset by ~1.8r
+    const shiftX = (cx + r * 2.5 < w) ? Math.round(r * 1.8) : Math.round(-r * 1.8);
+    const shiftY = (cy + r * 2.5 < h) ? Math.round(r * 1.8) : Math.round(-r * 1.8);
+
+    const x0 = Math.max(0, cx - r - Math.abs(shiftX));
+    const y0 = Math.max(0, cy - r - Math.abs(shiftY));
+    const x1 = Math.min(w, cx + r + Math.abs(shiftX));
+    const y1 = Math.min(h, cy + r + Math.abs(shiftY));
     const pw = x1 - x0;
     const ph = y1 - y0;
     if (pw <= 0 || ph <= 0) return;
 
+    // 1. Get original pixels
     const imgData = ctx.getImageData(x0, y0, pw, ph);
     const data = imgData.data;
 
-    // Collect surrounding ring samples (from r*0.7 to r)
-    let sumR = 0, sumG = 0, sumB = 0, ringCount = 0;
+    // 2. Create a blurred version for low-frequency color base
+    const patchCanvas = document.createElement('canvas');
+    patchCanvas.width = pw; patchCanvas.height = ph;
+    const pCtx = patchCanvas.getContext('2d')!;
+    pCtx.putImageData(imgData, 0, 0);
+
+    const blurCanvas = document.createElement('canvas');
+    blurCanvas.width = pw; blurCanvas.height = ph;
+    const bCtx = blurCanvas.getContext('2d', { willReadFrequently: true })!;
+    bCtx.filter = `blur(${Math.max(2, r * 0.4)}px)`;
+    bCtx.drawImage(patchCanvas, 0, 0);
+    const blurData = bCtx.getImageData(0, 0, pw, ph).data;
+
+    // 3. Frequency separation blend
+    // For each pixel in the target blemish radius:
+    // Result = Target_LowFreq (blur) + (Source_Original - Source_LowFreq)
     for (let y = 0; y < ph; y++) {
       for (let x = 0; x < pw; x++) {
         const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
-        if (dist >= r * 0.65 && dist <= r) {
-          const idx = (y * pw + x) * 4;
-          sumR += data[idx];
-          sumG += data[idx + 1];
-          sumB += data[idx + 2];
-          ringCount++;
-        }
-      }
-    }
+        if (dist <= r) {
+          // Soft radial mask for blending
+          const t = Math.cos((dist / r) * (Math.PI / 2));
+          const weight = Math.min(1.0, Math.max(0.0, t));
+          
+          // Target pixel index
+          const tIdx = (y * pw + x) * 4;
+          
+          // Source pixel index (shifted)
+          let sx = x + shiftX;
+          let sy = y + shiftY;
+          // clamp to patch bounds just in case
+          sx = Math.max(0, Math.min(pw - 1, sx));
+          sy = Math.max(0, Math.min(ph - 1, sy));
+          const sIdx = (sy * pw + sx) * 4;
 
-    if (ringCount === 0) return;
-    const avgR = sumR / ringCount;
-    const avgG = sumG / ringCount;
-    const avgB = sumB / ringCount;
+          // Compute Source High Frequency (Detail)
+          const detailR = data[sIdx] - blurData[sIdx];
+          const detailG = data[sIdx + 1] - blurData[sIdx + 1];
+          const detailB = data[sIdx + 2] - blurData[sIdx + 2];
 
-    // Radial blend inward
-    for (let y = 0; y < ph; y++) {
-      for (let x = 0; x < pw; x++) {
-        const dist = Math.hypot((x0 + x) - cx, (y0 + y) - cy);
-        if (dist < r) {
-          const t = Math.cos((dist / r) * (Math.PI / 2)); // 1.0 at center, 0.0 at radius
-          const weight = Math.min(1.0, Math.max(0.0, t * 0.85));
-          const idx = (y * pw + x) * 4;
-          data[idx] = Math.round(data[idx] * (1 - weight) + avgR * weight);
-          data[idx + 1] = Math.round(data[idx + 1] * (1 - weight) + avgG * weight);
-          data[idx + 2] = Math.round(data[idx + 2] * (1 - weight) + avgB * weight);
+          // Reconstruct: Target Base (blur) + Source Detail
+          const outR = blurData[tIdx] + detailR;
+          const outG = blurData[tIdx + 1] + detailG;
+          const outB = blurData[tIdx + 2] + detailB;
+
+          // Blend into original data using radial weight
+          data[tIdx] = Math.round(data[tIdx] * (1 - weight) + Math.min(255, Math.max(0, outR)) * weight);
+          data[tIdx + 1] = Math.round(data[tIdx + 1] * (1 - weight) + Math.min(255, Math.max(0, outG)) * weight);
+          data[tIdx + 2] = Math.round(data[tIdx + 2] * (1 - weight) + Math.min(255, Math.max(0, outB)) * weight);
         }
       }
     }
@@ -1798,6 +1918,145 @@ export class ImageEngine {
     ctx.restore();
   }
 
+
+  // Direct local skin retouch: edge-preserving smoothing batched for all strokes.
+  applyBatchedLocalSkinSmoothing(
+    strokes: LocalBrushOperation[],
+    w_n: number,
+    h_n: number,
+    x_n: number,
+    y_n: number,
+    landmarks?: NormalizedLandmark[]
+  ) {
+    if (!strokes || strokes.length === 0) return;
+
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+    const scale = Math.max(w, h) / 800;
+    
+    // Frequency-separation approximation: smooth low-frequency color while retaining fine texture.
+    const fineBlur = document.createElement('canvas');
+    fineBlur.width = w; fineBlur.height = h;
+    const fineCtx = fineBlur.getContext('2d')!;
+    fineCtx.filter = `blur(${Math.max(1, 1.5 * scale)}px)`;
+    fineCtx.drawImage(this.workCanvas, 0, 0);
+
+    const smooth = document.createElement('canvas');
+    smooth.width = w; smooth.height = h;
+    const smoothCtx = smooth.getContext('2d')!;
+    const blurRadius = 8 * scale; // Fixed radius; strength controlled by mask alpha
+    smoothCtx.filter = `blur(${blurRadius}px)`;
+    smoothCtx.drawImage(this.workCanvas, 0, 0);
+    smoothCtx.filter = 'none';
+
+    // Reintroduce a controlled amount of high-frequency detail.
+    smoothCtx.save();
+    smoothCtx.globalCompositeOperation = 'soft-light';
+    smoothCtx.globalAlpha = 0.22;
+    smoothCtx.drawImage(this.workCanvas, 0, 0);
+    smoothCtx.globalAlpha = 0.10;
+    smoothCtx.drawImage(fineBlur, 0, 0);
+    smoothCtx.restore();
+
+    const mask = document.createElement('canvas');
+    mask.width = w; mask.height = h;
+    const mCtx = mask.getContext('2d')!;
+
+    for (const op of strokes) {
+      const u = (op.x - x_n) / w_n;
+      const v = (op.y - y_n) / h_n;
+      if (u < -0.2 || u > 1.2 || v < -0.2 || v > 1.2) continue;
+
+      const cx = u * w;
+      const cy = v * h;
+      const radiusPx = Math.max(8, (op.radiusNorm / h_n) * h);
+      
+      // Calculate final absolute stroke alpha based on op.intensity directly.
+      const strokeAlpha = Math.min(0.82, 0.18 + (op.intensity / 100) * 0.62);
+      
+      const radial = mCtx.createRadialGradient(cx, cy, radiusPx * 0.45, cx, cy, radiusPx);
+      radial.addColorStop(0, `rgba(255,255,255,${1 * strokeAlpha})`);
+      radial.addColorStop(0.72, `rgba(255,255,255,${0.9 * strokeAlpha})`);
+      radial.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      mCtx.globalCompositeOperation = 'source-over';
+      mCtx.fillStyle = radial;
+      mCtx.beginPath();
+      mCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+      mCtx.fill();
+    }
+
+    // Intersect with actual face segmentation when available.
+    if (this.segmentationMask) {
+      mCtx.globalCompositeOperation = 'destination-in';
+      this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
+    }
+
+    // Never smooth hair.
+    if (this.segmentationMask) {
+      mCtx.globalCompositeOperation = 'destination-out';
+      this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
+    }
+
+    // Protect eyes / brows / lips if landmarks are available.
+    if (landmarks && landmarks.length > 0) {
+      mCtx.globalCompositeOperation = 'destination-out';
+      const protect = (ids: number[], featherPx: number) => {
+        mCtx.beginPath();
+        ids.forEach((idx, i) => {
+          const p = landmarks[idx];
+          if (!p) return;
+          if (i === 0) mCtx.moveTo(p.x * w, p.y * h);
+          else mCtx.lineTo(p.x * w, p.y * h);
+        });
+        mCtx.closePath();
+        mCtx.filter = `blur(${featherPx}px)`;
+        mCtx.fillStyle = '#fff';
+        mCtx.fill();
+        mCtx.filter = 'none';
+      };
+      protect([33, 160, 158, 133, 153, 144], 2.5 * scale);
+      protect([362, 385, 387, 263, 373, 380], 2.5 * scale);
+      protect([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95], 2 * scale);
+      protect([70, 63, 105, 66, 107, 55, 65, 52, 53, 46], 2 * scale);
+      protect([300, 293, 334, 296, 336, 285, 295, 282, 283, 276], 2 * scale);
+    }
+
+    smoothCtx.globalCompositeOperation = 'destination-in';
+    smoothCtx.drawImage(mask, 0, 0);
+
+    ctx.save();
+    ctx.globalAlpha = 1.0; // Intensity mapped directly into the mask alpha
+    ctx.drawImage(smooth, 0, 0);
+    ctx.restore();
+  }
+
+  // Direct manipulation warp replayed from normalized source-image coordinates.
+  applyLocalWarpOperation(op: LocalWarpOperation) {
+    if (!this.webGLWarp || op.radiusNorm <= 0) return;
+    const target = {
+      x: op.x + op.dx * op.intensity,
+      y: op.y + op.dy * op.intensity
+    };
+    
+    const protectHair = op.tool === 'face_slim' || op.tool === 'chin_slim';
+    const protectBackground = op.tool === 'face_slim' || op.tool === 'chin_slim' || op.tool === 'body_slim';
+    
+    const glCanvas = this.applyWarpWithMask([
+      {
+        center: { x: op.x, y: op.y },
+        target,
+        radius: Math.max(0.025, op.radiusNorm),
+        intensity: 1.0,
+        mode: 0.0
+      }
+    ], protectHair, protectBackground);
+    const ctx = this.workCanvas.getContext('2d')!;
+    ctx.clearRect(0, 0, this.workCanvas.width, this.workCanvas.height);
+    ctx.drawImage(glCanvas, 0, 0);
+  }
+
   // Effect 10: Body Slim / Waist Reshape (B070)
   applyBodySlim(intensity: number, centerYNorm = 0.65) {
     if (intensity === 0 || !this.webGLWarp) return;
@@ -1825,7 +2084,7 @@ export class ImageEngine {
     ];
 
     const ctx = this.workCanvas.getContext('2d')!;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, warpPoints);
+    const glCanvas = this.applyWarpWithMask(warpPoints);
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(glCanvas, 0, 0);
   }
@@ -2003,7 +2262,7 @@ export class ImageEngine {
     const nose = landmarks[1], noseBase = landmarks[2];
     if (!nose || !noseBase) return;
     const shiftY = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: { x: nose.x, y: nose.y + shiftY }, radius: 0.18, intensity: 0.9, mode: 0 },
       { center: noseBase, target: { x: noseBase.x, y: noseBase.y + shiftY * 0.8 }, radius: 0.15, intensity: 0.85, mode: 0 }
     ]);
@@ -2018,7 +2277,7 @@ export class ImageEngine {
     const chin = landmarks[152], lowerLip = landmarks[17];
     if (!chin || !lowerLip) return;
     const shiftY = (intensity / 100.0) * 0.028;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: chin, target: { x: chin.x, y: chin.y + shiftY }, radius: 0.20, intensity: 0.95, mode: 0 },
       { center: lowerLip, target: { x: lowerLip.x, y: lowerLip.y + shiftY * 0.5 }, radius: 0.14, intensity: 0.8, mode: 0 }
     ]);
@@ -2033,7 +2292,7 @@ export class ImageEngine {
     const forehead = landmarks[10], leftT = landmarks[67], rightT = landmarks[297];
     if (!forehead) return;
     const shiftY = (intensity / 100.0) * -0.030;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: forehead, target: { x: forehead.x, y: forehead.y + shiftY }, radius: 0.28, intensity: 0.95, mode: 0 },
       ...(leftT ? [{ center: leftT, target: { x: leftT.x, y: leftT.y + shiftY * 0.6 }, radius: 0.20, intensity: 0.8, mode: 0 }] : []),
       ...(rightT ? [{ center: rightT, target: { x: rightT.x, y: rightT.y + shiftY * 0.6 }, radius: 0.20, intensity: 0.8, mode: 0 }] : [])
@@ -2049,7 +2308,7 @@ export class ImageEngine {
     const nose = landmarks[1];
     if (!nose) return;
     const mode = intensity > 0 ? -1.0 : 1.0;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: nose, radius: 0.45, intensity: (Math.abs(intensity) / 100.0) * 0.35, mode }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2063,7 +2322,7 @@ export class ImageEngine {
     const leftIris = landmarks[468], rightIris = landmarks[473];
     if (!leftIris || !rightIris) return;
     const shiftX = (intensity / 100.0) * 0.012;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftIris, target: { x: leftIris.x + shiftX, y: leftIris.y }, radius: 0.06, intensity: 0.9, mode: 0 },
       { center: rightIris, target: { x: rightIris.x + shiftX, y: rightIris.y }, radius: 0.06, intensity: 0.9, mode: 0 }
     ]);
@@ -2078,7 +2337,7 @@ export class ImageEngine {
     const nose = landmarks[1];
     if (!nose) return;
     const mode = intensity > 0 ? -1.0 : 1.0;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: nose, target: nose, radius: 0.16, intensity: (Math.abs(intensity) / 100.0) * 0.30, mode }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2092,7 +2351,7 @@ export class ImageEngine {
     const tip = landmarks[4] || landmarks[1];
     if (!tip) return;
     const shiftY = (intensity / 100.0) * -0.018;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: tip, target: { x: tip.x, y: tip.y + shiftY }, radius: 0.08, intensity: 0.95, mode: 0 },
       { center: tip, target: tip, radius: 0.09, intensity: (intensity / 100.0) * 0.25, mode: -1.0 }
     ]);
@@ -2108,7 +2367,7 @@ export class ImageEngine {
     if (!upperLip || !lowerLip) return;
     const shiftY = (intensity / 100.0) * 0.022;
     const mouthCenter = { x: (upperLip.x + lowerLip.x) / 2, y: (upperLip.y + lowerLip.y) / 2 };
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: mouthCenter, target: { x: mouthCenter.x, y: mouthCenter.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2122,7 +2381,7 @@ export class ImageEngine {
     const leftCorner = landmarks[61], rightCorner = landmarks[291];
     if (!leftCorner || !rightCorner) return;
     const shiftY = (intensity / 100.0) * 0.016;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftCorner, target: { x: leftCorner.x, y: leftCorner.y + shiftY }, radius: 0.12, intensity: 0.9, mode: 0 },
       { center: rightCorner, target: { x: rightCorner.x, y: rightCorner.y - shiftY }, radius: 0.12, intensity: 0.9, mode: 0 }
     ]);
@@ -2137,7 +2396,7 @@ export class ImageEngine {
     const leftArch = landmarks[105], rightArch = landmarks[334];
     if (!leftArch || !rightArch) return;
     const shiftY = (intensity / 100.0) * -0.024;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftArch, target: { x: leftArch.x, y: leftArch.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 },
       { center: rightArch, target: { x: rightArch.x, y: rightArch.y + shiftY }, radius: 0.18, intensity: 0.95, mode: 0 }
     ]);
@@ -2152,7 +2411,7 @@ export class ImageEngine {
     const leftHead = landmarks[107], rightHead = landmarks[336];
     if (!leftHead || !rightHead) return;
     const shiftX = (intensity / 100.0) * 0.018;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftHead, target: { x: leftHead.x - shiftX, y: leftHead.y }, radius: 0.12, intensity: 0.9, mode: 0 },
       { center: rightHead, target: { x: rightHead.x + shiftX, y: rightHead.y }, radius: 0.12, intensity: 0.9, mode: 0 }
     ]);
@@ -2167,7 +2426,7 @@ export class ImageEngine {
     const leftTail = landmarks[70], rightTail = landmarks[300];
     if (!leftTail || !rightTail) return;
     const shiftY = (intensity / 100.0) * -0.020;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTail, target: { x: leftTail.x, y: leftTail.y + shiftY }, radius: 0.14, intensity: 0.9, mode: 0 },
       { center: rightTail, target: { x: rightTail.x, y: rightTail.y + shiftY }, radius: 0.14, intensity: 0.9, mode: 0 }
     ]);
@@ -2182,7 +2441,7 @@ export class ImageEngine {
     const leftPeak = landmarks[105], rightPeak = landmarks[334];
     if (!leftPeak || !rightPeak) return;
     const shiftY = (intensity / 100.0) * -0.022;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftPeak, target: { x: leftPeak.x, y: leftPeak.y + shiftY }, radius: 0.12, intensity: 0.95, mode: 0 },
       { center: rightPeak, target: { x: rightPeak.x, y: rightPeak.y + shiftY }, radius: 0.12, intensity: 0.95, mode: 0 }
     ]);
@@ -2372,14 +2631,217 @@ export class ImageEngine {
     });
   }
 
+  applyLipstick(landmarks: NormalizedLandmark[], colorHex: string, intensity: number, finish: number = 50, liner: number = 100) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    // Finish: 0 = matte (multiply), 100 = gloss (overlay/soft-light)
+    ctx.globalCompositeOperation = finish > 50 ? 'soft-light' : 'multiply';
+    ctx.fillStyle = colorHex;
+    const alphaBase = intensity / 100.0;
+    const linerScale = 0.5 + liner / 200.0; // 0 = 0.5 (ombre), 100 = 1.0 (full)
+    ctx.globalAlpha = alphaBase * (finish > 50 ? 0.6 : 0.4) * linerScale;
+    
+    const lipUpperIds = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291];
+    const lipLowerIds = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291];
+    
+    ctx.beginPath();
+    for (let i = 0; i < lipUpperIds.length; i++) {
+      const pt = landmarks[lipUpperIds[i]];
+      if (!pt) continue;
+      if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
+      else ctx.lineTo(pt.x * w, pt.y * h);
+    }
+    for (let i = lipLowerIds.length - 1; i >= 0; i--) {
+      const pt = landmarks[lipLowerIds[i]];
+      if (!pt) continue;
+      ctx.lineTo(pt.x * w, pt.y * h);
+    }
+    ctx.fill();
+    
+    // Gloss specular highlight if finish > 50
+    if (finish > 50) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.globalAlpha = ((finish - 50) / 50.0) * (intensity / 100.0);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  applyBlush(landmarks: NormalizedLandmark[], colorHex: string, intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    
+    const drawBlush = (centerId: number) => {
+      const pt = landmarks[centerId];
+      if (!pt) return;
+      const cx = pt.x * w;
+      const cy = pt.y * h;
+      const rx = w * 0.08;
+      const ry = h * 0.05;
+      
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+      grad.addColorStop(0, colorHex);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    drawBlush(116); // Left cheek center approx
+    drawBlush(345); // Right cheek center approx
+    ctx.restore();
+  }
+
+  applyContour(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalAlpha = (intensity / 100.0) * 0.3;
+    
+    // Highlight on nose tip
+    const noseTip = landmarks[4];
+    if (noseTip) {
+      ctx.globalCompositeOperation = 'screen';
+      const cx = noseTip.x * w;
+      const cy = noseTip.y * h;
+      const r = w * 0.04;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Contour on jawline
+    ctx.globalCompositeOperation = 'multiply';
+    const jawIds = [132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361];
+    ctx.beginPath();
+    for (let i = 0; i < jawIds.length; i++) {
+      const pt = landmarks[jawIds[i]];
+      if (!pt) continue;
+      const px = pt.x * w;
+      const py = pt.y * h;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.lineWidth = w * 0.03;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5a4033';
+    ctx.filter = 'blur(10px)';
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
   // B061: Full Makeup Preset (Preset makeup hoàn chỉnh)
   applyMakeupPreset(landmarks: NormalizedLandmark[], _preset = 'natural', intensity = 60) {
+    if (!_preset) _preset = 'natural';
     if (intensity === 0 || !landmarks || landmarks.length === 0) return;
-    this.applyEyeBrightening(landmarks, intensity * 0.6);
-    this.applyEyeCatchlight(landmarks, intensity * 0.5);
-    this.applyEyeliner(landmarks, intensity * 0.65);
-    this.applyLipFinish(landmarks, 'gloss', intensity * 0.6);
+    
+    let eyeBrighten = 0.6;
+    let eyeCatchlight = 0.5;
+    let eyeliner = 0.65;
+    let lip = 0.6;
+    
+    if (_preset === 'korean') {
+      eyeBrighten = 0.8; eyeCatchlight = 0.7; eyeliner = 0.4; lip = 0.8;
+      this.applyBlush(landmarks, '#ff9966', intensity * 0.5);
+    } else if (_preset === 'douyin') {
+      eyeBrighten = 0.9; eyeCatchlight = 0.9; eyeliner = 0.8; lip = 0.9;
+      this.applyBlush(landmarks, '#ff80df', intensity * 0.6);
+      this.applyContour(landmarks, intensity * 0.5);
+    } else if (_preset === 'western') {
+      eyeBrighten = 0.5; eyeCatchlight = 0.4; eyeliner = 0.9; lip = 0.7;
+      this.applyContour(landmarks, intensity * 0.8);
+      this.applyEyeShadow(landmarks, '#8b4513', intensity * 0.7);
+    }
+
+    this.applyEyeBrightening(landmarks, intensity * eyeBrighten);
+    this.applyEyeCatchlight(landmarks, intensity * eyeCatchlight);
+    this.applyEyeliner(landmarks, intensity * eyeliner);
+    this.applyLipstick(landmarks, _preset === 'western' ? '#993333' : '#ff4d4d', intensity * lip, _preset === 'western' ? 0 : 100, 100);
   }
+
+  applyFoundation(intensity: number) {
+    if (intensity === 0 || !this.segmentationMask) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = w; maskCanvas.height = h;
+    const mCtx = maskCanvas.getContext('2d')!;
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_FACE);
+    
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = w; baseCanvas.height = h;
+    const bCtx = baseCanvas.getContext('2d')!;
+    bCtx.fillStyle = '#ffeedd'; // Foundation color
+    bCtx.fillRect(0, 0, w, h);
+    
+    bCtx.globalCompositeOperation = 'destination-in';
+    bCtx.drawImage(maskCanvas, 0, 0);
+    
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = (intensity / 100.0) * 0.5;
+    ctx.drawImage(baseCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  applyHighlighter(landmarks: NormalizedLandmark[], intensity: number) {
+    if (intensity === 0 || !landmarks || landmarks.length === 0) return;
+    const ctx = this.workCanvas.getContext('2d')!;
+    const w = this.workCanvas.width;
+    const h = this.workCanvas.height;
+
+    ctx.save();
+    ctx.globalAlpha = (intensity / 100.0) * 0.4;
+    ctx.globalCompositeOperation = 'screen';
+    
+    const highlightSpots = [
+      { id: 4, r: 0.03 }, // Nose tip
+      { id: 164, r: 0.02 }, // Philtrum
+      { id: 116, r: 0.05 }, // Left cheekbone
+      { id: 345, r: 0.05 }  // Right cheekbone
+    ];
+    
+    for (const spot of highlightSpots) {
+      const pt = landmarks[spot.id];
+      if (!pt) continue;
+      const cx = pt.x * w;
+      const cy = pt.y * h;
+      const r = w * spot.r;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, 'rgba(255,255,255,0.8)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
 
   // B065: Tame Flyaway Hair (Giảm tóc con bay/xù)
   applyFlyawayReduction(intensity: number) {
@@ -2392,7 +2854,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1);
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     const smoothMask = document.createElement('canvas');
     smoothMask.width = w; smoothMask.height = h;
@@ -2430,7 +2892,7 @@ export class ImageEngine {
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = w; maskCanvas.height = h;
     const mCtx = maskCanvas.getContext('2d')!;
-    this.drawScaledSegmentationMask(mCtx, w, h, 1);
+    this.drawScaledSegmentationMask(mCtx, w, h, SEGMENT_HAIR);
 
     sCtx.globalCompositeOperation = 'destination-in';
     sCtx.drawImage(maskCanvas, 0, 0);
@@ -2448,7 +2910,7 @@ export class ImageEngine {
     const forehead = landmarks[10];
     if (!forehead) return;
     const shiftY = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: forehead, target: { x: forehead.x, y: forehead.y + shiftY }, radius: 0.25, intensity: 0.9, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2463,7 +2925,7 @@ export class ImageEngine {
     if (!forehead) return;
     const crownCenter = { x: forehead.x, y: Math.max(0.02, forehead.y - 0.12) };
     const targetCenter = { x: crownCenter.x, y: crownCenter.y - (intensity / 100.0) * 0.035 };
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: crownCenter, target: targetCenter, radius: 0.32, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2524,7 +2986,7 @@ export class ImageEngine {
   applyArmSlim(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.18, y: 0.52 }, target: { x: 0.18 + factor, y: 0.52 }, radius: 0.22, intensity: 0.9, mode: 0 },
       { center: { x: 0.82, y: 0.52 }, target: { x: 0.82 - factor, y: 0.52 }, radius: 0.22, intensity: 0.9, mode: 0 }
     ]);
@@ -2537,7 +2999,7 @@ export class ImageEngine {
   applyLegSlim(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.38, y: 0.85 }, target: { x: 0.38 + factor, y: 0.85 }, radius: 0.18, intensity: 0.9, mode: 0 },
       { center: { x: 0.62, y: 0.85 }, target: { x: 0.62 - factor, y: 0.85 }, radius: 0.18, intensity: 0.9, mode: 0 }
     ]);
@@ -2550,7 +3012,7 @@ export class ImageEngine {
   applyHeightStretch(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.045;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.5, y: 0.85 }, target: { x: 0.5, y: 0.85 + factor }, radius: 0.35, intensity: 0.95, mode: 0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2562,7 +3024,7 @@ export class ImageEngine {
   applyHipShape(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.040;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.30, y: 0.72 }, target: { x: 0.30 - factor, y: 0.72 }, radius: 0.22, intensity: 0.95, mode: 0 },
       { center: { x: 0.70, y: 0.72 }, target: { x: 0.70 + factor, y: 0.72 }, radius: 0.22, intensity: 0.95, mode: 0 }
     ]);
@@ -2575,7 +3037,7 @@ export class ImageEngine {
   applyTummyTuck(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.038;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.5, y: 0.68 }, target: { x: 0.5, y: 0.68 - factor * 0.5 }, radius: 0.25, intensity: 0.95, mode: -1.0 }
     ]);
     const ctx = this.workCanvas.getContext('2d')!;
@@ -2589,7 +3051,7 @@ export class ImageEngine {
     const leftTemple = landmarks[67], rightTemple = landmarks[297];
     if (!leftTemple || !rightTemple) return;
     const factor = (intensity / 100.0) * 0.035;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftTemple, target: { x: leftTemple.x - factor, y: leftTemple.y }, radius: 0.24, intensity: 0.9, mode: 0 },
       { center: rightTemple, target: { x: rightTemple.x + factor, y: rightTemple.y }, radius: 0.24, intensity: 0.9, mode: 0 }
     ]);
@@ -2604,7 +3066,7 @@ export class ImageEngine {
     const leftInner = landmarks[133], rightInner = landmarks[362];
     if (!leftInner || !rightInner) return;
     const factor = (intensity / 100.0) * 0.025;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: leftInner, target: { x: leftInner.x - factor, y: leftInner.y }, radius: 0.16, intensity: 0.95, mode: 0 },
       { center: rightInner, target: { x: rightInner.x + factor, y: rightInner.y }, radius: 0.16, intensity: 0.95, mode: 0 }
     ]);
@@ -2617,7 +3079,7 @@ export class ImageEngine {
   applyChestVolume(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.40, y: 0.58 }, target: { x: 0.40, y: 0.58 }, radius: 0.18, intensity: factor, mode: 1.0 },
       { center: { x: 0.60, y: 0.58 }, target: { x: 0.60, y: 0.58 }, radius: 0.18, intensity: factor, mode: 1.0 }
     ]);
@@ -2630,7 +3092,7 @@ export class ImageEngine {
   applyButtockVolume(intensity: number) {
     if (intensity === 0 || !this.webGLWarp) return;
     const factor = (intensity / 100.0) * 0.28;
-    const glCanvas = this.webGLWarp.applyWarp(this.workCanvas, [
+    const glCanvas = this.applyWarpWithMask([
       { center: { x: 0.38, y: 0.76 }, target: { x: 0.38, y: 0.76 }, radius: 0.22, intensity: factor, mode: 1.0 },
       { center: { x: 0.62, y: 0.76 }, target: { x: 0.62, y: 0.76 }, radius: 0.22, intensity: factor, mode: 1.0 }
     ]);
@@ -2827,6 +3289,15 @@ export class ImageEngine {
       this.applySkinEvening(mappedLandmarks, params.skin_evening);
     }
 
+    // User-painted local smoothing strokes. Coordinates are stored in source-image space
+    // and remapped through the current crop so preview/export remain identical.
+    if (params.localBrushes && params.localBrushes.length > 0) {
+      const skinSmoothStrokes = params.localBrushes.filter(op => op.tool === 'skin_smooth');
+      if (skinSmoothStrokes.length > 0) {
+        this.applyBatchedLocalSkinSmoothing(skinSmoothStrokes, w_n, h_n, x_n, y_n, mappedLandmarks);
+      }
+    }
+
     // Stage 2: Geometric Feature Shaping (WebGL Warp)
     if (params.face_slim > 0 && mappedLandmarks) {
       this.applyFaceSlimming(mappedLandmarks, params.face_slim);
@@ -2910,6 +3381,22 @@ export class ImageEngine {
       this.applyLipTilt(mappedLandmarks, params.lip_tilt);
     }
 
+    // User-directed local warp gestures. Map source coordinates/vectors through crop.
+    if (params.localWarps && params.localWarps.length > 0) {
+      for (const op of params.localWarps) {
+        const mappedOp: LocalWarpOperation = {
+          ...op,
+          x: (op.x - x_n) / w_n,
+          y: (op.y - y_n) / h_n,
+          dx: op.dx / w_n,
+          dy: op.dy / h_n,
+          radiusNorm: op.radiusNorm / h_n
+        };
+        if (mappedOp.x < -0.25 || mappedOp.x > 1.25 || mappedOp.y < -0.25 || mappedOp.y > 1.25) continue;
+        this.applyLocalWarpOperation(mappedOp);
+      }
+    }
+
     // Stage 3: Facial Details, Makeup & Hair (2D Canvas & Shaders)
     if (params.double_eyelid && params.double_eyelid > 0 && mappedLandmarks) {
       this.applyDoubleEyelid(mappedLandmarks, params.double_eyelid);
@@ -2938,12 +3425,33 @@ export class ImageEngine {
     if (params.teeth_whiten && params.teeth_whiten > 0 && mappedLandmarks) {
       this.applyTeethWhitening(mappedLandmarks, params.teeth_whiten);
     }
-    if (params.lip_finish_intensity && params.lip_finish_intensity > 0 && mappedLandmarks) {
-      this.applyLipFinish(mappedLandmarks, params.lip_finish, params.lip_finish_intensity);
+    
+    
+    if (params.makeup_lipstick && params.makeup_lipstick > 0 && mappedLandmarks) {
+      this.applyLipstick(mappedLandmarks, params.makeup_lipstick_color || '#ff4d4d', params.makeup_lipstick, params.lip_finish_intensity ?? 50, params.lip_liner ?? 100);
     }
-    if (params.lip_liner && params.lip_liner > 0 && mappedLandmarks) {
-      this.applyLipLiner(mappedLandmarks, '#c43a53', params.lip_liner);
+    if (params.makeup_blush && params.makeup_blush > 0 && mappedLandmarks) {
+      this.applyBlush(mappedLandmarks, params.makeup_blush_color || '#ff80df', params.makeup_blush);
     }
+    if (params.makeup_contour && params.makeup_contour > 0 && mappedLandmarks) {
+      this.applyContour(mappedLandmarks, params.makeup_contour);
+    }
+    if (params.makeup_eyeshadow && params.makeup_eyeshadow > 0 && mappedLandmarks) {
+      this.applyEyeShadow(mappedLandmarks, params.makeup_eyeshadow_color || '#8b4513', params.makeup_eyeshadow);
+    }
+    if (params.makeup_eyeliner && params.makeup_eyeliner > 0 && mappedLandmarks) {
+      this.applyEyeliner(mappedLandmarks, params.makeup_eyeliner);
+    }
+    if (params.makeup_foundation && params.makeup_foundation > 0) {
+      this.applyFoundation(params.makeup_foundation);
+    }
+    if (params.makeup_highlighter && params.makeup_highlighter > 0 && mappedLandmarks) {
+      this.applyHighlighter(mappedLandmarks, params.makeup_highlighter);
+    }
+    if (params.false_lashes && params.false_lashes > 0 && mappedLandmarks) {
+      this.applyFalseLashes(mappedLandmarks, params.false_lashes);
+    }
+
     if (params.makeup_preset_intensity && params.makeup_preset_intensity > 0 && mappedLandmarks) {
       this.applyMakeupPreset(mappedLandmarks, params.makeup_preset, params.makeup_preset_intensity);
     }

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-08T03:07:49.405Z",
+  "timestamp": "2026-10-09T08:21:53.926Z",
   "fixture": "real_portrait_front_real_photo_original.png",
   "totalToolsTested": 12,
   "allMonotonic": true,
@@ -7,9 +7,9 @@
     {
       "tool": "skin_smooth",
       "mae0": 0,
-      "mae30": 0.1474,
-      "mae60": 0.5424,
-      "mae100": 1.3852,
+      "mae30": 0.0809,
+      "mae60": 0.3868,
+      "mae100": 1.036,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_skin_smooth_000.png",
@@ -77,9 +77,9 @@
     {
       "tool": "face_slim",
       "mae0": 0,
-      "mae30": 1.7094,
-      "mae60": 2.496,
-      "mae100": 3.424,
+      "mae30": 1.4729,
+      "mae60": 2.0393,
+      "mae100": 2.7239,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_face_slim_000.png",
@@ -120,8 +120,8 @@
       "tool": "chin_vline",
       "mae0": 0,
       "mae30": 0.053,
-      "mae60": 0.0857,
-      "mae100": 0.1209,
+      "mae60": 0.0856,
+      "mae100": 0.1191,
       "isMonotonic": true,
       "artifacts": {
         "val0": "progression_chin_vline_000.png",

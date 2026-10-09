@@ -3,13 +3,14 @@ import {
   Undo2, Redo2, Download, ArrowLeft, Upload, Loader2, Sparkles, 
   UserRound, Droplets, Scissors, Eye, Smile, 
   Sliders, Palette, LayoutTemplate, SplitSquareVertical, Crop,
-  LayoutGrid, Save, Bookmark, Search, X, RotateCcw, ShieldCheck
+  LayoutGrid, Save, Bookmark, Search, X, RotateCcw, ShieldCheck,
+  ZoomIn, ZoomOut, Move, MousePointer2
 } from 'lucide-react';
 import { faceLandmarkManager } from '../engine/FaceLandmarkManager';
 import { segmenterManager } from '../engine/SegmenterManager';
 import { ImageEngine } from '../engine/ImageEngine';
 import { useAppContext, DEFAULT_EDIT_STATE } from '../context';
-import type { ToolCategory, ToolType, TemplateCustomText, CropOperation, HealingOperation, EditState } from '../context';
+import type { ToolCategory, ToolType, TemplateCustomText, CropOperation, HealingOperation, EditState, LocalBrushOperation, LocalWarpOperation } from '../context';
 import { COLOR_FILTERS } from '../presets/filters';
 import { POSTER_TEMPLATES } from '../presets/templates';
 import { CollageMaker } from './CollageMaker';
@@ -49,11 +50,57 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const [draftAvailable, setDraftAvailable] = useState<AppDraft | null>(null);
   const [draftToast, setDraftToast] = useState<string | null>(null);
   const [blemishRadius, setBlemishRadius] = useState(16);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [interactionMode, setInteractionMode] = useState<'retouch' | 'pan'>('retouch');
+  const [directRadius, setDirectRadius] = useState(64);
+  const [directStrength, setDirectStrength] = useState(55);
+  const [pointerPreview, setPointerPreview] = useState<{ u: number; v: number } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<ImageEngine | null>(null);
   const uploadTokenRef = useRef(0);
   const originalDataUrlRef = useRef<string | null>(null);
+  const gestureRef = useRef<{
+    kind: 'brush' | 'heal' | 'warp' | 'pan' | null;
+    pointerId: number | null;
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    startSource?: { x: number; y: number };
+    lastClientX: number;
+    lastClientY: number;
+  }>({
+    kind: null,
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    startPanX: 0,
+    startPanY: 0,
+    lastClientX: 0,
+    lastClientY: 0
+  });
+  const gestureStateRef = useRef<EditState | null>(null);
+  // Store plain immutable data — never retain React SyntheticEvent objects as long-lived state.
+  const activePointersRef = useRef<Map<number, { pointerId: number; clientX: number; clientY: number }>>(new Map());
+  const pinchRef = useRef<{ startDist: number, startZoom: number, startCenter: {x: number, y: number}, startPan: {x: number, y: number} } | null>(null);
+
+  const getPinchData = (map: Map<number, { pointerId: number; clientX: number; clientY: number }>) => {
+    const ptrs = Array.from(map.values());
+    if (ptrs.length < 2) return null;
+    const dx = ptrs[0].clientX - ptrs[1].clientX;
+    const dy = ptrs[0].clientY - ptrs[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const center = {
+      x: (ptrs[0].clientX + ptrs[1].clientX) / 2,
+      y: (ptrs[0].clientY + ptrs[1].clientY) / 2
+    };
+    return { dist, center };
+  };
+
+  const directRetouchTools: ToolType[] = ['skin_smooth', 'skin_blemish', 'face_slim', 'chin_slim', 'body_slim'];
+  const supportsDirectRetouch = directRetouchTools.includes(activeTool);
 
   // Filter list by category
   const filteredFilters = useMemo(() => {
@@ -173,6 +220,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   const applyEffects = () => {
     if (!engineRef.current || !canvasRef.current || !originalImage) return;
     
+    const t0 = performance.now();
     const faceLandmarks = landmarks?.[0];
     engineRef.current.applyPipeline(editState, faceLandmarks);
     
@@ -201,6 +249,12 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           );
         }
       }
+    }
+    
+    const t1 = performance.now();
+    if (typeof window !== 'undefined') {
+      (window as any).__perfMeasurements = (window as any).__perfMeasurements || [];
+      (window as any).__perfMeasurements.push(t1 - t0);
     }
   };
 
@@ -469,7 +523,7 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
           } catch (err: any) {
             if (currentToken === uploadTokenRef.current) {
               console.error("AI Model Error:", err);
-              setErrorMsg("Khởi tạo mô hình AI thất bại. Hãy thử lại.");
+              setErrorMsg("Khởi tạo mô hình AI thất bại. Đảm bảo kết nối mạng hoặc thử lại.");
             }
           } finally {
             if (currentToken === uploadTokenRef.current) {
@@ -484,6 +538,36 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
         }
       };
       img.src = url;
+    }
+  };
+
+  const handleRetryInit = async () => {
+    setErrorMsg(null);
+    setIsDetecting(true);
+    try {
+      await Promise.all([
+        faceLandmarkManager.initialize(),
+        segmenterManager.initialize()
+      ]);
+      if (canvasRef.current) {
+        const [detectedLandmarks, segResult] = await Promise.all([
+          faceLandmarkManager.detectFaces(canvasRef.current),
+          segmenterManager.segment(canvasRef.current)
+        ]);
+        setLandmarks(detectedLandmarks);
+        setSegmentationMask(segResult || null);
+        if (engineRef.current && segResult) {
+          engineRef.current.setSegmentationMask(segResult);
+        }
+        if (detectedLandmarks.length === 0) {
+          setErrorMsg("Không tìm thấy khuôn mặt trong ảnh. Bạn vẫn có thể sử dụng các công cụ chỉnh màu, bộ lọc và ghép poster.");
+        }
+      }
+    } catch (err) {
+      console.error("AI Model Retry Error:", err);
+      setErrorMsg("Khởi tạo mô hình AI thất bại. Đảm bảo kết nối mạng hoặc thử lại.");
+    } finally {
+      setIsDetecting(false);
     }
   };
 
@@ -557,37 +641,253 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
     setHistoryIndex(newHistory.length - 1);
   };
 
-  // Spot Blemish Healing on Canvas Click (B002) - Declarative Graph Operation
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== 'skin_blemish' || !canvasRef.current || !engineRef.current) return;
+  const getCanvasSourcePoint = (clientX: number, clientY: number) => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const u = (e.clientX - rect.left) / rect.width;
-    const v = (e.clientY - rect.top) / rect.height;
-
-    // Coordinate mapping: from current canvas space into uncropped original image normalized space
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const u = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const v = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
     const cropX = editState.crop?.x ?? 0;
     const cropY = editState.crop?.y ?? 0;
     const cropW = editState.crop?.width ?? 1;
     const cropH = editState.crop?.height ?? 1;
+    return {
+      u,
+      v,
+      x: cropX + u * cropW,
+      y: cropY + v * cropH,
+      radiusNorm: (directRadius / rect.height) * cropH
+    };
+  };
 
-    const origX = cropX + u * cropW;
-    const origY = cropY + v * cropH;
-    const radiusNorm = (blemishRadius / canvasRef.current.height) * cropH;
+  const appendDirectBrushPoint = (clientX: number, clientY: number) => {
+    const p = getCanvasSourcePoint(clientX, clientY);
+    if (!p) return;
 
-    const newOp: HealingOperation = {
-      id: 'heal_' + Date.now(),
-      x: origX,
-      y: origY,
-      radiusNorm
+    if (activeTool === 'skin_blemish') {
+      const op: HealingOperation = {
+        id: `heal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        x: p.x,
+        y: p.y,
+        radiusNorm: Math.max(0.002, p.radiusNorm * 0.45)
+      };
+      setEditState(prev => {
+        const next = { ...prev, healings: [...(prev.healings || []), op] };
+        gestureStateRef.current = next;
+        return next;
+      });
+      return;
+    }
+
+    if (activeTool === 'skin_smooth') {
+      const op: LocalBrushOperation = {
+        id: `smooth_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        tool: 'skin_smooth',
+        x: p.x,
+        y: p.y,
+        radiusNorm: Math.max(0.006, p.radiusNorm),
+        intensity: directStrength
+      };
+      setEditState(prev => {
+        const next = { ...prev, localBrushes: [...(prev.localBrushes || []), op] };
+        gestureStateRef.current = next;
+        return next;
+      });
+    }
+  };
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return;
+    canvasRef.current.setPointerCapture(e.pointerId);
+    // Store plain data — do NOT retain the SyntheticEvent which React will recycle.
+    activePointersRef.current.set(e.pointerId, { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY });
+
+    if (activePointersRef.current.size >= 2) {
+      if (gestureRef.current.kind === 'brush' || gestureRef.current.kind === 'heal' || gestureRef.current.kind === 'warp') {
+        if (gestureStateRef.current) {
+           setEditState(history[historyIndex]);
+           gestureStateRef.current = null;
+        }
+      }
+      
+      gestureRef.current.kind = 'pan';
+      gestureRef.current.pointerId = null;
+      
+      const pData = getPinchData(activePointersRef.current);
+      if (pData) {
+        pinchRef.current = {
+          startDist: Math.max(1, pData.dist),
+          startZoom: zoom,
+          startCenter: pData.center,
+          startPan: { ...pan }
+        };
+      }
+      return;
+    }
+
+    const shouldPan = interactionMode === 'pan' || e.button === 1;
+    if (shouldPan) {
+      gestureRef.current = {
+        kind: 'pan',
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: pan.x,
+        startPanY: pan.y,
+        lastClientX: e.clientX,
+        lastClientY: e.clientY
+      };
+      return;
+    }
+
+    if (!supportsDirectRetouch) return;
+    const p = getCanvasSourcePoint(e.clientX, e.clientY);
+    if (!p) return;
+
+    const kind = activeTool === 'skin_smooth' ? 'brush' : activeTool === 'skin_blemish' ? 'heal' : 'warp';
+    gestureRef.current = {
+      kind,
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPanX: pan.x,
+      startPanY: pan.y,
+      startSource: { x: p.x, y: p.y },
+      lastClientX: e.clientX,
+      lastClientY: e.clientY
     };
 
-    const nextState: EditState = {
-      ...editState,
-      healings: [...(editState.healings || []), newOp]
-    };
+    if (kind === 'brush' || kind === 'heal') {
+      appendDirectBrushPoint(e.clientX, e.clientY);
+    }
+  };
 
-    setEditState(nextState);
-    commitHistory(nextState);
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointersRef.current.has(e.pointerId)) {
+      // Update plain data snapshot — do NOT store the SyntheticEvent.
+      activePointersRef.current.set(e.pointerId, { pointerId: e.pointerId, clientX: e.clientX, clientY: e.clientY });
+    }
+
+    if (activePointersRef.current.size >= 2) {
+      const pData = getPinchData(activePointersRef.current);
+      if (pData && pinchRef.current) {
+        const { startDist, startZoom, startCenter, startPan } = pinchRef.current;
+        const newZoom = Math.min(5, Math.max(1, startZoom * (pData.dist / startDist)));
+        setZoom(newZoom);
+        
+        setPan({
+          x: startPan.x + (pData.center.x - startCenter.x),
+          y: startPan.y + (pData.center.y - startCenter.y)
+        });
+      }
+      return;
+    }
+
+    const p = getCanvasSourcePoint(e.clientX, e.clientY);
+    if (p) setPointerPreview({ u: p.u, v: p.v });
+
+    const gesture = gestureRef.current;
+    if (gesture.pointerId !== e.pointerId || !gesture.kind) return;
+
+    if (gesture.kind === 'pan') {
+      setPan({
+        x: gesture.startPanX + (e.clientX - gesture.startClientX),
+        y: gesture.startPanY + (e.clientY - gesture.startClientY)
+      });
+      return;
+    }
+
+    if (gesture.kind === 'brush' || gesture.kind === 'heal') {
+      const minDistance = Math.max(10, directRadius * 0.32);
+      const distance = Math.hypot(e.clientX - gesture.lastClientX, e.clientY - gesture.lastClientY);
+      if (distance >= minDistance) {
+        gesture.lastClientX = e.clientX;
+        gesture.lastClientY = e.clientY;
+        appendDirectBrushPoint(e.clientX, e.clientY);
+      }
+    }
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activePointersRef.current.delete(e.pointerId);
+    if (activePointersRef.current.size < 2) {
+      pinchRef.current = null;
+    }
+    
+    if (activePointersRef.current.size === 1 && gestureRef.current.kind === 'pan') {
+      const ptr = Array.from(activePointersRef.current.values())[0];
+      gestureRef.current.pointerId = ptr.pointerId;
+      gestureRef.current.startClientX = ptr.clientX;
+      gestureRef.current.startClientY = ptr.clientY;
+      gestureRef.current.startPanX = pan.x;
+      gestureRef.current.startPanY = pan.y;
+    }
+
+    const gesture = gestureRef.current;
+    if (gesture.pointerId !== e.pointerId || !gesture.kind) {
+      if (activePointersRef.current.size === 0) {
+        gestureRef.current.kind = null;
+        gestureRef.current.pointerId = null;
+        gestureStateRef.current = null;
+      }
+      return;
+    }
+
+    if (gesture.kind === 'warp' && gesture.startSource) {
+      const end = getCanvasSourcePoint(e.clientX, e.clientY);
+      if (end) {
+        let dx = end.x - gesture.startSource.x;
+        let dy = end.y - gesture.startSource.y;
+        const distance = Math.hypot(dx, dy);
+
+        // Clamp direct drag magnitude (max 0.15 normalized displacement)
+        const maxDist = 0.15;
+        if (distance > maxDist) {
+          dx = (dx / distance) * maxDist;
+          dy = (dy / distance) * maxDist;
+        }
+
+        if (Math.hypot(dx, dy) > 0.0015 && (activeTool === 'face_slim' || activeTool === 'chin_slim' || activeTool === 'body_slim')) {
+          const op: LocalWarpOperation = {
+            id: `warp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            tool: activeTool,
+            x: gesture.startSource.x,
+            y: gesture.startSource.y,
+            dx,
+            dy,
+            radiusNorm: Math.max(0.01, end.radiusNorm),
+            intensity: Math.max(0.15, Math.min(1, directStrength / 100))
+          };
+          const nextState: EditState = {
+            ...editState,
+            localWarps: [...(editState.localWarps || []), op]
+          };
+          setEditState(nextState);
+          gestureStateRef.current = nextState;
+        }
+      }
+    }
+
+    if (gesture.kind !== 'pan') {
+      const stateToCommit = gestureStateRef.current;
+      if (stateToCommit) commitHistory(stateToCommit);
+    }
+
+    gestureRef.current.kind = null;
+    gestureRef.current.pointerId = null;
+    gestureStateRef.current = null;
+  };
+
+  const handleCanvasWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    setZoom(prev => Math.min(5, Math.max(1, prev * factor)));
+  };
+
+  const resetCanvasView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setInteractionMode('retouch');
   };
 
   // Direct Aspect Ratio Crop (B090 / X020) - Declarative Graph Operation
@@ -646,13 +946,37 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
   };
 
   const handleResetTool = (toolId: ToolType) => {
-    setEditState(prev => resetToolValue(prev, toolId));
-    setTimeout(commitHistory, 50);
+    let committed: EditState | null = null;
+    setEditState(prev => {
+      let next = resetToolValue(prev, toolId);
+      if (toolId === 'skin_smooth') {
+        next = { ...next, localBrushes: (next.localBrushes || []).filter(op => op.tool !== 'skin_smooth') };
+      } else if (toolId === 'skin_blemish') {
+        next = { ...next, healings: [] };
+      } else if (toolId === 'face_slim' || toolId === 'chin_slim' || toolId === 'body_slim') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool !== toolId) };
+      }
+      committed = next;
+      return next;
+    });
+    setTimeout(() => committed && commitHistory(committed), 0);
   };
 
   const resetCurrentCategory = () => {
-    setEditState(prev => resetCategoryValues(prev, activeCategory));
-    setTimeout(commitHistory, 50);
+    let committed: EditState | null = null;
+    setEditState(prev => {
+      let next = resetCategoryValues(prev, activeCategory);
+      if (activeCategory === 'skin') {
+        next = { ...next, localBrushes: [], healings: [] };
+      } else if (activeCategory === 'face') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool === 'body_slim') };
+      } else if (activeCategory === 'body') {
+        next = { ...next, localWarps: (next.localWarps || []).filter(op => op.tool !== 'body_slim') };
+      }
+      committed = next;
+      return next;
+    });
+    setTimeout(() => committed && commitHistory(committed), 0);
   };
 
   // If collage maker is open, render collage workspace
@@ -782,17 +1106,170 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 </div>
               )}
               {errorMsg && (
-                <div style={{ position: 'absolute', top: 10, background: 'rgba(220, 38, 38, 0.9)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 30 }}>
+                <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: 'rgba(220, 38, 38, 0.9)', color: 'white', padding: '8px 16px', borderRadius: '8px', zIndex: 30, display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {errorMsg}
+                  {errorMsg.includes('thất bại') && (
+                    <button 
+                      onClick={handleRetryInit} 
+                      style={{ padding: '4px 8px', background: 'white', color: 'red', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      Thử lại
+                    </button>
+                  )}
                 </div>
               )}
-              <canvas 
-                ref={canvasRef} 
-                data-testid="main-canvas"
-                className="main-canvas" 
-                onClick={handleCanvasClick}
-                style={{ cursor: activeTool === 'skin_blemish' ? 'crosshair' : 'default' }}
-              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 12,
+                  zIndex: 25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.92)',
+                  boxShadow: '0 4px 16px rgba(15,23,42,0.12)',
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Thu nhỏ ảnh"
+                  onClick={() => setZoom(v => Math.max(1, v / 1.2))}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 5 }}
+                ><ZoomOut size={16} /></button>
+                <button
+                  type="button"
+                  aria-label="Đặt lại mức thu phóng"
+                  onClick={resetCanvasView}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', minWidth: 52, fontSize: 12, fontWeight: 700 }}
+                >{Math.round(zoom * 100)}%</button>
+                <button
+                  type="button"
+                  aria-label="Phóng to ảnh"
+                  onClick={() => setZoom(v => Math.min(5, v * 1.2))}
+                  style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 5 }}
+                ><ZoomIn size={16} /></button>
+                {supportsDirectRetouch && (
+                  <button
+                    type="button"
+                    data-testid="btn-direct-interaction-mode"
+                    aria-label={interactionMode === 'retouch' ? 'Chuyển sang di chuyển ảnh' : 'Chuyển sang chỉnh trực tiếp'}
+                    onClick={() => setInteractionMode(m => m === 'retouch' ? 'pan' : 'retouch')}
+                    style={{
+                      border: '1px solid rgba(148,163,184,0.35)',
+                      background: interactionMode === 'retouch' ? 'rgba(228,164,189,0.22)' : 'white',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      padding: '5px 8px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      fontSize: 11,
+                      fontWeight: 700
+                    }}
+                  >
+                    {interactionMode === 'retouch' ? <MousePointer2 size={14} /> : <Move size={14} />}
+                    {interactionMode === 'retouch' ? 'Chỉnh vùng' : 'Di chuyển'}
+                  </button>
+                )}
+              </div>
+
+              {supportsDirectRetouch && interactionMode === 'retouch' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 12,
+                    right: 12,
+                    zIndex: 25,
+                    width: 190,
+                    padding: '9px 11px',
+                    borderRadius: 12,
+                    background: 'rgba(38,38,38,0.82)',
+                    color: '#fff',
+                    fontSize: 11,
+                    backdropFilter: 'blur(8px)'
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 5 }}>
+                    Vuốt trực tiếp trên vùng cần chỉnh
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span>Vùng</span>
+                    <input
+                      aria-label="Kích thước vùng chỉnh trực tiếp"
+                      type="range"
+                      min="24"
+                      max="120"
+                      value={directRadius}
+                      onChange={e => setDirectRadius(Number(e.target.value))}
+                    />
+                    <span>{directRadius}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 34px', alignItems: 'center', gap: 6 }}>
+                    <span>Cường độ</span>
+                    <input
+                      aria-label="Cường độ chỉnh trực tiếp"
+                      type="range"
+                      min="15"
+                      max="100"
+                      value={directStrength}
+                      onChange={e => setDirectStrength(Number(e.target.value))}
+                    />
+                    <span>{directStrength}</span>
+                  </div>
+                </div>
+              )}
+
+              <div
+                data-testid="canvas-transform-stage"
+                style={{
+                  position: 'relative',
+                  display: 'inline-flex',
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center center',
+                  willChange: 'transform'
+                }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  data-testid="main-canvas"
+                  className="main-canvas"
+                  onPointerDown={handleCanvasPointerDown}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  onPointerCancel={handleCanvasPointerUp}
+                  onPointerLeave={() => setPointerPreview(null)}
+                  onWheel={handleCanvasWheel}
+                  style={{
+                    touchAction: 'none',
+                    cursor: interactionMode === 'pan'
+                      ? 'grab'
+                      : supportsDirectRetouch
+                        ? (activeTool === 'skin_blemish' || activeTool === 'skin_smooth' ? 'crosshair' : 'cell')
+                        : 'default'
+                  }}
+                />
+                {supportsDirectRetouch && interactionMode === 'retouch' && pointerPreview && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      pointerEvents: 'none',
+                      position: 'absolute',
+                      left: `${pointerPreview.u * 100}%`,
+                      top: `${pointerPreview.v * 100}%`,
+                      width: `${(directRadius * 2) / zoom}px`,
+                      height: `${(directRadius * 2) / zoom}px`,
+                      transform: 'translate(-50%, -50%)',
+                      borderRadius: '50%',
+                      border: `${1.5 / zoom}px solid rgba(255,255,255,0.95)`,
+                      boxShadow: `0 0 0 ${1 / zoom}px rgba(228,164,189,0.9), 0 0 ${8 / zoom}px rgba(0,0,0,0.2)`
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -821,6 +1298,19 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                 data-testid={`tool-item-${tool.id}`}
                 className={`tool-btn-compact ${activeTool === tool.id ? 'active' : ''}`}
                 onClick={() => {
+                  if (tool.id === 'teeth_whiten' && landmarks && landmarks.length > 0) {
+                    const face = landmarks[0];
+                    const topLip = face[13];
+                    const bottomLip = face[14];
+                    if (topLip && bottomLip) {
+                      const dist = Math.hypot(topLip.x - bottomLip.x, topLip.y - bottomLip.y);
+                      if (dist < 0.015) {
+                        setErrorMsg('Không tìm thấy môi/răng hở, tính năng tạm ẩn');
+                        setTimeout(() => setErrorMsg(null), 3000);
+                        return;
+                      }
+                    }
+                  }
                   setActiveTool(tool.id);
                   if (activeCategory !== tool.category) {
                     setActiveCategory(tool.category);
@@ -869,6 +1359,9 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                   </button>
                   <button data-testid="tab-face" className={`tab ${activeCategory === 'face' ? 'active' : ''}`} onClick={() => { setActiveCategory('face'); setActiveTool('face_slim'); }}>
                     <UserRound size={16} />Khuôn mặt
+                  </button>
+                  <button data-testid="tab-makeup" className={`tab ${activeCategory === 'makeup' ? 'active' : ''}`} onClick={() => { setActiveCategory('makeup'); setActiveTool('makeup_preset'); }}>
+                    <Sparkles size={16} />Trang điểm
                   </button>
                   <button data-testid="tab-eyes" className={`tab ${activeCategory === 'eyes' ? 'active' : ''}`} onClick={() => { setActiveCategory('eyes'); setActiveTool('eye_enlarge'); }}>
                     <Eye size={16} />Mắt
@@ -975,13 +1468,139 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
                               />
                               <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
                             </div>
+                          </div>
+                        ) : activeTool === 'makeup_preset' ? (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                              {[
+                                { id: 'natural', name: 'Tự nhiên' },
+                                { id: 'korean', name: 'Hàn Quốc' },
+                                { id: 'douyin', name: 'Douyin' },
+                                { id: 'western', name: 'Tây Âu' }
+                              ].map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => {
+                                    setEditState(prev => ({ ...prev, makeup_preset: c.id, makeup_preset_intensity: prev.makeup_preset_intensity || 60 }));
+                                    setTimeout(commitHistory, 50);
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '16px',
+                                    border: (editState.makeup_preset || 'natural') === c.id ? '2px solid var(--color-accent)' : '1px solid #e2e8f0',
+                                    background: (editState.makeup_preset || 'natural') === c.id ? 'rgba(212, 175, 55, 0.1)' : '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  {c.name}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {editState.makeup_preset_intensity ?? 0}
+                              </span>
+                            </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">0</span>
+                              <input 
+                                type="range"
+                                data-testid="tool-slider"
+                                className="premium-slider"
+                                min="0"
+                                max="100"
+                                value={editState.makeup_preset_intensity ?? 0}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory}
+                                onTouchEnd={commitHistory}
+                                onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-                              <button 
-                                data-testid="btn-reset-tool"
-                                onClick={() => handleResetTool(activeTool)}
-                                className="btn-reset-tool"
-                                title="Đặt lại công cụ này"
-                              >
+                              <button data-testid="btn-reset-tool" onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
+                                <RotateCcw size={12} /> Đặt lại
+                              </button>
+                            </div>
+                          </div>
+                        ) : activeTool === 'makeup_lipstick' || activeTool === 'makeup_blush' || activeTool === 'makeup_eyeshadow' ? (
+                          <div>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                              {(
+                                activeTool === 'makeup_lipstick' ? [
+                                  { id: '#ff0000', name: 'Đỏ thuần' },
+                                  { id: '#ff4d4d', name: 'Đỏ tươi' },
+                                  { id: '#b30000', name: 'Đỏ rượu' },
+                                  { id: '#cc3300', name: 'Đỏ đất' },
+                                  { id: '#993333', name: 'Nâu đỏ' },
+                                  { id: '#ff9966', name: 'Cam san hô' },
+                                  { id: '#ff6600', name: 'Cam cháy' },
+                                  { id: '#ff80df', name: 'Hồng phấn' },
+                                  { id: '#ff3399', name: 'Hồng cánh sen' },
+                                  { id: '#cc6699', name: 'Hồng đất' }
+                                ] : activeTool === 'makeup_blush' ? [
+                                  { id: '#ffb3b3', name: 'Hồng đào' },
+                                  { id: '#ff80df', name: 'Hồng phấn' },
+                                  { id: '#ff66b3', name: 'Hồng sen' },
+                                  { id: '#ff9966', name: 'Cam san hô' },
+                                  { id: '#ff8c66', name: 'Cam đất' },
+                                  { id: '#e67300', name: 'Cam gạch' },
+                                  { id: '#cc6699', name: 'Mận chín' },
+                                  { id: '#d98cb3', name: 'Tím nhạt' }
+                                ] : [
+                                  { id: '#ffe6cc', name: 'Trắng ngà' },
+                                  { id: '#ffcc99', name: 'Be nhạt' },
+                                  { id: '#d9b38c', name: 'Nâu nhạt' },
+                                  { id: '#bf8040', name: 'Nâu đồng' },
+                                  { id: '#8b4513', name: 'Nâu đậm' },
+                                  { id: '#ffb3b3', name: 'Hồng phấn' },
+                                  { id: '#ff9966', name: 'Cam đào' },
+                                  { id: '#cc3300', name: 'Đỏ gạch' },
+                                  { id: '#4d4d4d', name: 'Xám khói' },
+                                  { id: '#000000', name: 'Đen tuyền' }
+                                ]
+                              ).map(c => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => {
+                                    setEditState(prev => ({ 
+                                      ...prev, 
+                                      [`${activeTool}_color`]: c.id, 
+                                      [activeTool]: (prev as any)[activeTool] || 50 
+                                    }));
+                                    setTimeout(commitHistory, 50);
+                                  }}
+                                  title={c.name}
+                                  style={{
+                                    width: '26px', height: '26px', borderRadius: '50%',
+                                    backgroundColor: c.id,
+                                    border: (editState as any)[`${activeTool}_color`] === c.id ? '2px solid var(--color-accent)' : '2px solid #ffffff',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)', cursor: 'pointer'
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Cường độ</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)' }}>
+                                {(editState as any)[activeTool] ?? 0}
+                              </span>
+                            </div>
+                            <div className="active-tool-slider-row">
+                              <span className="slider-bound-label">0</span>
+                              <input 
+                                type="range" data-testid="tool-slider" className="premium-slider" min="0" max="100"
+                                value={(editState as any)[activeTool] ?? 0}
+                                onChange={handleSliderChange}
+                                onMouseUp={commitHistory} onTouchEnd={commitHistory} onKeyUp={commitHistory}
+                              />
+                              <span className="slider-bound-label" style={{ textAlign: 'right' }}>100</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                              <button data-testid="btn-reset-tool" onClick={() => handleResetTool(activeTool)} className="btn-reset-tool">
                                 <RotateCcw size={12} /> Đặt lại
                               </button>
                             </div>
@@ -1101,6 +1720,31 @@ export const Editor: React.FC<Props> = ({ onExit }) => {
 
                         <div className="tool-subgroup-title">Trang điểm mắt</div>
                         {PUBLIC_TOOLS.filter(t => t.category === 'eyes' && t.subgroup === 'Trang điểm mắt').map(renderToolButton)}
+                      </div>
+                    )}
+
+                    {/* MAKEUP CATEGORY */}
+                    {activeCategory === 'makeup' && (
+                      <div className="tool-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <h4 className="util-label" style={{ margin: 0 }}>Trang điểm</h4>
+                          <button onClick={resetCurrentCategory} style={{ fontSize: '11px', color: 'rgba(38,38,38,0.5)', background: 'none', border: 'none', cursor: 'pointer' }}>Đặt lại tất cả</button>
+                        </div>
+
+                        <div className="tool-subgroup-title">Tổng thể</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Tổng thể').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Mặt</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Mặt').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Môi</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Môi').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Má & khối</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Má & khối').map(renderToolButton)}
+
+                        <div className="tool-subgroup-title">Mắt</div>
+                        {PUBLIC_TOOLS.filter(t => t.category === 'makeup' && t.subgroup === 'Mắt').map(renderToolButton)}
                       </div>
                     )}
 

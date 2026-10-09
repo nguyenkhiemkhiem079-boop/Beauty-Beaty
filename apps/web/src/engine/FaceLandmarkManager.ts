@@ -14,7 +14,7 @@ export class FaceLandmarkManager {
       let filesetResolver;
     try {
       filesetResolver = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
+        "/wasm"
       );
       
       this.landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {

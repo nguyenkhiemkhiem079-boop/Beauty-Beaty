@@ -597,6 +597,183 @@ export const PUBLIC_TOOLS: PublicToolDef[] = [
     default: 0,
     availability: 'available',
     searchTerms: ['sac thai', 'tint', 'hong', 'xanh']
+  },
+  // --- MAKEUP ---
+  {
+    id: 'makeup_preset',
+    name: 'Phong cách',
+    desc: 'Áp dụng bộ trang điểm có sẵn: Tự nhiên, Hàn Quốc, Douyin, Tây âu.',
+    category: 'makeup',
+    subgroup: 'Tổng thể',
+    iconKey: 'sparkles',
+    icon: Sparkles,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['makeup', 'phong cach', 'preset', 'trang diem', 'tu nhien', 'han quoc', 'douyin', 'tay au']
+  },
+  {
+    id: 'makeup_lipstick',
+    name: 'Màu son',
+    desc: 'Thoa son môi với nhiều màu sắc và kiểu dáng (lì, bóng).',
+    category: 'makeup',
+    subgroup: 'Môi',
+    iconKey: 'smile',
+    icon: Smile,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['son', 'moi', 'lip', 'lipstick', 'mau son']
+  },
+  {
+    id: 'makeup_blush',
+    name: 'Má hồng',
+    desc: 'Thêm phấn má hồng tươi tắn cho khuôn mặt.',
+    category: 'makeup',
+    subgroup: 'Má & khối',
+    iconKey: 'palette',
+    icon: Palette,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['ma hong', 'blush', 'phan ma']
+  },
+  {
+    id: 'makeup_foundation',
+    name: 'Kem nền',
+    desc: 'Lớp nền mỏng mịn nâng tone da toàn mặt.',
+    category: 'makeup',
+    subgroup: 'Mặt',
+    iconKey: 'sparkles',
+    icon: Sparkles,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['kem nen', 'nền', 'foundation', 'phan nen']
+  },
+  {
+    id: 'makeup_highlighter',
+    name: 'Phấn bắt sáng',
+    desc: 'Bắt sáng sống mũi, gò má, mang lại độ rạng rỡ.',
+    category: 'makeup',
+    subgroup: 'Má & khối',
+    iconKey: 'sparkles',
+    icon: Sparkles,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['bat sang', 'highlighter', 'phan bat sang']
+  },
+  {
+    id: 'makeup_contour',
+    name: 'Tạo khối',
+    desc: 'Tạo khối và bắt sáng giúp khuôn mặt sắc nét, thon gọn.',
+    category: 'makeup',
+    subgroup: 'Má & khối',
+    iconKey: 'sliders',
+    icon: Sliders,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['khoi', 'tao khoi', 'contour', 'highlight', 'bat sang']
+  },
+  {
+    id: 'makeup_eyeshadow',
+    name: 'Phấn mắt',
+    desc: 'Đánh phấn mắt với nhiều tone màu tự nhiên.',
+    category: 'makeup',
+    subgroup: 'Mắt',
+    iconKey: 'eye',
+    icon: Eye,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['mat', 'phan mat', 'eyeshadow']
+  },
+  {
+    id: 'makeup_eyeliner',
+    name: 'Kẻ mắt',
+    desc: 'Kẻ đường viền mắt sắc sảo, tự nhiên.',
+    category: 'makeup',
+    subgroup: 'Mắt',
+    iconKey: 'eye',
+    icon: Eye,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['mat', 'ke mat', 'eyeliner', 'vien mat']
+  },
+  {
+    id: 'false_lashes',
+    name: 'Lông mi',
+    desc: 'Gắn mi giả cong vút tự nhiên.',
+    category: 'makeup',
+    subgroup: 'Mắt',
+    iconKey: 'eye',
+    icon: Eye,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['mi', 'long mi', 'mi gia', 'false lashes', 'lashes']
+  },
+  {
+    id: 'lip_finish',
+    name: 'Chất son',
+    desc: 'Độ bóng của son (0: lì/matte, 100: bóng/gloss).',
+    category: 'makeup',
+    subgroup: 'Môi',
+    iconKey: 'smile',
+    icon: Smile,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['chat son', 'son bong', 'son li', 'matte', 'gloss']
+  },
+  {
+    id: 'lip_liner',
+    name: 'Viền môi',
+    desc: 'Độ rộng vùng son (0: lòng môi, 100: full viền môi).',
+    category: 'makeup',
+    subgroup: 'Môi',
+    iconKey: 'smile',
+    icon: Smile,
+    controlType: 'slider',
+    min: 0,
+    max: 100,
+    step: 1,
+    default: 0,
+    availability: 'available',
+    searchTerms: ['vien moi', 'long moi', 'ombre', 'full']
   }
 ];
 
@@ -643,6 +820,17 @@ export function getToolValue(state: EditState, toolId: ToolType): number {
     case 'saturation': return state.saturation;
     case 'temperature': return state.temperature;
     case 'tint': return state.tint;
+    case 'makeup_preset': return state.makeup_preset_intensity ?? 0;
+    case 'makeup_lipstick': return state.makeup_lipstick ?? 0;
+    case 'lip_finish': return state.lip_finish_intensity ?? 0;
+    case 'lip_liner': return state.lip_liner ?? 0;
+    case 'makeup_blush': return state.makeup_blush ?? 0;
+    case 'makeup_foundation': return state.makeup_foundation ?? 0;
+    case 'makeup_highlighter': return state.makeup_highlighter ?? 0;
+    case 'false_lashes': return state.false_lashes ?? 0;
+    case 'makeup_contour': return state.makeup_contour ?? 0;
+    case 'makeup_eyeshadow': return state.makeup_eyeshadow ?? 0;
+    case 'makeup_eyeliner': return state.makeup_eyeliner ?? 0;
     default: return 0;
   }
 }
@@ -686,6 +874,17 @@ export function setToolValue(state: EditState, toolId: ToolType, value: number):
     case 'saturation': return { ...state, saturation: value };
     case 'temperature': return { ...state, temperature: value };
     case 'tint': return { ...state, tint: value };
+    case 'makeup_preset': return { ...state, makeup_preset_intensity: value };
+    case 'makeup_lipstick': return { ...state, makeup_lipstick: value };
+    case 'lip_finish': return { ...state, lip_finish_intensity: value };
+    case 'lip_liner': return { ...state, lip_liner: value };
+    case 'makeup_blush': return { ...state, makeup_blush: value };
+    case 'makeup_foundation': return { ...state, makeup_foundation: value };
+    case 'makeup_highlighter': return { ...state, makeup_highlighter: value };
+    case 'false_lashes': return { ...state, false_lashes: value };
+    case 'makeup_contour': return { ...state, makeup_contour: value };
+    case 'makeup_eyeshadow': return { ...state, makeup_eyeshadow: value };
+    case 'makeup_eyeliner': return { ...state, makeup_eyeliner: value };
     default: return state;
   }
 }
@@ -696,6 +895,18 @@ export function setToolValue(state: EditState, toolId: ToolType, value: number):
 export function resetToolValue(state: EditState, toolId: ToolType): EditState {
   if (toolId === 'eye_color') {
     return { ...state, eye_color: '#3d6b8c', eye_color_intensity: 0 };
+  }
+  if (toolId === 'makeup_preset') {
+    return { ...state, makeup_preset: undefined, makeup_preset_intensity: 0 };
+  }
+  if (toolId === 'makeup_lipstick') {
+    return { ...state, makeup_lipstick: 0, makeup_lipstick_color: undefined };
+  }
+  if (toolId === 'makeup_blush') {
+    return { ...state, makeup_blush: 0, makeup_blush_color: undefined };
+  }
+  if (toolId === 'makeup_eyeshadow') {
+    return { ...state, makeup_eyeshadow: 0, makeup_eyeshadow_color: undefined };
   }
   if (toolId === 'skin_blemish') {
     return { ...state, healings: [] };
@@ -757,6 +968,23 @@ export function resetCategoryValues(state: EditState, category: ToolCategory): E
   } else if (category === 'templates') {
     next.template_id = undefined;
     next.template_custom_text = undefined;
+  } else if (category === 'makeup') {
+    next.makeup_preset = undefined;
+    next.makeup_preset_intensity = 0;
+    next.makeup_lipstick = 0;
+    next.makeup_lipstick_color = undefined;
+    next.lip_finish = undefined;
+    next.lip_finish_intensity = 0;
+    next.lip_liner = 0;
+    next.makeup_blush = 0;
+    next.makeup_blush_color = undefined;
+    next.makeup_foundation = 0;
+    next.makeup_highlighter = 0;
+    next.false_lashes = 0;
+    next.makeup_contour = 0;
+    next.makeup_eyeshadow = 0;
+    next.makeup_eyeshadow_color = undefined;
+    next.makeup_eyeliner = 0;
   }
   return next;
 }

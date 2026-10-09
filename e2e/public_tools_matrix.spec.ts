@@ -16,6 +16,14 @@ interface ToolVerificationResult {
   deltaMAE: number;
 }
 
+interface SliderTool {
+  category: string;
+  tool: string;
+  code: string;
+  testVal: number;
+  prerequisite?: { [key: string]: number };
+}
+
 test.describe("Public Tools Full Chain Verification Matrix", () => {
 
   test('Verify full UI -> slider -> undo/redo -> reset chain for all public slider tools', async ({ page }) => {
@@ -74,7 +82,19 @@ test.describe("Public Tools Full Chain Verification Matrix", () => {
       { category: 'adjust', tool: 'contrast', code: 'X022', testVal: 25 },
       { category: 'adjust', tool: 'saturation', code: 'X022', testVal: 30 },
       { category: 'adjust', tool: 'temperature', code: 'X022', testVal: 35 },
-      { category: 'adjust', tool: 'tint', code: 'X022', testVal: 25 }
+      { category: 'adjust', tool: 'tint', code: 'X022', testVal: 25 },
+      // Makeup
+      { category: 'makeup', tool: 'makeup_preset', code: 'B061', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_lipstick', code: 'B051', testVal: 50 },
+      { category: 'makeup', tool: 'lip_finish', code: 'B052', testVal: 100, prerequisite: { makeup_lipstick: 50 } },
+      { category: 'makeup', tool: 'lip_liner', code: 'B053', testVal: 50, prerequisite: { makeup_lipstick: 50 } },
+      { category: 'makeup', tool: 'makeup_blush', code: 'B054', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_foundation', code: 'B055', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_highlighter', code: 'B059', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_contour', code: 'B060', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_eyeshadow', code: 'B056', testVal: 50 },
+      { category: 'makeup', tool: 'makeup_eyeliner', code: 'B057', testVal: 50 },
+      { category: 'makeup', tool: 'false_lashes', code: 'B058', testVal: 50 }
     ];
 
     const results: ToolVerificationResult[] = [];
@@ -120,6 +140,28 @@ test.describe("Public Tools Full Chain Verification Matrix", () => {
       const tab = page.locator(`[data-testid="tab-${item.category}"]`);
       await tab.click();
       await page.waitForTimeout(100);
+
+      // Handle prerequisite if any
+      if (item.prerequisite) {
+        for (const [preqTool, preqVal] of Object.entries(item.prerequisite)) {
+          // Find the category of the prerequisite tool
+          const preqItem = PUBLIC_SLIDER_TOOLS.find(t => t.tool === preqTool);
+          if (preqItem) {
+            await page.locator(`[data-testid="tab-${preqItem.category}"]`).click();
+            await page.waitForTimeout(100);
+            await page.locator(`[data-testid="tool-item-${preqTool}"]`).click();
+            await page.waitForTimeout(100);
+            const slider = page.locator('[data-testid="tool-slider"]');
+            await slider.fill(String(preqVal));
+            await slider.dispatchEvent('change');
+            await slider.dispatchEvent('mouseup');
+            await page.waitForTimeout(200);
+          }
+        }
+        // Go back to the tool's tab
+        await tab.click();
+        await page.waitForTimeout(100);
+      }
 
       // Select Tool
       const toolBtn = page.locator(`[data-testid="tool-item-${item.tool}"]`);
@@ -177,6 +219,24 @@ test.describe("Public Tools Full Chain Verification Matrix", () => {
       const resetUrl = await getCanvasDataUrl();
       const resetDiff = await getCanvasMAE(baselineUrl, resetUrl);
       const resetWorks = resetDiff === 0;
+
+      // Unset prerequisite if any
+      if (item.prerequisite) {
+        for (const [preqTool, _] of Object.entries(item.prerequisite)) {
+          const preqItem = PUBLIC_SLIDER_TOOLS.find(t => t.tool === preqTool);
+          if (preqItem) {
+            await page.locator(`[data-testid="tab-${preqItem.category}"]`).click();
+            await page.waitForTimeout(100);
+            await page.locator(`[data-testid="tool-item-${preqTool}"]`).click();
+            await page.waitForTimeout(100);
+            const pBtnReset = page.locator('[data-testid="btn-reset-tool"]');
+            if (await pBtnReset.isVisible()) {
+              await pBtnReset.click();
+              await page.waitForTimeout(200);
+            }
+          }
+        }
+      }
 
       console.log(`  ${item.tool}: Delta MAE=${deltaMAE.toFixed(4)} | Undo=${undoWorks} | Redo=${redoWorks} | Reset=${resetWorks}`);
 

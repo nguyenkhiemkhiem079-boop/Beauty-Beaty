@@ -1,4 +1,4 @@
-export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'body' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai';
+export type ToolCategory = 'skin' | 'face' | 'eyes' | 'mouth' | 'hair' | 'body' | 'adjust' | 'filters' | 'templates' | 'crop' | 'collage' | 'ai' | 'makeup';
 
 export type ToolType = 
   | 'skin_smooth' 
@@ -37,6 +37,17 @@ export type ToolType =
   | 'temperature'
   | 'tint'
   | 'crop'
+  | 'makeup_preset'
+  | 'makeup_lipstick'
+  | 'lip_finish'
+  | 'lip_liner'
+  | 'makeup_blush'
+  | 'makeup_foundation'
+  | 'makeup_eyeshadow'
+  | 'makeup_eyeliner'
+  | 'false_lashes'
+  | 'makeup_highlighter'
+  | 'makeup_contour'
   | 'ai_makeup';
 
 export interface TemplateCustomText {
@@ -49,9 +60,31 @@ export interface TemplateCustomText {
 
 export interface HealingOperation {
   id?: string;
-  x: number;          // normalized x (0..1) relative to canvas
-  y: number;          // normalized y (0..1) relative to canvas
-  radiusNorm: number; // normalized radius relative to canvas height
+  x: number;          // normalized x (0..1) relative to source image
+  y: number;          // normalized y (0..1) relative to source image
+  radiusNorm: number; // normalized radius relative to source image height
+}
+
+export type DirectRetouchTool = 'skin_smooth' | 'face_slim' | 'chin_slim' | 'body_slim';
+
+export interface LocalBrushOperation {
+  id?: string;
+  tool: 'skin_smooth';
+  x: number;          // normalized source-image coordinate
+  y: number;
+  radiusNorm: number;
+  intensity: number;  // 0..100
+}
+
+export interface LocalWarpOperation {
+  id?: string;
+  tool: 'face_slim' | 'chin_slim' | 'body_slim';
+  x: number;          // normalized source-image start point
+  y: number;
+  dx: number;         // normalized drag vector in source-image space
+  dy: number;
+  radiusNorm: number;
+  intensity: number;  // 0..1 scalar applied to the drag vector
 }
 
 export interface CropOperation {
@@ -114,6 +147,8 @@ export interface EditState {
   template_placement?: 'top' | 'center' | 'bottom';
   crop?: CropOperation;
   healings?: HealingOperation[];
+  localBrushes?: LocalBrushOperation[];
+  localWarps?: LocalWarpOperation[];
   ai_makeup?: number;
   // Local-capable algorithmic feature parameters
   skin_blemish_reduction?: number; // B003
@@ -143,6 +178,16 @@ export interface EditState {
   false_lashes?: number;           // B058
   makeup_preset?: string;          // B061
   makeup_preset_intensity?: number;// B061
+  makeup_lipstick?: number;
+  makeup_lipstick_color?: string;
+  makeup_blush?: number;
+  makeup_blush_color?: string;
+  makeup_foundation?: number;      // B055
+  makeup_contour?: number;
+  makeup_eyeshadow?: number;
+  makeup_eyeshadow_color?: string;
+  makeup_eyeliner?: number;
+  makeup_highlighter?: number;     // B059
   hair_flyaway?: number;           // B065
   hair_highlight?: string;         // B067
   hair_highlight_intensity?: number;// B067
@@ -212,6 +257,8 @@ export const DEFAULT_EDIT_STATE: EditState = {
     height: 1
   },
   healings: [],
+  localBrushes: [],
+  localWarps: [],
   skin_blemish_reduction: 0,
   wrinkle_reduction: 0,
   skin_evening: 0,
