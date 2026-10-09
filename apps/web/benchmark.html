@@ -1,67 +1,155 @@
-<!DOCTYPE html>
-<html>
-<head><title>Bench</title></head>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>D'Beaty — Direct Retouch Benchmark (development only)</title>
+</head>
 <body>
-  <canvas id="c"></canvas>
+  <h1>Direct Retouch Performance Benchmark</h1>
+  <p>Use a licensed real-portrait fixture. CPU throttling is set by the external Playwright runner.</p>
+  <input id="fixture" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Real portrait fixture">
+  <button id="start" type="button" disabled>Run benchmark</button>
+  <pre id="output" role="status">Choose a real portrait to begin.</pre>
+
   <script type="module">
     import { ImageEngine } from './src/engine/ImageEngine.ts';
-    
-    async function run() {
-      const wait = (ms) => new Promise(r => setTimeout(r, ms));
-      
-      const doBench = async (size, strokesCount) => {
-        const c = document.getElementById('c');
-        c.width = size.w;
-        c.height = size.h;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#ffccaa';
-        ctx.fillRect(0,0,size.w,size.h);
-        
-        const engine = new ImageEngine(c);
-        
-        const strokes = [];
-        for (let i=0; i<strokesCount; i++) {
-          strokes.push({
-            id: 's'+i, tool: 'skin_smooth',
-            x: Math.random()*size.w, y: Math.random()*size.h,
-            radiusNorm: 0.1, intensity: 50
-          });
-        }
-        
-        // Warmup
-        engine.applyPipeline({ localBrushes: strokes });
-        await wait(100);
-        
-        const times = [];
-        for (let i=0; i<15; i++) {
-          const t0 = performance.now();
-          engine.applyPipeline({ localBrushes: strokes });
-          const t1 = performance.now();
-          times.push(t1-t0);
-          await wait(16);
-        }
-        
-        times.sort((a,b)=>a-b);
-        const avg = times.reduce((a,b)=>a+b, 0) / times.length;
-        const p95 = times[Math.floor(times.length * 0.95)];
-        
-        console.log(`BENCH: ${size.w}x${size.h} - ${strokesCount} strokes -> Avg: ${avg.toFixed(2)}ms, P95: ${p95.toFixed(2)}ms`);
-        engine.dispose();
-      };
 
-      await doBench({w: 800, h: 600}, 1);
-      await doBench({w: 800, h: 600}, 10);
-      await doBench({w: 800, h: 600}, 25);
-      await doBench({w: 800, h: 600}, 50);
-      
-      await doBench({w: 4000, h: 3000}, 10);
-      await doBench({w: 4000, h: 3000}, 25);
-      await doBench({w: 4000, h: 3000}, 50);
-      
-      console.log('DONE');
+    const fileInput = document.getElementById('fixture');
+    const start = document.getElementById('start');
+    const output = document.getElementById('output');
+    const cases = [
+      { width: 800, height: 600, strokes: 1 },
+      { width: 800, height: 600, strokes: 10 },
+      { width: 800, height: 600, strokes: 25 },
+      { width: 800, height: 600, strokes: 50 },
+      { width: 4000, height: 3000, strokes: 10 },
+      { width: 4000, height: 3000, strokes: 25 },
+      { width: 4000, height: 3000, strokes: 50 }
+    ];
+
+    fileInput.addEventListener('change', () => {
+      start.disabled = !fileInput.files?.length;
+    });
+
+    // Normalized, deterministic positions. Keep the centers separated so every
+    // stroke can be independently validated against its own source-image ROI.
+    function createStrokes(count) {
+      return Array.from({ length: count }, (_, i) => ({
+        id: 'benchmark-' + i,
+        tool: 'skin_smooth',
+        x: 0.37 + (i % 10) * 0.028,
+        y: 0.40 + Math.floor(i / 10) * 0.055,
+        radiusNorm: 0.011,
+        intensity: 50
+      }));
     }
-    
-    run();
+
+    function sampleDelta(original, rendered, stroke) {
+      const x = Math.round(stroke.x * original.width);
+      const y = Math.round(stroke.y * original.height);
+      const radius = Math.max(2, Math.round(stroke.radiusNorm * original.height * 0.45));
+      const left = Math.max(0, x - radius);
+      const top = Math.max(0, y - radius);
+      const width = Math.min(original.width - left, radius * 2 + 1);
+      const height = Math.min(original.height - top, radius * 2 + 1);
+      const before = original.getContext('2d', { willReadFrequently: true }).getImageData(left, top, width, height).data;
+      const after = rendered.getContext('2d', { willReadFrequently: true }).getImageData(left, top, width, height).data;
+      let delta = 0;
+      for (let i = 0; i < before.length; i += 4) {
+        delta += Math.abs(before[i] - after[i]);
+        delta += Math.abs(before[i + 1] - after[i + 1]);
+        delta += Math.abs(before[i + 2] - after[i + 2]);
+      }
+      return delta / (before.length * 0.75);
+    }
+
+    function prepareSource(bitmap, width, height) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      // Center-crop rather than distort the original portrait's aspect ratio.
+      const sourceScale = Math.max(width / bitmap.width, height / bitmap.height);
+      const sw = width / sourceScale;
+      const sh = height / sourceScale;
+      ctx.drawImage(bitmap, (bitmap.width - sw) / 2, (bitmap.height - sh) / 2, sw, sh, 0, 0, width, height);
+      return canvas;
+    }
+
+    async function benchmarkCase(bitmap, spec) {
+      const source = prepareSource(bitmap, spec.width, spec.height);
+      const engine = new ImageEngine(source);
+      const strokes = createStrokes(spec.strokes);
+
+      try {
+        // This times only the ImageEngine pipeline: NOT segmentation,
+        // MediaPipe, PNG encoding, download, or full user interaction.
+        engine.applyPipeline({ localBrushes: strokes });
+        const deltas = strokes.map(stroke => sampleDelta(source, engine.getCanvas(), stroke));
+        const changedStrokeCount = deltas.filter(value => value > 0).length;
+        if (changedStrokeCount !== spec.strokes) {
+          throw new Error('Invalid benchmark: only ' + changedStrokeCount + '/' + spec.strokes + ' target ROIs changed.');
+        }
+
+        const repetitions = 15;
+        const samplesMs = [];
+        for (let i = 0; i < repetitions; i++) {
+          const startTime = performance.now();
+          engine.applyPipeline({ localBrushes: strokes });
+          // Synchronize the 2D canvas read to include pending rendering work.
+          engine.getCanvas().getContext('2d', { willReadFrequently: true }).getImageData(0, 0, 1, 1);
+          samplesMs.push(performance.now() - startTime);
+        }
+        const sorted = [...samplesMs].sort((a, b) => a - b);
+        const averageMs = samplesMs.reduce((a, b) => a + b, 0) / samplesMs.length;
+        const p95Ms = sorted[Math.ceil(sorted.length * 0.95) - 1];
+        return {
+          ...spec,
+          changedStrokeCount,
+          allStrokesEffective: true,
+          averageMs,
+          p95Ms,
+          samplesMs,
+          measurement: 'ImageEngine.applyPipeline; excludes PNG encoding and MediaPipe'
+        };
+      } finally {
+        engine.dispose();
+      }
+    }
+
+    start.addEventListener('click', async () => {
+      if (!fileInput.files?.[0]) return;
+      start.disabled = true;
+      window.__benchmarkComplete = false;
+      window.__benchmarkResult = null;
+      output.textContent = 'Running seven cases against a real portrait...';
+      let bitmap;
+      try {
+        bitmap = await createImageBitmap(fileInput.files[0]);
+        const results = [];
+        for (const spec of cases) {
+          const result = await benchmarkCase(bitmap, spec);
+          results.push(result);
+          output.textContent = 'Completed ' + results.length + '/' + cases.length + ' validated cases.';
+        }
+        window.__benchmarkResult = {
+          success: true,
+          fixtureName: fileInput.files[0].name,
+          sampleCountPerCase: 15,
+          note: 'Post-change batched-engine measurements only. No before/after comparison is implied.',
+          results
+        };
+        output.textContent = JSON.stringify(window.__benchmarkResult, null, 2);
+      } catch (error) {
+        window.__benchmarkResult = { success: false, error: String(error) };
+        output.textContent = 'BENCHMARK FAILED: ' + String(error);
+      } finally {
+        bitmap?.close();
+        window.__benchmarkComplete = true;
+        start.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
