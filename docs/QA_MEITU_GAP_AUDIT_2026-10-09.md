@@ -132,3 +132,17 @@ Accessibility: tab/arrow/escape, contrast, aria-live, focus-visible; inspect acc
 For every tested capability: canonical ID, Meitu edition/link, D'Beaty UI path, sample ID, expected result, actual outcome, 0/30/60/100 images, target/protected ROI statistics, Playwright/real device verdict, severity P0/P1/P2/P3, reproduction steps, root cause, fix commit, retest SHA, reviewer signoff. Verdicts are exactly `PASS_VISUAL`, `PASS_TECHNICAL_ONLY`, `FAIL`, `BLOCKED_EXTERNAL`, `OUT_OF_SCOPE`, `NOT_TESTED`.
 
 **Release decision today:** `MEITU_PARITY_CERTIFIED = NO`. `READY_FOR_MERGE` is a distinct decision based on regression/CI and scope, not competitive feature-completeness.
+
+## Production public URL smoke (2026-10-09; NON-DESTRUCTIVE)
+
+Independent live browser visit: https://beauty-beaty.pages.dev/
+- PASS: landing renders, navigation, `Mở Editor` CTA, editor empty state and file upload affordance.
+- PASS: collage opens with six layout choices, per-cell upload controls, spacing/radius, background colors and `Xuất Ghép Ảnh HD` button.
+- OBSERVED: homepage still displays the original monochrome/Unsplash hero photograph (not the recently user-requested replacement portrait).
+- NOT VERIFIED: photo editing effects, tool performance, image export functionality, or true absence/presence of direct-touch controls, **because no image was uploaded**. Direct-touch UI may be conditional on an active image and selected tool.
+- IMPORTANT: production follows main; branch `feat/direct-touch-retouch` is an unmerged Draft PR. Do not treat branch-only fixes as production features.
+
+## Additional QA documentation risks
+
+- `docs/MODEL_LICENSES.md` references library versions which do not match current `apps/web/package.json`: audit source provenance, license URLs and model licensing before claiming complete legal compliance. Keep each third-party image fixture's author/source URL when available, not only a broad platform license label.
+- `docs/TEST_EVIDENCE.md` still contains historical narrative for earlier algorithm versions. Tag evidence by exact commit SHA and update after changes; avoid treating old screenshots as proof of current skin smoothing/warp.
